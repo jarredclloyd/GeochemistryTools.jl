@@ -7,7 +7,8 @@ using DataFrames
 using GLMakie
 using CairoMakie
 
-include("Formula_to_weight.jl")
-export molecularwt
+include("FormulaToWeight.jl")
+include("GCTDictionaries.jl")
+include("DecayEquations.jl")
 
 end
