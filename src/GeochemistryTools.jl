@@ -1,14 +1,10 @@
 module GeochemistryTools
 
-using Statistics
-using StatsBase
-using CSV
-using DataFrames
-using GLMakie
-using CairoMakie
+using Statistics, StatsBase, CSV, DataFrames, CairoMakie, GLMakie
+using Base.Threads: @spawn, @threads
 
 include("FormulaToWeight.jl")
 include("GCTDictionaries.jl")
-include("DecayEquations.jl")
+include("UPb.jl")
 
 end
