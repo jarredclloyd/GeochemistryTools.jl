@@ -1,7 +1,6 @@
-#=
+#= Preamble
 This file contains various decay system equations for calculation of ratios and ages (U-Pb).
 =#
-
 
 export age2ratioPb207U235, age2ratioPb206U238, age2ratioPb207Pb206, ratio2agePb207U235, ratio2agePb206U238,
     ratio2agePb207Pb206, calcaitchisonTW
@@ -30,7 +29,7 @@ function age2ratioPb206U238(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @threads for i in 1:nages
+        @simd for i ∈ 1:nages
             ratio[i] = ratioPb206U238(age[i])
         end
         return ratio
@@ -62,7 +61,7 @@ function age2ratioPb207U235(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @threads for i in 1:nages
+        @simd for i ∈ 1:nages
             ratio[i] = ratioPb207U235(age[i])
         end
         return ratio
@@ -94,7 +93,7 @@ function age2ratioPb207Pb206(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @threads for i in 1:nages
+        @simd for i ∈ 1:nages
             ratio[i] = ratioPb207Pb206(age[i])
         end
         return ratio
@@ -126,7 +125,7 @@ function ratio2agePb206U238(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @threads for i in 1:nratios
+        @simd for i ∈ 1:nratios
             age[i] = agePb206U238(ratio[i])
         end
         return age
@@ -134,6 +133,7 @@ function ratio2agePb206U238(ratio)
         age = agePb206U238(ratio)
     end
 end
+
 
 """
     ratio2agePb207U235(ratio)
@@ -157,7 +157,7 @@ function ratio2agePb207U235(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @threads for i in 1:nratios
+        @simd for i ∈ 1:nratios
             age[i] = agePb207U235(ratio[i])
         end
         return age
@@ -190,7 +190,7 @@ function ratio2agePb207Pb206(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @threads for i in 1:nratios
+        @threads for i ∈ 1:nratios
             age[i] = agePb207Pb206(ratio[i])
         end
         return age
@@ -202,9 +202,9 @@ end
 """
     calcaitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
 
-Computes the Aitchison distance (in Tera-Wasserburg space) for specified parameters.
+Computes the Aitchison distance (∈ Tera-Wasserburg space) for specified parameters.
 
-Used as a measure of concordance in Tera-Wasserburg space. Unlike IsoplotR, does not multiply the value by 100.
+Used as a measure of concordance ∈ Tera-Wasserburg space. Unlike IsoplotR, does not multiply the value by 100.
 
 For the Wetherill space variant see: calcaitchisonW.
 
@@ -218,7 +218,7 @@ function calcaitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
     if isa(rU238Pb206, Array)
         aitchdist = zeros(size(rU238Pb206))
         ncount = length(rU238Pb206)
-        @threads for i in 1:ncount
+        @simd for i ∈ 1:ncount
             aitchdist[i] = aitchisonTW(rU238Pb206[i], rPb207Pb206[i], aPb206U238[i], aPb207Pb206[i])
         end
         return aitchdist
@@ -227,7 +227,7 @@ function calcaitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
     end
 end
 
-#Primitive functions
+#Base functions
 function ratioPb207U235(age)
     exp(λU235 * age) - 1
 end
@@ -267,10 +267,17 @@ function agePb207Pb206(ratio)
     if ratio > 0
         t_guess = (log(ratio) + 3.21121) / 0.000586671
         tolerance = 0.000000000001
-        ε = 1 * 10^-24
+        ε = 1e-24
+        n_iterations = 1
         while abs(ratio - ratioPb207Pb206(t_guess)) > tolerance && abs(ratioprimePb207Pb206(t_guess)) > ε
             t_iteration = t_guess - (ratioPb207Pb206(t_guess) - ratio) / ratioprimePb207Pb206(t_guess)
             t_guess = t_iteration
+            n_iterations = n_iterations + 1
+            if n_iterations > 10000
+                t_guess = Inf
+                println("Convergence not reached within 10000 iterations!")
+                break
+            end
         end
         return t_guess
     else

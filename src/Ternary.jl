@@ -1,7 +1,7 @@
 #=
 Functions for plotting ternary plots
-
 =#
+
 export ternary2cartesian, cartesian2ternary
 
 """

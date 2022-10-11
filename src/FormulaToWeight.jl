@@ -1,3 +1,7 @@
+#= Preamble
+This file contains various decay system equations for calculation of ratios and ages (U-Pb).
+=#
+
 export molecularwt
 
 """
@@ -23,7 +27,7 @@ function molecularwt(formula)
     if isa(formula, Array)
         weight = zeros(size(formula))
         nformulas = length(formula)
-        Threads.@threads for i in 1:nformulas
+        @threads for i in 1:nformulas
             weight[i] = computemass(formula[i])
             printstyled("Molecular weight of input formula {" * string(formula[i]) * "} is:\n" * string(weight[i]) *
                         " gmol⁻¹.\n", bold=true)
@@ -150,6 +154,9 @@ end
 #Find number of moles for ion
 function findnmoles(formula, mole_index)
     formula_length = length(formula)
+    #if findnext('.', formula, mole_index) ≠ nothing
+    #    decimal_index = findnext('.', formula, mole_index)
+
     if mole_index + 2 ≤ formula_length && formula[mole_index+2] ≡ '.' #find decimals >10.00
         if mole_index + 4 ≤ formula_length && isdigit(formula[mole_index+4]) ≡ true
             n_moles = parse(Float64, formula[mole_index:mole_index+4])

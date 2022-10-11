@@ -2,17 +2,42 @@
 This jl file contains dictionaries and other reference information for that are used in "GeochemistryTools.jl"
 =#
 
-#Exports
-export Avogadro, element_symbol_to_mass, λU235, SEλU235, λU238, SEλU238
+export Avogadro, element_symbol_to_mass,
+    #decay constants: 
+    λK40, SEλK40,
+    λRb87, SEλRb87,
+    λSm147, SEλSm147,
+    λLu176, SEλLu176,
+    λRe187, SEλRe187,
+    λRa226, SEλRa226,
+    λTh230, SEλTh230,
+    λTh232, SEλTh232,
+    λPa231, SEλPa231,
+    λU234, SEλU234,
+    λU235, SEλU235,
+    λU238, SEλU238,
+    #Isotope ratios:
+    U238U235, SE238U235
 
-#Constants
+#Constant Declarations: general
 const Avogadro = 6.02214076 * 10^23
-const λU235 = 0.00098485
-const λU238 = 0.000155125
-const SEλU235 = 0.000000670
-const SEλU238 = 0.000000083
-const U238U235 = 137.818
-const SE238U235 = 0.045
+
+#Constant Declarations: decay constants
+const λK40, SEλK40 = 0.00055305, 0.00000132
+const λRb87, SEλRb87 = 0.000013972, 0.000000045
+const λSm147, SEλSm147 = 0.000006524, 0.000000012
+const λLu176, SEλLu176 = 0.00001867, 0.00000008
+const λRe187, SEλRe187 = 0.00001666, 0.000000085
+const λRa226, SEλRa226 = 0.4332, 0.0019
+const λTh230, SEλTh230 = 0.0091705, 0.0000016
+const λTh232, SEλTh232 = 0.0000495, 0.0000025
+const λPa231, SEλPa231 = 0.021158, 0.00071
+const λU234, SEλU234 = 0.00282206, 0.00000080
+const λU235, SEλU235 = 0.00098485, 0.000000670
+const λU238, SEλU238 = 0.000155125, 0.000000083
+
+#Constant Declarations: isotope ratios
+const U238U235, SE238U235 = 137.818, 0.0225
 
 #Element properties (mass, ionic radii, charges, symbol, name)
 element_symbol_to_name = Dict()
@@ -20,6 +45,7 @@ element_symbol_to_name = Dict()
 """
     element_symbol_to_mass(x)
 Return the IUPAC aggregate atomic mass (gmol⁻¹) for a given element.
+
 Single character elements must be entered as a character using ' '.
 Double character elements must be entered as a string " ".
 
