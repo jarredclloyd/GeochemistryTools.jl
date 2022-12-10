@@ -6,7 +6,7 @@ export anmirpls
 
 #Functions
 """
-    anmirpls(ṽ, Ι)
+    ANMIRPLS(ṽ, Ι)
 
 Compute the baseline subtracted raman-shift spectra.
 
@@ -32,4 +32,25 @@ function anmirpls(ṽ, Ι)
     bias = median((Y₀ .- fit) .* ind)
     #7. final baseline subtraction
     corrected = Y₀ .- fit - bias
+end
+
+"""
+    IarPLS(v̄, I)
+
+    Compute the baseline subtracted raman-shift spectra via IarPLS.
+
+ṽ is a vector of the wavenumbers and Ι is a vector of intensities.
+"""
+function IarPLS(I, λ = 1e5, diff = 2, max_iter = 50, ϵ = 1e-6)
+    n = length(I)
+    t = 1
+    Wⁱ = LinearAlgebra.I(n)
+    for t ∈ 1:max_iter
+        Z = (W + λ * D' * D) ^-1 * W * Y
+
+end
+
+function ISRU(x)
+    1 / 2 * (1 - (ℯ^t * (x - 2 * σₓ₋) / σₓ₋))
+    
 end
