@@ -12,7 +12,9 @@ using Base.Threads: @spawn, @threads
 @reexport using Glob
 @reexport using GLMakie
 @reexport using HypothesisTests
+
 using PyCall
+using Conda
 
 include("FormulaToWeight.jl")
 include("GCTDictionaries.jl")
@@ -22,7 +24,12 @@ include("RbSr.jl")
 include("ICP_MS.jl")
 include("RamanSpectroscopy.jl")
 
-pyimport_conda("scipy", "conda")
-pybaselines = PyCall.pyimport_conda("pybaselines", "conda")
+const pybaselines = PyNULL()
+
+pyimport_conda("scipy", "scipy")
+
+function __init__()
+    copy!(pybaselines, pyimport_conda("pybaselines", "pybaselines"))
+end
 
 end
