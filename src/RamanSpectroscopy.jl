@@ -31,7 +31,7 @@ function load_Raman(hostdir, sample::String;
     data = CSV.read(file, DataFrame; header=[:wavenumber, :intensity], skipto=firstrow, types=Float64, footerskip=trailing_rows,
         ignoreemptyrows=true)
     if process == true
-        fit_base(data, :intensity)
+        fit_base(data; intensity_col=:intensity)
     elseif process == false
         return data
     end
