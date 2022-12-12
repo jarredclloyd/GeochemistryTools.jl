@@ -1,7 +1,7 @@
 module GeochemistryTools
 
-using Reexport
 using Base.Threads: @spawn, @threads
+using Reexport
 @reexport using CSV
 @reexport using DataFrames
 @reexport using Distributions
@@ -10,7 +10,6 @@ using Base.Threads: @spawn, @threads
 @reexport using StatsBase
 @reexport using ColorSchemes
 @reexport using Glob
-@reexport using GLMakie
 @reexport using HypothesisTests
 
 using PyCall
@@ -31,5 +30,8 @@ pyimport_conda("scipy", "scipy")
 function __init__()
     copy!(pybaselines, pyimport_conda("pybaselines", "pybaselines"))
 end
+
+println("Hello 😃 \n If you wish to use the 'plot' functions of this package you will need to add a Makie backend 
+(e.g. GLMakie, CairoMakie)")
 
 end
