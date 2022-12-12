@@ -38,7 +38,8 @@ function yorkfit(A::DataFrame, SElevel::Int=2, SEtype::String="abs")
     widthA::Int64 = ncol(A)
     if SEtype == "abs"
         if widthA == 5
-            β₀, β₀SE, β₁, β₁SE, σᵦ₁ᵦ₀, χ², χ²ᵣ, pval = york(A[:, 1], A[:, 2] ./ SElevel, A[:, 3], A[:, 4] ./ SElevel, A[:, 5])
+            β₀, β₀SE, β₁, β₁SE, σᵦ₁ᵦ₀, χ², χ²ᵣ, pval = york(A[:, 1], A[:, 2] ./ SElevel, A[:, 3], A[:, 4] ./ SElevel, 
+            A[:, 5])
         elseif widthA == 4
             β₀, β₀SE, β₁, β₁SE, σᵦ₁ᵦ₀, χ², χ²ᵣ, pval = york(A[:, 1], A[:, 2] ./ SElevel, A[:, 3], A[:, 4] ./ SElevel)
         else
