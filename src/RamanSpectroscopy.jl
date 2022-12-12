@@ -94,7 +94,7 @@ Optional parameters linewidth (1) and colour ("#800080") can be set to change th
 julia> plot_raman_cor(df; normalised = true, linewidth = 0.5, colour = :blue)
 ```
 """
-function plot_raman_cor(data::DataFrame;
+function plot_Raman_cor(data::DataFrame;
     normalised::Bool=true,
     linewidth=1,
     colour="#800080")
@@ -125,7 +125,7 @@ Optional parameters linewidth (1) and colour ("#800080") can be set to change th
 julia> plot_raman_cor!(df; normalised = true, linewidth = 0.5, colour = :blue)
 ```
 """
-function plot_raman_cor!(data::DataFrame;
+function plot_Raman_cor!(data::DataFrame;
     normalised::Bool=true,
     linewidth=1,
     colour="#800080")
