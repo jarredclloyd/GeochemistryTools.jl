@@ -2,7 +2,7 @@
 This file contains various decay system equations for calculation of ratios and ages (U-Pb).
 =#
 
-export load_Raman, fit_base, plot_raman_cor, plot_raman_cor!
+export load_Raman, fit_base, plot_Raman_cor, plot_Raman_cor!
 
 """
     load_Raman(hostdir, sample; [firstrow, trailing_rows, process])

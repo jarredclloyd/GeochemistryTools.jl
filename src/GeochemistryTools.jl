@@ -11,6 +11,7 @@ using Reexport
 @reexport using ColorSchemes
 @reexport using Glob
 @reexport using HypothesisTests
+@reexport using GLMakie
 
 using PyCall
 using Conda
