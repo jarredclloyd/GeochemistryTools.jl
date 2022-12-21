@@ -2,7 +2,7 @@
 This file contains various decay system equations for calculation of ratios and ages (U-Pb).
 =#
 
-export load_Raman, fit_base, plot_Raman_cor, plot_Raman_cor!
+export loadRaman, fit_base, plot_Raman_cor, plot_Raman_cor!
 
 """
     loadRaman(hostdir, sample; [firstrow, trailing_rows, process])
@@ -20,7 +20,7 @@ intensities using the function `fit_base()`.
 
 # Example
 ```julia-repl
-julia> load_Raman('path/to/dir', "G17560"; firstrow = 58, trailing_rows = 0, process = true)
+julia> loadRaman('path/to/dir', "G17560"; firstrow = 58, trailing_rows = 0, process = true)
 ```
 """
 function loadRaman(hostdir, sample::String;

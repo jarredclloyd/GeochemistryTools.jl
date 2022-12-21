@@ -2,10 +2,10 @@
 This file contains tools for (Agilent) ICP-MS data
 =#
 
-export load_downhole, plot_dh_scatter
+export loadDownhole, plot_dh_scatter
 
 """
-    load_downhole(hostdir, sample, CPS_col1, CPS_col2, [firstrow, stable_time])
+    loadDownhole(hostdir, sample, CPS_col1, CPS_col2, [firstrow, stable_time])
 
 Load and prepare data from CSV agilent CSV files to assess downhole fractionation.
 
@@ -27,7 +27,7 @@ want to remove the rows prior to the stable signal time, adjust `firstrow` to eq
 
 # Example
 ```
-julia> load_downhole("path/to/dir", "sample_x", "Rb85", "Sr87"; firstrow = 5, stable_row = 110)
+julia> loadDownhole("path/to/dir", "sample_x", "Rb85", "Sr87"; firstrow = 5, stable_row = 110)
 MxN DataFrame
 
 ```
