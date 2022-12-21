@@ -5,7 +5,7 @@ This file contains various decay system equations for calculation of ratios and 
 export load_Raman, fit_base, plot_Raman_cor, plot_Raman_cor!
 
 """
-    load_Raman(hostdir, sample; [firstrow, trailing_rows, process])
+    loadRaman(hostdir, sample; [firstrow, trailing_rows, process])
 
 Loads Raman spectra data from txt file in hostdir.
 
@@ -23,7 +23,7 @@ intensities using the function `fit_base()`.
 julia> load_Raman('path/to/dir', "G17560"; firstrow = 58, trailing_rows = 0, process = true)
 ```
 """
-function load_Raman(hostdir, sample::String;
+function loadRaman(hostdir, sample::String;
     firstrow::Int=11,
     trailing_rows::Int=0,
     process::Bool=true)

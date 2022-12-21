@@ -32,7 +32,7 @@ MxN DataFrame
 
 ```
 """
-function load_downhole(hostdir, sample::String, CPS_col1::String, CPS_col2::String;
+function loadDownhole(hostdir, sample::String, CPS_col1::String, CPS_col2::String;
     firstrow::Int = 5,
     stable_time::Number = 32)
     files = glob(sample * "*.csv", hostdir)

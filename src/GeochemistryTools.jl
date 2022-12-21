@@ -23,6 +23,7 @@ include("EIVLinearRegression.jl")
 include("RbSr.jl")
 include("ICP_MS.jl")
 include("RamanSpectroscopy.jl")
+include("Profilometer.jl")
 
 const pybaselines = PyNULL()
 
