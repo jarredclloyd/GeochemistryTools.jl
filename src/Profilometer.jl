@@ -1,6 +1,9 @@
 #= 
 Functions for laser profilometry (Olympus OLS5000)
 =#
+
+export loadProfilometer
+
 """
     loadProfilometer(hostdir::String, sample::String; pixelwidth::Int=1024, headerrow::Int=19, datarow::Int=20)
 
