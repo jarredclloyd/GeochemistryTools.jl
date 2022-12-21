@@ -5,18 +5,20 @@ Functions for laser profilometry (Olympus OLS5000)
 export loadProfilometer
 
 """
-    loadProfilometer(hostdir::String, sample::String; pixelwidth::Int=1024, headerrow::Int=19, datarow::Int=20)
+    loadProfilometer(hostdir::string, sample::string; pixelwidth::Int=1024, headerrow::Int=19, datarow::Int=20)
 
     Loads Olympus OLS5000 profilometer CSV data (exported as area)
 """
-function loadProfilometer(hostdir, sample; pixelwidth = 1024, headerrow = 19, datarow = 20)
+function loadProfilometer(hostdir, sample; pixelwidth::Int = 1024, headerrow::Int = 19, datarow::Int = 20)
     file = glob(sample * "*.csv", hostdir)
+    yresolution = CSV.read(file, DataFrame; header = false, skipto = 5, limit = 1, select = [1, 2])
+    yresolution = yresolution[1,2]
     df = CSV.read(file, DataFrame; header = headerrow, skipto = datarow, drop = (index, name) -> index > pixelwidth)
     df = stack(df, 2:pixelwidth)
     df.POS = replace.(df[!, 2], "POS = " => "")
-    df.y = 0 .+ parse.(Int, df.POS) .* 0.25
+    df.y = 0 .+ parse.(Int, df.POS) .* yresolution
     select!(df, :DataLine => :x, :y, :value => :z)
-    df.z = (df[!, :z]) .- maximum(df[!, :z])
+    df.z = (df[!, :z]) .- mode(df[!, :z])
     
     return df
 end
