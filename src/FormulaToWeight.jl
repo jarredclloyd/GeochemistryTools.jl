@@ -55,25 +55,25 @@ end
 function computeionmass(formula, left_index)
     formula_length = length(formula)
     right_index = left_index + 1
-    if right_index < formula_length && formula[right_index] ≡ '(' #to catch ")(' in formulas
+    if right_index < formula_length && formula[right_index] == '(' #to catch ")(' in formulas
         left_index = left_index + 1
         right_index = left_index + 1
     end
-    if formula[left_index] ≡ '('  #to catch parenthesised ions
+    if formula[left_index] == '('  #to catch parenthesised ions
         left_index = left_index + 1
-        if findnext(')', formula, left_index) ≠ nothing
+        if findnext(')', formula, left_index) != nothing
             right_index = findnext(')', formula, left_index)
             parentheses_end = right_index
-            if right_index - left_index ≡ 1
+            if right_index - left_index == 1
                 mass = element_symbol_to_mass[formula[left_index]]
                 left_index = left_index + 2
-            elseif right_index - left_index ≡ 2    #e.g., (OH) (Mg) (B2)
+            elseif right_index - left_index == 2    #e.g., (OH) (Mg) (B2)
                 right_index = right_index - 1
-                if formula[right_index] == uppercase(formula[right_index]) && isdigit(formula[right_index]) ≡ false
+                if formula[right_index] == uppercase(formula[right_index]) && isdigit(formula[right_index]) == false
                     ion_mass = element_symbol_to_mass[formula[left_index]]
                     ion_mass = ion_mass + element_symbol_to_mass[formula[right_index]]
                     left_index = left_index + 3
-                elseif formula[right_index] ≡ uppercase(formula[right_index]) && isdigit(formula[right_index]) ≡ true
+                elseif formula[right_index] == uppercase(formula[right_index]) && isdigit(formula[right_index]) == true
                     ion_mass = element_symbol_to_mass[formula[left_index]]
                     n_moles = parse(Int, formula[right_index])
                     ion_mass = n_moles * ion_mass
@@ -88,26 +88,26 @@ function computeionmass(formula, left_index)
                 right_index = left_index + 1
                 mass = 0   #reset mass before cumulative calculation through parenthesised ions
                 while right_index ≤ parentheses_end
-                    if formula[right_index] ≡ ')' && isdigit(formula[left_index]) ≡ false   #e.g., H)
+                    if formula[right_index] == ')' && isdigit(formula[left_index]) == false   #e.g., H)
                         ion_mass = element_symbol_to_mass[formula[left_index]]
                         left_index = right_index + 1
                         right_index = left_index + 1
                         position_index = left_index
-                    elseif isdigit(formula[right_index]) ≡ true && formula[left_index] ≡
+                    elseif isdigit(formula[right_index]) == true && formula[left_index] ==
                                                                    uppercase(formula[left_index])   #e.g., O10, O3
                         ion_mass = element_symbol_to_mass[formula[left_index]]
                         n_moles, position_index = findnmoles(formula, right_index)
                         ion_mass = n_moles * ion_mass
                         left_index = position_index
                         right_index = left_index + 1
-                    elseif isdigit(formula[right_index]) ≡ false && formula[right_index] ≡
+                    elseif isdigit(formula[right_index]) == false && formula[right_index] ==
                                                                     lowercase(formula[right_index])  #e.g., Mg
                         ion_mass = element_symbol_to_mass[formula[left_index:right_index]]
                         n_moles, position_index = findnmoles(formula, right_index + 1)
                         ion_mass = n_moles * ion_mass
                         left_index = position_index
                         right_index = left_index + 1
-                    elseif isdigit(formula[right_index]) ≡ false && formula[right_index] ≡
+                    elseif isdigit(formula[right_index]) == false && formula[right_index] ==
                                                                     uppercase(formula[right_index]) #e.g., O in OH
                         ion_mass = element_symbol_to_mass[formula[left_index]]
                         left_index = right_index
@@ -130,11 +130,11 @@ function computeionmass(formula, left_index)
         mass = mass * n_moles #final mass within parentheses multiplied by n moles of parenthesised ions e.g., )2
         left_index = position_index
     elseif right_index ≤ formula_length
-        if isdigit(formula[right_index]) ≡ true && formula[left_index] ≡ uppercase(formula[left_index])    #e.g., B2
+        if isdigit(formula[right_index]) == true && formula[left_index] == uppercase(formula[left_index])    #e.g., B2
             ion_mass = element_symbol_to_mass[formula[left_index]]
             n_moles, position_index = findnmoles(formula, right_index)
             mass = ion_mass * n_moles
-        elseif isdigit(formula[right_index]) ≡ false && formula[right_index] ≡ lowercase(formula[right_index])     #e.g., Mg
+        elseif isdigit(formula[right_index]) == false && formula[right_index] == lowercase(formula[right_index])     #e.g., Mg
             ion_mass = element_symbol_to_mass[formula[left_index:right_index]]
             n_moles, position_index = findnmoles(formula, right_index + 1)
             mass = ion_mass * n_moles
@@ -143,7 +143,7 @@ function computeionmass(formula, left_index)
             mass = ion_mass
             position_index = right_index
         end
-    elseif right_index > formula_length && formula[left_index] ≡ uppercase(formula[left_index])   #e.g., O  in MgO
+    elseif right_index > formula_length && formula[left_index] == uppercase(formula[left_index])   #e.g., O  in MgO
         ion_mass = element_symbol_to_mass[formula[left_index]]
         mass = ion_mass
         position_index = right_index
@@ -154,44 +154,43 @@ end
 #Find number of moles for ion
 function findnmoles(formula, mole_index)
     formula_length = length(formula)
-    #if findnext('.', formula, mole_index) ≠ nothing
+    #if findnext('.', formula, mole_index) != nothing
     #    decimal_index = findnext('.', formula, mole_index)
-
-    if mole_index + 2 ≤ formula_length && formula[mole_index+2] ≡ '.' #find decimals >10.00
-        if mole_index + 4 ≤ formula_length && isdigit(formula[mole_index+4]) ≡ true
+    if mole_index + 2 ≤ formula_length && formula[mole_index+2] == '.' #find decimals >10.00
+        if mole_index + 4 ≤ formula_length && isdigit(formula[mole_index+4]) == true
             n_moles = parse(Float64, formula[mole_index:mole_index+4])
             position_index = mole_index + 5
-        elseif mole_index + 3 ≤ formula_length && isdigit(formula[mole_index+3]) ≡ true
+        elseif mole_index + 3 ≤ formula_length && isdigit(formula[mole_index+3]) == true
             n_moles = parse(Float64, formula[mole_index:mole_index+2])
             position_index = mole_index + 4
         end
-    elseif mole_index + 1 ≤ formula_length && formula[mole_index+1] ≠ '.' #find Int
-        if isdigit(formula[mole_index+1]) ≡ true && isdigit(formula[mole_index]) ≡ true  #e.g., Si10
+    elseif mole_index + 1 ≤ formula_length && formula[mole_index+1] != '.' #find Int
+        if isdigit(formula[mole_index+1]) == true && isdigit(formula[mole_index]) == true  #e.g., Si10
             n_moles = parse(Int, formula[mole_index:mole_index+1])
             position_index = mole_index + 2
-        elseif isdigit(formula[mole_index]) ≡ true  #e.g., B2
+        elseif isdigit(formula[mole_index]) == true  #e.g., B2
             n_moles = parse(Int, formula[mole_index])
             position_index = mole_index + 1
         else
             n_moles = 1
             position_index = mole_index
         end
-    elseif mole_index + 1 ≤ formula_length && formula[mole_index+1] ≡ '.' #find decimals <10.00
-        if mole_index + 3 ≤ formula_length && isdigit(formula[mole_index+3]) ≡ true
+    elseif mole_index + 1 ≤ formula_length && formula[mole_index+1] == '.' #find decimals <10.00
+        if mole_index + 3 ≤ formula_length && isdigit(formula[mole_index+3]) == true
             n_moles = parse(Float64, formula[mole_index:mole_index+3])
             position_index = mole_index + 4
-        elseif mole_index + 2 ≤ formula_length && isdigit(formula[mole_index+2]) ≡ true
+        elseif mole_index + 2 ≤ formula_length && isdigit(formula[mole_index+2]) == true
             n_moles = parse(Float64, formula[mole_index:mole_index+2])
             position_index = mole_index + 3
         end
-    elseif mole_index ≤ formula_length && isdigit(formula[mole_index]) ≡ true
+    elseif mole_index ≤ formula_length && isdigit(formula[mole_index]) == true
         n_moles = parse(Int, string(formula[mole_index]))
         position_index = mole_index + 1
     else
         n_moles = 1
         position_index = mole_index
     end
-    if position_index ≤ formula_length && formula[position_index] ≡ ')'
+    if position_index ≤ formula_length && formula[position_index] == ')'
         position_index = position_index + 1
     end
     return n_moles, position_index
