@@ -12,6 +12,7 @@ using Reexport
 @reexport using Glob
 @reexport using HypothesisTests
 @reexport using GLMakie
+@reexport using Dates
 
 using PyCall
 using Conda
@@ -33,7 +34,7 @@ function __init__()
     copy!(pybaselines, pyimport_conda("pybaselines", "pybaselines"))
 end
 
-println("Hello 😃 \n If you wish to use the 'plot' functions of this package you will need to add a Makie backend 
+println("Hello 👋 \n If you wish to use the 'plot' functions of this package you will need to add a Makie backend 
 (e.g. GLMakie, CairoMakie)")
 
 end
