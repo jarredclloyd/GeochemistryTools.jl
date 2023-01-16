@@ -5,10 +5,18 @@ This file contains various decay system equations for calculation of ratios and 
 export ageRbSr, RbSrAgeNorm, RbSrAgeInv
 
 #Rb-Sr
+"""
+    ageRbSr(β₁, [β₀=0.0, β₁SE=0.0, β₀SE=0.0, σᵦ₁ᵦ₀=0.0; inverse = false, SElevel_in = 2, SElevel_out = 2])
 
-function ageRbSr(β₁, β₀=0.0, β₁SE=0.0, β₀SE=0.0, σᵦ₁ᵦ₀=0.0; inverse = false, SElevel_in = 2, 
-    SElevel_out = 2)
+    calculates ages and uncertainties of RbSr data.
+
+"""
+function ageRbSr(β₁, β₀=0.0, β₁SE=0.0, β₀SE=0.0, σᵦ₁ᵦ₀=0.0; 
+    inverse = false, SElevel_in = 2, SElevel_out = 2)
     if inverse == false
+        if .==(β₁, 0.0) == true
+            error("Non-zero values ∈ ℝ are required for slope (β₁) to calculate ages for isochron data.")
+        end
         if isa(β₁, Array) == true
             nslopes = length(β₁)
             age = zeros(nslopes)
@@ -25,8 +33,8 @@ function ageRbSr(β₁, β₀=0.0, β₁SE=0.0, β₀SE=0.0, σᵦ₁ᵦ₀=0.0;
             ageSE = ageSE * SElevel_out
         end
     elseif inverse == true
-        if .<=(β₀, 0.0) == true || .<=(β₁, 0.0) == true
-            error("Real values (>0) are required for both the intercept (β₀) and the slope (β₁) to calculate ages for 
+        if .==(β₀, 0.0) == true || .==(β₁, 0.0) == true
+            error("Non-zero values ∈ ℝ are required for both the intercept (β₀) and the slope (β₁) to calculate ages for 
             inverse isochron data.")
         end
         if isa(β₁, Array) == true && isa(β₀, Array) == true && length(β₁) == length(β₀)
@@ -55,14 +63,18 @@ function ageRbSr(β₁, β₀=0.0, β₁SE=0.0, β₀SE=0.0, σᵦ₁ᵦ₀=0.0;
 end 
 
 function RbSrAgeNorm(β₁::Real, β₁SE::Real=0.0)
+    if .==(β₁, 0.0) == true
+        error("Non-zero values ∈ ℝ are required for slope (β₁) to calculate ages for isochron data.")
+    end
     date = log(β₁ + 1) / λRb87
     dateSE = abs(log(β₁SE + 1) / λRb87)
     return date, dateSE
 end
 
 function RbSrAgeInv(β₀::Real, β₁::Real, β₀SE::Real=0.0, β₁SE::Real=0.0, σᵦ₁ᵦ₀::Real=0.0)
-    if isa(β₀, Real) !== true || isa(β₁, Real) !== true
-        error("Both the intercept (β₀) and the slope (β₁) are required for inverse isochron age calculations.")
+    if .==(β₀, 0.0) == true || .==(β₁, 0.0) == true
+            error("Non-zero values ∈ ℝ are required for both the intercept (β₀) and the slope (β₁) to calculate ages for 
+            inverse isochron data.")
     end
     ratio = inv(-β₀ / β₁)
     date = log(ratio + 1) / λRb87
