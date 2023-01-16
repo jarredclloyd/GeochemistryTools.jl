@@ -29,7 +29,7 @@ function age2ratioPb206U238(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @simd for i ∈ 1:nages
+        @simd for i in 1:nages
             ratio[i] = ratioPb206U238(age[i])
         end
         return ratio
@@ -61,7 +61,7 @@ function age2ratioPb207U235(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @simd for i ∈ 1:nages
+        @simd for i in 1:nages
             ratio[i] = ratioPb207U235(age[i])
         end
         return ratio
@@ -93,7 +93,7 @@ function age2ratioPb207Pb206(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @simd for i ∈ 1:nages
+        @simd for i in 1:nages
             ratio[i] = ratioPb207Pb206(age[i])
         end
         return ratio
@@ -125,7 +125,7 @@ function ratio2agePb206U238(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @simd for i ∈ 1:nratios
+        @simd for i in 1:nratios
             age[i] = agePb206U238(ratio[i])
         end
         return age
@@ -157,7 +157,7 @@ function ratio2agePb207U235(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @simd for i ∈ 1:nratios
+        @simd for i in 1:nratios
             age[i] = agePb207U235(ratio[i])
         end
         return age
@@ -190,7 +190,7 @@ function ratio2agePb207Pb206(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @threads for i ∈ 1:nratios
+        @threads for i in 1:nratios
             age[i] = agePb207Pb206(ratio[i])
         end
         return age
@@ -202,9 +202,9 @@ end
 """
     calcaitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
 
-Computes the Aitchison distance (∈ Tera-Wasserburg space) for specified parameters.
+Computes the Aitchison distance (in Tera-Wasserburg space) for specified parameters.
 
-Used as a measure of concordance ∈ Tera-Wasserburg space. Unlike IsoplotR, does not multiply the value by 100.
+Used as a measure of concordance in Tera-Wasserburg space. Unlike IsoplotR, does not multiply the value by 100.
 
 For the Wetherill space variant see: calcaitchisonW.
 
@@ -218,7 +218,7 @@ function calcaitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
     if isa(rU238Pb206, Array)
         aitchdist = zeros(size(rU238Pb206))
         ncount = length(rU238Pb206)
-        @simd for i ∈ 1:ncount
+        @simd for i in 1:ncount
             aitchdist[i] = aitchisonTW(rU238Pb206[i], rPb207Pb206[i], aPb206U238[i], aPb207Pb206[i])
         end
         return aitchdist
