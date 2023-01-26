@@ -20,7 +20,7 @@ function loadProfilometer(hostdir, sample; headerrow::Int=19, datarow::Int=20)
     pixelwidth = ncol(df)
     df = stack(df, 2:pixelwidth)
     df.POS = replace.(df[!, 2], "POS = " => "")
-    df.y = 0 .+ parse.(Int, df.POS) .* yresolution
+    df.y = 0 .+ parse.(Int, df.POS) .* xresolution
     select!(df, :DataLine => :x, :y, :value => :z)
     df.z = (df[!, :z]) .- mode(df[!, :z])
     metadata!(df, "xresolution", xresolution);
