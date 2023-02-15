@@ -5,7 +5,7 @@ This file contains tools for (Agilent) ICP-MS data
 export loadDownhole, plot_dh_scatter
 
 """
-    loadDownhole(hostdir, sample, CPS_col1, CPS_col2, [firstrow, stable_time])
+    loadDownhole(hostdir, sample, CPS_col1, CPS_col2, [firstrow, stabletime])
 
 Load and prepare data from CSV agilent CSV files to assess downhole fractionation.
 
@@ -20,21 +20,21 @@ desired mass by replacing ` -> ` with `_` (e.g. `K39 -> 39` to `K39_39`).
 Concatenates the data into one table, calculates ratio between `CPS_col1` and `CPS_col2`, the median-normalised ratio, 
 and sorts the table by time. 
 
-It is recommended to specify the `stable_time` parameter to the point where the signal counts are stabilised. It is set by 
+It is recommended to specify the `stabletime` parameter to the point where the signal counts are stabilised. It is set by 
 default to be 32 (i.e. 32 seconds). This parameter is used to filter the rows to calculate the median CPS ratio. If you 
-want to remove the rows prior to the stable signal time, adjust `firstrow` to equal the row equivalent to the stable_time
+want to remove the rows prior to the stable signal time, adjust `firstrow` to equal the row equivalent to the stabletime
 (usually about 110 for a 30 second gas blank).
 
 # Example
 ```
-julia> loadDownhole("path/to/dir", "sample_x", "Rb85", "Sr87"; firstrow = 5, stable_row = 110)
+julia> loadDownhole("path/to/dir", "sample_x", "Rb85", "Sr87"; firstrow = 5, stabletime = 110)
 MxN DataFrame
 
 ```
 """
 function loadDownhole(hostdir, sample::String, CPS_col1::String, CPS_col2::String;
     firstrow::Int = 5,
-    stable_time::Number = 32)
+    stabletime::Number = 32)
     files = glob(sample * "*.csv", hostdir)
     data = CSV.read(files, DataFrame; header = 4, skipto = firstrow, types = Float64, footerskip = 3, 
         ignoreemptyrows = true, normalizenames = true)
@@ -43,9 +43,9 @@ function loadDownhole(hostdir, sample::String, CPS_col1::String, CPS_col2::Strin
     sort!(data, :time)
     data.ratio =  data[!, CPS_col1] ./ data[!, CPS_col2]
     replace!(data[!, :ratio], Inf => 0)
-    mdn = median(filter(x -> x .> 0, data[data.time .> stable_time, :ratio]))
+    mdn = median(filter(x -> x .> 0, data[data.time .> stabletime, :ratio]))
     data.ratio_mdn_norm = data[!,:ratio] ./ mdn
-    metadata!(data, "name", sample); metadata!(data,"stable_time", stable_time);
+    metadata!(data, "name", sample); metadata!(data,"stable time", stabletime);
     return data
 end
 

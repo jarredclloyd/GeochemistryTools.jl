@@ -14,7 +14,7 @@ Compute the ²⁰⁶Pb/²³⁸U ratio for a given age.
 Works for vectors and other arrays if column is specified.
 
 # Examples
-```
+```julia-repl
 julia> age2ratioPb206U238(1000)
  0.16780392747297124
 
@@ -46,7 +46,7 @@ Compute the ²⁰⁷Pb/²³⁵U ratio for a given age.
 Works for vectors and other arrays if column is specified.
 
 # Examples
-```
+```julia-repl
 julia> age2ratioPb207U235(1000)
  1.6774102427622641
 
@@ -78,7 +78,7 @@ Compute the ²⁰⁷Pb/²⁰⁶Pb ratio for a given age.
 Works for vectors and other arrays if column is specified.
 
 # Examples
-```
+```julia-repl
 julia> age2ratioPb207Pb206(1000)
   0.07253226274578425
 
@@ -110,7 +110,7 @@ Compute the ²⁰⁶Pb/²³⁸U age for a given ratio.
 Works for vectors and other arrays if column is specified.
 
 # Examples
-```
+```julia-repl
 julia> ratio2agePb206U238(0.16780392747297124)
 1000.0000000000005
 
@@ -142,7 +142,7 @@ Compute the ²⁰⁷Pb/²³⁵U age for a given ratio.
 Works for vectors and other arrays if column is specified.
 
 # Examples
-```
+```julia-repl
 julia> ratio2agePb207U235(1.6774102427622641)
 1000.0
 
@@ -175,7 +175,7 @@ Works for vectors and other arrays if column is specified.
 Uses the Newton-Raphson iterative method to solve for age with a tolerance of 1e-12 of the input ratio(s).
 
 # Examples
-```
+```julia-repl
 julia> ratio2agePb207Pb206(0.07253226274578425)
 1000.0000000001221
 
@@ -209,7 +209,7 @@ Used as a measure of concordance in Tera-Wasserburg space. Unlike IsoplotR, does
 For the Wetherill space variant see: calcaitchisonW.
 
 # Examples
-```
+```julia-repl
 julia> calcaitchisonTW(5.959336083841503, 0.07434716497717946, 1000, 1050)
 0.02471346503520116
 ```
