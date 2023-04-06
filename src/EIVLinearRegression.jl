@@ -48,9 +48,9 @@ function yorkfit(df::DataFrame, SElevel::Int=2, SEtype::String="abs"; SrInitial:
     if SrInitial != nothing
         if isa(SrInitial, String) == true && haskey(Dict_SrInitial, SrInitial) == true
             push!(df, Dict_SrInitial[SrInitial])
-        elseif length(SrInitial) == 1 && isdigit(SrInitial)
+        elseif length(SrInitial) == 1 && isa(SrInitial, Number)
             push!(df, [1e-10, 1e-18, SrInitial, 0.01])
-        elseif length(SrInitial) == 2 && isdigit(SrInitial[1]) && isdigit(SrInitial[2])
+        elseif length(SrInitial) == 2 && isa(SrInitial[1], Number) && isa(SrInitial[2], Number)
             push!(df, [1e-10, 1e-18, SrInitial[1], SrInitial[2]])
         elseif length(SrInitial) >= 3
             error("Only the initial Sr ratio value and its uncertainty is required.")
