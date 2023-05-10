@@ -1,8 +1,8 @@
 #= Preamble
-This file contains various decay system equations for calculation of ratios and ages (U-Pb).
+This file contains various decay system equations for calculation of ratios and ages (Rb—Sr).
 =#
 
-export ageRbSr, RbSrAgeNorm, RbSrAgeInv
+export ageRbSr, RbSrAgeNorm, RbSrAgeInv, confidenceInterval, inflateCI, inflateSE
 
 #Rb-Sr
 """
@@ -15,7 +15,7 @@ function ageRbSr(β₁, β₀=0.0, β₁SE=0.0, β₀SE=0.0, σᵦ₁ᵦ₀=0.0;
     inverse = false, SElevel_in = 2, SElevel_out = 2)
     if inverse == false
         if .==(β₁, 0.0) == true
-            error("Non-zero values ∈ ℝ are required for slope (β₁) to calculate ages for isochron data.")
+            throw(ArgumentError("Non-zero values ∈ ℝ are required for slope (β₁) to calculate ages for isochron data."))
         end
         if isa(β₁, Array) == true
             nslopes = length(β₁)
@@ -34,8 +34,8 @@ function ageRbSr(β₁, β₀=0.0, β₁SE=0.0, β₀SE=0.0, σᵦ₁ᵦ₀=0.0;
         end
     elseif inverse == true
         if .==(β₀, 0.0) == true || .==(β₁, 0.0) == true
-            error("Non-zero values ∈ ℝ are required for both the intercept (β₀) and the slope (β₁) to calculate ages for 
-            inverse isochron data.")
+            throw(ArgumentError("Non-zero values ∈ ℝ are required for both the intercept (β₀) and the slope (β₁) to calculate ages for 
+            inverse isochron data."))
         end
         if isa(β₁, Array) == true && isa(β₀, Array) == true && length(β₁) == length(β₀)
             nslopes = length(β₁)
@@ -64,7 +64,7 @@ end
 
 function RbSrAgeNorm(β₁::Real, β₁SE::Real=0.0)
     if .==(β₁, 0.0) == true
-        error("Non-zero values ∈ ℝ are required for slope (β₁) to calculate ages for isochron data.")
+         throw(ArgumentError("Non-zero values ∈ ℝ are required for slope (β₁) to calculate ages for isochron data."))
     end
     date = log(β₁ + 1) / λRb87
     dateSE = abs(log(β₁SE + 1) / λRb87)
@@ -73,12 +73,23 @@ end
 
 function RbSrAgeInv(β₀::Real, β₁::Real, β₀SE::Real=0.0, β₁SE::Real=0.0, σᵦ₁ᵦ₀::Real=0.0)
     if .==(β₀, 0.0) == true || .==(β₁, 0.0) == true
-            error("Non-zero values ∈ ℝ are required for both the intercept (β₀) and the slope (β₁) to calculate ages for 
-            inverse isochron data.")
+             throw(ArgumentError("Non-zero values ∈ ℝ are required for both the intercept (β₀) and the slope (β₁) to calculate ages for 
+            inverse isochron data."))
     end
     ratio = inv(-β₀ / β₁)
     date = log(ratio + 1) / λRb87
     ratioSE = ratio * sqrt((β₀SE / β₀)^2 + (β₁SE / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁))
     dateSE = abs(log(ratioSE + (β₀ ^2 * β₀SE ^2 + β₁ ^2 * β₁SE ^2 + 2 * β₀ * β₁ * σᵦ₁ᵦ₀) + 1) / λRb87)
     return date, dateSE
+end
+
+function confidenceInterval(SE, n; SElevel=1, CIlevel = 0.95)
+    (SE / SElevel) * cquantile(TDist(n - 2), (1 - CIlevel) / 2)
+end
+
+function inflateSE(SE, χ²ᵣ)
+    SE * sqrt(χ²ᵣ)
+end
+function inflateCI(SE, χ²ᵣ, n; SElevel = 1, CIlevel = 0.95)
+    (SE / SElevel) * cquantile(TDist(n - 2), (1 - CIlevel) / 2 ) * sqrt(χ²ᵣ)
 end

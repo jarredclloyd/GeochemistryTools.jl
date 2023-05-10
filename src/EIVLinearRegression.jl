@@ -45,17 +45,18 @@ York et al. 2004 doi:https://doi.org/10.1119/1.1632486.
 """
 function yorkfit(df::DataFrame; SElevel::Int=2, SEtype::String="abs", SrInitial::Any=nothing)
     dfCols::Int64 = ncol(df)
-    if SrInitial != nothing
+    dfRows = nrow(df)
+    if SrInitial !== nothing
         if isa(SrInitial, String) == true && haskey(Dict_SrInitial, SrInitial) == true
-            push!(df, Dict_SrInitial[SrInitial])
-        elseif length(SrInitial) == 1 && isa(SrInitial, Number)
-            push!(df, [1e-10, 1e-18, SrInitial, 0.01])
+            SrInitial = Dict_SrInitial[SrInitial]
+        elseif length(SrInitial) == 1 && isa(SrInitial, Number)    
+            SrInitial = [1e-10, 1e-18, SrInitial, 0.01]
         elseif length(SrInitial) == 2 && isa(SrInitial[1], Number) && isa(SrInitial[2], Number)
-            push!(df, [1e-10, 1e-18, SrInitial[1], SrInitial[2]])
+            SrInitial = [1e-10, 1e-18, SrInitial[1], SrInitial[2]]
         elseif length(SrInitial) >= 3
-            error("Only the initial Sr ratio value and its uncertainty is required.")
+            throw(ArgumentError("Only the initial Sr ratio value and its uncertainty is required."))
         else
-            error("""
+            throw(ArgumentError("""
             SrInitial variable is malformed. 
             Use either a string that matches a fixed value or reference material name: 
                 e.g. "MDC", "MDCinv", or "SolarSystem" 
@@ -63,8 +64,19 @@ function yorkfit(df::DataFrame; SElevel::Int=2, SEtype::String="abs", SrInitial:
                 e.g. 0.72 or [0.7200, 0.0010] 
              
             For a full list of available reference material keys: keys(Dict_SrInitial)
-            """)
+            """))
         end
+        if dfCols == 4
+            push!(df, SrInitial)
+        elseif dfCols == 5
+            temp = deepcopy(SrInitial)
+            push!(temp, 0)
+            push!(df, temp)
+        end
+        # elseif length(SrInitial) == 1 && isa(SrInitial, Number)
+            # push!(df, [1e-10, 1e-18, SrInitial, 0.01])
+        # elseif length(SrInitial) == 2 && isa(SrInitial[1], Number) && isa(SrInitial[2], Number)
+            # push!(df, [1e-10, 1e-18, SrInitial[1], SrInitial[2]])        
     end
     if SEtype == "abs"
         if dfCols == 5
@@ -73,7 +85,7 @@ function yorkfit(df::DataFrame; SElevel::Int=2, SEtype::String="abs", SrInitial:
         elseif dfCols == 4
             β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(df[:, 1], df[:, 2] ./ SElevel, df[:, 3], df[:, 4] ./ SElevel)
         else
-            println("Column width is not equal to 4 or 5. Some data is missing.")
+           throw(ArgumentError("Column width is not equal to 4 or 5. Some data is missing."))
         end
     elseif SEtype == "rel"
         if dfCols == 5
@@ -83,17 +95,18 @@ function yorkfit(df::DataFrame; SElevel::Int=2, SEtype::String="abs", SrInitial:
             β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(df[:, 1], (df[:, 2] .* df[:, 1]) ./ SElevel, df[:, 3],
                 (df[:, 4] .* df[:, 3]) ./ SElevel)
         else
-            println("Column width is not equal to 4 or 5. Some data is missing.")
+           throw(ArgumentError("Column width is not equal to 4 or 5. Some data is missing."))
         end
     end
+    popat!(df, dfRows + 1)
     return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX
 end
 
 #Base functions
 function deming(X, Y)
     nX::Int = length(X)
-    if nX ≠ length(Y)
-        println("Lengths of data vectors are not equal. Please ensure all data (X & Y) are of equal length.")
+    if nX !== length(Y)
+       throw(ArgumentError("Lengths of data vectors are not equal. Please ensure all data (X & Y) are of equal length."))
     else
         λ::Float64 = (var(Y)) / (var(X))
         X̄::Float64 = mean(X)
@@ -125,10 +138,12 @@ function jackknife(df::DataFrame, method::String="deming")
     end
 end
 
-function york(X::Vector{Float64}, sX::Vector{Float64}, Y::Vector{Float64}, sY::Vector{Float64}, ρXY=[0.0, 0.0])
+function york(X::Vector{Float64}, sX::Vector{Float64}, Y::Vector{Float64}, sY::Vector{Float64}, ρXY=nothing)
     nX::Int = length(X)
-    if length(ρXY) ≠ nX
+    if ρXY === nothing
         ρXY::Vector{Float64} = zeros(nX)
+    elseif length(ρXY) !== nX
+        ρXY = push!(zeros(nX-length(ρXY)))
     end
     β₀::Float64, β₁::Float64 = coeffs(Polynomials.fit(X, Y, 1))
     βₑ::Float64 = β₁
