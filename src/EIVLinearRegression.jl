@@ -15,13 +15,13 @@ function demingfit(df::DataFrame)
     if isnan(β₀) || isnan(β₁)
         println("Solution not computed!")
     else
-        β₀SE::Float64, β₁SE::Float64 = jackknife(df, "deming")
+        β₀SE::Float64, β₁SE::Float64, n = jackknife(df, "deming")
     end
-    return β₀, β₀SE, β₁, β₁SE
+    return β₀, β₀SE, β₁, β₁SE, n
 end
 
 """
-    yorkfit(df::DataFrame, [SElevel::Int=2, SEtype::String="abs"; SrInitial::Any=nothing])
+    yorkfit(df::DataFrame; [SElevel::Int=2, SEtype::String="abs", SrInitial::Any=nothing])
 
 Compute line of best fit using York errors-in-variables regression algorithm.
 
@@ -43,7 +43,7 @@ julia> york(df, 2, "abs"; SrInitial = "MDCInv")
 # Reference
 York et al. 2004 doi:https://doi.org/10.1119/1.1632486.
 """
-function yorkfit(df::DataFrame, SElevel::Int=2, SEtype::String="abs"; SrInitial::Any=nothing)
+function yorkfit(df::DataFrame; SElevel::Int=2, SEtype::String="abs", SrInitial::Any=nothing)
     dfCols::Int64 = ncol(df)
     if SrInitial != nothing
         if isa(SrInitial, String) == true && haskey(Dict_SrInitial, SrInitial) == true
@@ -68,25 +68,25 @@ function yorkfit(df::DataFrame, SElevel::Int=2, SEtype::String="abs"; SrInitial:
     end
     if SEtype == "abs"
         if dfCols == 5
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀ = york(df[:, 1], df[:, 2] ./ SElevel, df[:, 3], df[:, 4] ./ SElevel,
+            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(df[:, 1], df[:, 2] ./ SElevel, df[:, 3], df[:, 4] ./ SElevel,
                 df[:, 5])
         elseif dfCols == 4
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀ = york(df[:, 1], df[:, 2] ./ SElevel, df[:, 3], df[:, 4] ./ SElevel)
+            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(df[:, 1], df[:, 2] ./ SElevel, df[:, 3], df[:, 4] ./ SElevel)
         else
             println("Column width is not equal to 4 or 5. Some data is missing.")
         end
     elseif SEtype == "rel"
         if dfCols == 5
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀ = york(df[:, 1], (df[:, 2] .* df[:, 1]) ./ SElevel, df[:, 3],
+            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(df[:, 1], (df[:, 2] .* df[:, 1]) ./ SElevel, df[:, 3],
                 (df[:, 4] .* df[:, 3]) ./ SElevel, df[:, 5])
         elseif dfCols == 4
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀ = york(df[:, 1], (df[:, 2] .* df[:, 1]) ./ SElevel, df[:, 3],
+            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(df[:, 1], (df[:, 2] .* df[:, 1]) ./ SElevel, df[:, 3],
                 (df[:, 4] .* df[:, 3]) ./ SElevel)
         else
             println("Column width is not equal to 4 or 5. Some data is missing.")
         end
     end
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀
+    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX
 end
 
 #Base functions
@@ -121,7 +121,7 @@ function jackknife(df::DataFrame, method::String="deming")
         end
         β₀SE::Float64 = sem(jackknifed_estimates[:, 1])
         β₁SE::Float64 = sem(jackknifed_estimates[:, 2])
-        return β₀SE, β₁SE
+        return β₀SE, β₁SE, nX
     end
 end
 
@@ -164,5 +164,5 @@ function york(X::Vector{Float64}, sX::Vector{Float64}, Y::Vector{Float64}, sY::V
     ν::Int = nX - 2
     χ²ᵣ::Float64 = χ² / ν
     pval::Float64 = ccdf(Chisq(ν), χ²)
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀
+    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX
 end
