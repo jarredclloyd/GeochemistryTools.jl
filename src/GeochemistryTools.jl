@@ -25,6 +25,8 @@ include("RbSr.jl")
 include("ICP_MS.jl")
 include("RamanSpectroscopy.jl")
 include("Profilometer.jl")
+include("MineralFormulas.jl")
+include("LanthanoidLambda.jl")
 
 const pybaselines = PyNULL()
 

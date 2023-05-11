@@ -2,7 +2,7 @@
 This jl file contains dictionaries and other reference information for that are used in "GeochemistryTools.jl"
 =#
 
-export Avogadro, element_symbol_to_mass, Dict_SrInitial,
+export Avogadro, element_symbol_to_mass, molecular_weight_oxide, Dict_SrInitial,
     #decay constants: 
     λK40, SEλK40,
     λRb87, SEλRb87,
@@ -73,6 +73,41 @@ element_symbol_to_mass = Dict(
     ("Tl", 204.3833), ("Pb", 207.2), ("Bi", 208.9804), ("Th", 232.03806), ("Pa", 231.03588), ('U', 238.0289)]
 )
 
+"""
+    cn_eight_IR(x)
+Return the eightfold coordinate ionic radius of specified element.
+
+Single character elements must be entered as a character using ' '.
+Double character elements must be entered as a string " ".
+
+#Examples
+```julia-repl
+julia > 
+```
+"""
+cn_eight_IR = Dict(
+    [
+]
+)
+
+# Molecular properties
+molecular_weight_oxide = Dict(
+    [
+    ("H2O", 18.015), ("Li2O" , 29.879), ("BeO" , 25.0112), ("B2O3" , 69.617), ("Na2O" , 61.979), ("MgO" , 40.304),
+    ("Al2O3" , 101.961), ("SiO2" , 60.083), ("P2O5" , 141.943), ("SO2" , 64.058), ("SO3" , 80.057),
+    ("SO4" , 96.056), ("K2O" , 94.195), ("CaO" , 56.077), ("TiO2" , 79.865), ("V2O5" , 181.879),
+    ("VO2" , 82.94), ("Cr2O3" , 151.989), ("Mn2O3" , 157.873), ("MnO" , 70.937), ("MnO2" , 86.936),
+    ("Fe2O3" , 159.687), ("Fe3O4" , 231.531), ("FeO" , 71.844), ("Co3O4" , 240.795), ("CoO" , 74.932),
+    ("NiO" , 74.692), ("Cu2O" , 143.091), ("CuO" , 79.545), ("ZnO" , 81.379), ("Ga2O3" , 187.443),
+    ("GeO2" , 104.628), ("As2O3" , 197.841), ("SeO2" , 110.969), ("Rb2O" , 186.935), ("SrO" , 103.619),
+    ("Y2O3" , 225.809), ("ZrO2" , 123.222), ("Nb2O5" , 265.807), ("MoO3" , 143.947), ("Ag2O" , 231.739),
+    ("CdO" , 128.409), ("In2O3" , 277.637), ("SnO2" , 150.708), ("Sb2O3" , 291.517), ("TeO2" , 159.598),
+    ("Cs2O" , 281.819), ("BaO" , 153.329), ("La2O3" , 325.817), ("Ce2O3" , 328.237), ("CeO2" , 172.118),
+    ("Pr2O3" , 329.817), ("Nd2O3" , 336.477), ("Sm2O3" , 348.717), ("Gd2O3" , 362.497), ("Tb2O3" , 365.857), ("Er2O3" , 382.517), ("HfO2" , 210.488), ("Ta2O5" , 441.895), ("WO3" , 231.837), ("HgO" , 216.589),
+    ("Tl2O3" , 456.757), ("PbO" , 223.199), ("PbO2" , 239.198), ("Bi2O3" , 465.957), ("ThO2" , 264.038),
+    ("U3O8" , 842.082), ("UO2" , 270.028)
+]
+)
 #Isotopic properties (mass, radii, charge)
 
 #C1 Chondrite (Palme and O'Neill 2016)
@@ -80,16 +115,16 @@ element_symbol_to_mass = Dict(
 # Initial Sr87/86 ratios
 Dict_SrInitial = Dict(
     [
-        ("MDC", [1e-10, 1e-12, 0.72607, 0.00070]), ("MDCInv", [1e-10, 1e-12, 1.37727767295, 0.0013278]),
-        ("Hogsbo", [1e-10, 1e-12, 0.72000, 0.000103]), ("HogsboInv", [1e-10, 1e-12, 1.38889, 0.000198688]),
-        ("MicaMg", [1e-10, 1e-12, 0.72607, 0.00070]), ("MicaMgInv", [1e-10, 1e-12, 1.37727767295, 0.0013278]),
-        ("SolarSystem", [1e-10, 1e-12,  0.69899, 0.00005]), ("SolarSystemInv", [1e-10, 1e-12, 1.430635631, 0.000102336]), 
-        ("GLO", [1e-10, 1e-12, 0.707358, 0.0001]), ("GLOInv", [1e-10, 1e-12, 1.413727292, 0.0002]),
-        ("LaPosta", [1e-10, 1e-12,  0.70483, 0.0001]), ("LaPostaInv", [1e-10, 1e-12, 1.418781834, 0.0002]), 
-        ("MtDromedary", [1e-10, 1e-12,  0.7049, 0.0001]), ("MtDromedaryInv", [1e-10, 1e-12, 1.418640942, 0.0002]), 
-        ("WilsonsProm", [1e-10, 1e-12, 0.71, 0.0001]), ("WilsonsPromInv", [1e-10, 1e-12, 1.408450704, 0.0002]), 
-        ("NIST610", [1e-10, 1e-12, 0.7097, 0.0001]), ("NIST610Inv", [1e-10, 1e-12, 1.409, 0.0002]),
-        ("BCR2G", [1e-10, 1e-12, 0.704913, 0.00001]), ("BCR2GInv", [1e-10, 1e-12, 1.418615, 0.000020]),
-        ("NIST612", [1e-10, 1e-12, 0.7090630, 0.0001]), ("NIST612Inv", [1e-10, 1e-12, 1.4103120, 0.0002])
-    ]
+    ("MDC", [1e-10, 1e-12, 0.72607, 0.00070]), ("MDCInv", [1e-10, 1e-12, 1.37727767295, 0.0013278]),
+    ("Hogsbo", [1e-10, 1e-12, 0.72000, 0.000103]), ("HogsboInv", [1e-10, 1e-12, 1.38889, 0.000198688]),
+    ("MicaMg", [1e-10, 1e-12, 0.72607, 0.00070]), ("MicaMgInv", [1e-10, 1e-12, 1.37727767295, 0.0013278]),
+    ("SolarSystem", [1e-10, 1e-12, 0.69899, 0.00005]), ("SolarSystemInv", [1e-10, 1e-12, 1.430635631, 0.000102336]),
+    ("GLO", [1e-10, 1e-12, 0.707358, 0.0001]), ("GLOInv", [1e-10, 1e-12, 1.413727292, 0.0002]),
+    ("LaPosta", [1e-10, 1e-12, 0.70483, 0.0001]), ("LaPostaInv", [1e-10, 1e-12, 1.418781834, 0.0002]),
+    ("MtDromedary", [1e-10, 1e-12, 0.7049, 0.0001]), ("MtDromedaryInv", [1e-10, 1e-12, 1.418640942, 0.0002]),
+    ("WilsonsProm", [1e-10, 1e-12, 0.71, 0.0001]), ("WilsonsPromInv", [1e-10, 1e-12, 1.408450704, 0.0002]),
+    ("NIST610", [1e-10, 1e-12, 0.7097, 0.0001]), ("NIST610Inv", [1e-10, 1e-12, 1.409, 0.0002]),
+    ("BCR2G", [1e-10, 1e-12, 0.704913, 0.00001]), ("BCR2GInv", [1e-10, 1e-12, 1.418615, 0.000020]),
+    ("NIST612", [1e-10, 1e-12, 0.7090630, 0.0001]), ("NIST612Inv", [1e-10, 1e-12, 1.4103120, 0.0002])
+]
 )
