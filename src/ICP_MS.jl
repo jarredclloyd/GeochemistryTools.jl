@@ -5,7 +5,7 @@ This file contains tools for (Agilent) ICP-MS data
 export loadDownhole, plot_dh_scatter
 
 """
-    loadDownhole(hostdir, sample, CPS_col1, CPS_col2, [firstrow, stabletime])
+    loadDownhole(hostdir, sample, CPS_col1, CPS_col2, [firstrow, stabletime, signalend])
 
 Load and prepare data from CSV agilent CSV files to assess downhole fractionation.
 
@@ -25,6 +25,10 @@ default to be 32 (i.e. 32 seconds). This parameter is used to filter the rows to
 want to remove the rows prior to the stable signal time, adjust `firstrow` to equal the row equivalent to the stabletime
 (usually about 110 for a 30 second gas blank).
 
+By default `signalend` is set to `Inf`, as such it will use the entire signal. It is recommended to set this to a value
+appropriate to your data (i.e. total signal time minus ~5 [e.g. 65]) to avoid some artefacts that may occur near the end
+ of an ablation.
+
 # Example
 ```
 julia> loadDownhole("path/to/dir", "sample_x", "Rb85", "Sr87"; firstrow = 5, stabletime = 110)
@@ -34,7 +38,8 @@ MxN DataFrame
 """
 function loadDownhole(hostdir, sample::String, CPS_col1::String, CPS_col2::String;
     firstrow::Int = 5,
-    stabletime::Number = 32)
+    stabletime::Number = 32, 
+    signalend::Number = Inf)
     files = glob(sample * "*.csv", hostdir)
     data = CSV.read(files, DataFrame; header = 4, skipto = firstrow, types = Float64, footerskip = 3, 
         ignoreemptyrows = true, normalizenames = true)
@@ -43,9 +48,9 @@ function loadDownhole(hostdir, sample::String, CPS_col1::String, CPS_col2::Strin
     sort!(data, :time)
     data.ratio =  data[!, CPS_col1] ./ data[!, CPS_col2]
     replace!(data[!, :ratio], Inf => 0)
-    mdn = median(filter(x -> x .> 0, data[data.time .> stabletime, :ratio]))
+    mdn = median(filter(x -> x .> 0, data[stabletime .< data.time .< signalend, :ratio]))
     data.ratio_mdn_norm = data[!,:ratio] ./ mdn
-    metadata!(data, "name", sample); metadata!(data,"stable time", stabletime);
+    metadata!(data, "name", sample); metadata!(data,"stable time", stabletime); metadata!(data,"signal end", signalend)
     return data
 end
 
