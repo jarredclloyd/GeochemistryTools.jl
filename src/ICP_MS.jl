@@ -5,7 +5,7 @@ This file contains tools for (Agilent) ICP-MS data
 export loadDownhole, plot_dh_scatter
 
 """
-    loadDownhole(hostdir, sample, CPS_col1, CPS_col2, [firstrow, stabletime, signalend])
+    loadDownhole(hostdir, sample, CPS_col1, CPS_col2, [firstrow, stabletime, signalend, trim])
 
 Load and prepare data from CSV agilent CSV files to assess downhole fractionation.
 
@@ -26,8 +26,11 @@ want to remove the rows prior to the stable signal time, adjust `firstrow` to eq
 (usually about 110 for a 30 second gas blank).
 
 By default `signalend` is set to `Inf`, as such it will use the entire signal. It is recommended to set this to a value
-appropriate to your data (i.e. total signal time minus ~5 [e.g. 65]) to avoid some artefacts that may occur near the end
- of an ablation.
+appropriate to your data (i.e. total signal time minus ~5 [e.g. 65]) to avoid some artefacts that may occur near the end 
+of an ablation.
+
+By default `trim` is set to `false`. If set to `true` it will delete all data from the first record past `signalend` to 
+the last record.
 
 # Example
 ```
@@ -37,9 +40,7 @@ MxN DataFrame
 ```
 """
 function loadDownhole(hostdir, sample::String, CPS_col1::String, CPS_col2::String;
-    firstrow::Int = 5,
-    stabletime::Number = 32, 
-    signalend::Number = Inf)
+    firstrow::Int = 5, stabletime::Number = 32, signalend::Number = Inf, trim = false)
     files = glob(sample * "*.csv", hostdir)
     data = CSV.read(files, DataFrame; header = 4, skipto = firstrow, types = Float64, footerskip = 3, 
         ignoreemptyrows = true, normalizenames = true)
@@ -50,6 +51,9 @@ function loadDownhole(hostdir, sample::String, CPS_col1::String, CPS_col2::Strin
     replace!(data[!, :ratio], Inf => 0)
     mdn = median(filter(x -> x .> 0, data[stabletime .< data.time .< signalend, :ratio]))
     data.ratio_mdn_norm = data[!,:ratio] ./ mdn
+    if trim == true
+        filter!(:time => x -> x .< signalend, data)
+    end
     metadata!(data, "name", sample); metadata!(data,"stable time", stabletime); metadata!(data,"signal end", signalend)
     return data
 end
