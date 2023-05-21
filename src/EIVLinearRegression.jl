@@ -126,11 +126,9 @@ function jackknife(df::DataFrame, method::String="deming")
     if method == "deming"
         jackknifed_estimates::Matrix = zeros(Float64, nX, 2)
         @simd for j_position ∈ 1:nX
-            holder = popat!(df, j_position)
-            β₀est::Float64, β₁est::Float64 = deming(df[!, 1], df[!, 2])
+            β₀est::Float64, β₁est::Float64 = deming(df[Not(j_position), 1], df[Not(j_position), 2])
             jackknifed_estimates[j_position, 1] = β₀est
             jackknifed_estimates[j_position, 2] = β₁est
-            insert!(df, j_position, holder)
         end
         β₀SE::Float64 = sem(jackknifed_estimates[:, 1])
         β₁SE::Float64 = sem(jackknifed_estimates[:, 2])
