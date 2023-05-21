@@ -98,7 +98,9 @@ function yorkfit(df::DataFrame; SElevel::Int=2, SEtype::String="abs", SrInitial:
            throw(ArgumentError("Column width is not equal to 4 or 5. Some data is missing."))
         end
     end
-    popat!(df, dfRows + 1)
+    if SrInitial !== nothing
+        popat!(df, dfRows + 1)
+    end
     return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX
 end
 
