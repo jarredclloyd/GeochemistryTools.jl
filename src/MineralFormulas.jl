@@ -9,7 +9,8 @@ export MicaFormula
 Calculates mica formula based on input data and declared units.
 
 # Description
-Data is a data frame containing sample name and elemental data (either as element or oxide) in a consistent unit (either ppm OR wt%)
+Data is a data frame containing sample name and elemental data (either as element or oxide)
+in a consistent unit (either ppm OR wt%)
 Units is the units the data is in, a string of value "ppm" OR "wt%"
 
 # Example
@@ -18,7 +19,7 @@ julia> MicaFormula(df, "ppm")
 ```
 """
 
-function MicaFormula(data::DataFrame, units::String; normalising_O::Int = 12)
+function MicaFormula(data::DataFrame, units::String; normalising_O::Int = 11)
     I_site = [:Na, :K, :Ca, :Rb, :Cs, :Ba]
     M_site = [:Li, :Mg, :Ti, :V, :Cr, :Mn, :Zn, :Fe]
     TM_site = [:Al]
@@ -31,15 +32,27 @@ function MicaFormula(data::DataFrame, units::String; normalising_O::Int = 12)
 
     if uppercase(units) == "PPM"
         oxide_conversion = [
-            1.347955633, 1.204601258, 1.399196567, 1.093596434, 1.060187345, 1.1165004, 2.152665706, 1.658259617, 1.668477239, 1.628126104, 1.461545119, 1.291219193, 1.244707862, 1.28648939, 1.889426284,
-            2.775260203, 3.220027752, 2.139327043, 1, 1, 8.936011905
+            1.347955633, 1.204601258, 1.399196567, 1.093596434, 1.060187345, 1.1165004,
+            2.152665706, 1.658259617, 1.668477239, 1.628126104, 1.461545119, 1.291219193,
+            1.244707862, 1.28648939, 1.889426284, 2.775260203, 3.220027752, 2.139327043, 1,
+            1, 8.936011905
         ]
         weight_percent = (workingvector ./ 1e4) .* oxide_conversion
     elseif lowercase(units) == "wt%"
         weight_percent = workingvector
     end
     molecular_weights = [
-        molecular_weight_oxide["Na2O"], molecular_weight_oxide["K2O"], molecular_weight_oxide["CaO"], molecular_weight_oxide["Rb2O"], molecular_weight_oxide["Cs2O"], molecular_weight_oxide["BaO"], molecular_weight_oxide["Li2O"], molecular_weight_oxide["MgO"], molecular_weight_oxide["TiO2"], molecular_weight_oxide["VO2"], molecular_weight_oxide["Cr2O3"], molecular_weight_oxide["MnO"], molecular_weight_oxide["ZnO"], molecular_weight_oxide["FeO"], molecular_weight_oxide["Al2O3"], molecular_weight_oxide["BeO"], molecular_weight_oxide["B2O3"], molecular_weight_oxide["SiO2"], element_symbol_to_mass['F'], element_symbol_to_mass["Cl"], molecular_weight_oxide["H2O"]
+        molecular_weight_oxide["Na2O"], molecular_weight_oxide["K2O"],
+        molecular_weight_oxide["CaO"], molecular_weight_oxide["Rb2O"],
+        molecular_weight_oxide["Cs2O"], molecular_weight_oxide["BaO"],
+        molecular_weight_oxide["Li2O"], molecular_weight_oxide["MgO"],
+        molecular_weight_oxide["TiO2"], molecular_weight_oxide["VO2"],
+        molecular_weight_oxide["Cr2O3"], molecular_weight_oxide["MnO"],
+        molecular_weight_oxide["ZnO"], molecular_weight_oxide["FeO"],
+        molecular_weight_oxide["Al2O3"], molecular_weight_oxide["BeO"],
+        molecular_weight_oxide["B2O3"], molecular_weight_oxide["SiO2"],
+        element_symbol_to_mass['F'], element_symbol_to_mass["Cl"],
+        molecular_weight_oxide["H2O"]
     ]
 
     oxide_moles = weight_percent ./ molecular_weights
@@ -54,12 +67,13 @@ function MicaFormula(data::DataFrame, units::String; normalising_O::Int = 12)
     iterations = 0
     H_initial = 2 - (normalised_oxygen_moles[19] + normalised_oxygen_moles[20])
     O_OH = (0.5 * H_initial) / normalising_factor
-    moles_oxygen[21] = O_OH 
+
+    moles_oxygen[21] = O_OH
     ϵ = 1
     while normalised_oxygen_sum > normalising_O && ϵ > 1e-8 && iterations <= 1000
+        normalised_oxygen_moles = moles_oxygen .* normalising_factor
         oxygen_sum = sum(moles_oxygen) - (0.5 * (moles_oxygen[19] + moles_oxygen[20]))
         normalising_factor = normalising_O / oxygen_sum
-        normalised_oxygen_moles = moles_oxygen .* normalising_factor
         normalised_oxygen_sum = sum(normalised_oxygen_moles)
         H_iteration = 2 - (normalised_oxygen_moles[19] + normalised_oxygen_moles[20])
         O_OH = (0.5 * H_iteration) / normalising_factor
@@ -69,11 +83,13 @@ function MicaFormula(data::DataFrame, units::String; normalising_O::Int = 12)
         iterations = iterations + 1
         H_initial = H_iteration
     end
-    element_oxy_ratio = [2, 2, 1, 2, 2, 1, 2, 1, 0.5, 0.5, 0.667, 1, 1, 1, 0.667, 1, 0.667, 0.5, 0.5, 0.5, 0.5]
+    element_oxy_ratio = [2, 2, 1, 2, 2, 1, 2, 1, 0.5, 0.5, 0.667, 1, 1, 1, 0.667, 1, 0.667,
+    0.5, 0.5, 0.5, 0.5]
     atoms_per_formula_unit = normalised_oxygen_moles .* element_oxy_ratio
     return atoms_per_formula_unit, iterations
 end
 
+# use lowercase.(names(data)) to make code shorter.
 function micaFindColumns(data)
     workingdata = DataFrame()
     if in("Sample", names(data)) == true
@@ -227,4 +243,4 @@ function micaFindColumns(data)
         workingdata.OH .= 0
     end
     return workingdata
-end 
+end
