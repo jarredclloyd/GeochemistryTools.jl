@@ -1,10 +1,10 @@
 #= Preamble
 This file contains functions for calculating mineral formulas from ppm or wt% data
 =#
-export MicaFormula
+export formula_mica
 
 """
-    MicaFormula(data, units; [normalising_O::Int=11])
+    formula_mica(data, units; [normalising_O::Int=11])
 
 Calculates mica formula based on input data and declared units.
 
@@ -16,18 +16,18 @@ Units is the units the data is in, a string of value "ppm" OR "wt%"
 
 # Example
 ```julia-repl
-julia> MicaFormula(df, "ppm")
+julia> formula_mica(df, "ppm")
 ```
 """
 
-function MicaFormula(data::AbstractDataFrame, units::AbstractString; normalising_O::Int=11)
+function formula_mica(data::AbstractDataFrame, units::AbstractString; normalising_O::Int=11)
     I_site = [:Na, :K, :Ca, :Rb, :Cs, :Ba]
     M_site = [:Li, :Mg, :Ti, :V, :Cr, :Mn, :Zn, :Fe]
     TM_site = [:Al]
     T_site = [:Be, :B, :Si]
     A_site = [:F, :Cl, :OH]
     column_names = [:Na, :K, :Ca, :Rb, :Cs, :Ba, :Li, :Mg, :Ti, :V, :Cr, :Mn, :Zn, :Fe, :Al, :Be, :B, :Si, :F, :Cl, :OH]
-    workingdata = _micaFindColumns(data)
+    workingdata = _find_columns_mica(data)
     workingvector = collect(values(workingdata[1, Not(:Sample)]))
 
     if uppercase(units) == "PPM"
@@ -65,36 +65,30 @@ function MicaFormula(data::AbstractDataFrame, units::AbstractString; normalising
     H_initial = 2 - (normalised_oxygen_moles[19] + normalised_oxygen_moles[20])
     O_OH = (0.5 * H_initial) / normalising_factor
     moles_oxygen[21] = O_OH
-    oxygen_sum = sum(moles_oxygen) - 0.5 * (moles_oxygen[19 + moles_oxygen[20]])
+    oxygen_sum = sum(moles_oxygen) - 0.5 * (moles_oxygen[19] + moles_oxygen[20])
     normalising_factor = normalising_O / oxygen_sum
     normalised_oxygen_moles = moles_oxygen .* normalising_factor
 
     ϵ = 1
-    while normalised_oxygen_sum > normalising_O && ϵ > 1e-8 && iterations <= 1000
-        # moles_oxygen = moles_compound .* oxide_factors
-        # oxygen_sum = sum(moles_oxygen)
-        # normalising_factor = normalising_O / oxygen_sum
-
-
-        # normalised_oxygen_moles = moles_oxygen .* normalising_factor
-        # oxygen_sum = sum(moles_oxygen) - (0.5 * (moles_oxygen[19] + moles_oxygen[20]))
-        # normalising_factor = normalising_O / oxygen_sum
-        # normalised_oxygen_sum = sum(normalised_oxygen_moles)
-        # H_iteration = 2 - (normalised_oxygen_moles[19] + normalised_oxygen_moles[20])
-        # O_OH = (0.5 * H_iteration) / normalising_factor
-        # moles_oxygen[21] = O_OH
-        # normalised_oxygen_moles[21] = O_OH
-        # ϵ = abs(H_iteration - H_initial)
-        # iterations = iterations + 1
-        # H_initial = H_iteration
+    while ϵ > 1e-4 && iterations <= 1000
+        H_iteration = 2 - (normalised_oxygen_moles[19] + normalised_oxygen_moles[20])
+        O_OH = (0.5 * H_iteration) / normalising_factor
+        moles_oxygen[21] = O_OH
+        oxygen_sum = sum(moles_oxygen) - 0.5 * (moles_oxygen[19]+moles_oxygen[20])
+        normalising_factor = normalising_O / oxygen_sum
+        normalised_oxygen_moles = moles_oxygen .* normalising_factor
+        ϵ = abs(H_iteration - H_initial)
+        iterations = iterations + 1
+        H_initial = H_iteration
     end
-    element_oxy_ratio = [2, 2, 1, 2, 2, 1, 2, 1, 0.5, 0.5, 0.667, 1, 1, 1, 0.667, 1, 0.667, 0.5, 0.5, 0.5, 0.5]
+
+    element_oxy_ratio = [2, 2, 1, 2, 2, 1, 2, 1, 0.5, 0.5, 0.667, 1, 1, 1, 0.667, 1, 0.667, 0.5, 1, 1, 2]
     atoms_per_formula_unit = normalised_oxygen_moles .* element_oxy_ratio
-    return atoms_per_formula_unit, iterations
+    return atoms_per_formula_unit
 end
 
 # use lowercase.(names(data)) to make code shorter.
-function _micaFindColumns(data)
+function _find_columns_mica(data)
     workingdata = DataFrame()
     if in("sample", lowercase.(names(data))) == true
         workingdata.Sample = data[:, :Sample]
