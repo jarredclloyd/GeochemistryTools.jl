@@ -2,7 +2,10 @@
 This jl file contains dictionaries and other reference information for that are used in "GeochemistryTools.jl"
 =#
 
-export Avogadro, element_symbol_to_mass, molecular_weight_oxide, Dict_SrInitial,
+export Avogadro,
+    element_symbol_to_mass,
+    molecular_weight_oxide,
+    dict_sr87_sr86i,
     #decay constants:
     λK40, SEλK40,
     λRb87, SEλRb87,
@@ -20,27 +23,27 @@ export Avogadro, element_symbol_to_mass, molecular_weight_oxide, Dict_SrInitial,
     U238U235, SE238U235
 
 #Constant Declarations: general
-const avogadro = 6.02214076 * 10^23
-const planck = 6.62607015e-34 #JHz⁻¹
-const speedoflight = 299792458 #ms⁻¹
-const boltzmann = 1.380649e-23 #JK⁻¹
+const avogadro::AbstractFloat = 6.02214076 * 10^23
+const planck::AbstractFloat = 6.62607015e-34 #JHz⁻¹
+const speedoflight::AbstractFloat = 299792458 #ms⁻¹
+const boltzmann::AbstractFloat = 1.380649e-23 #JK⁻¹
 
 #Constant Declarations: decay constants
-const λK40, SEλK40 = 0.00055305, 0.00000132
-const λRb87, SEλRb87 = 0.000013972, 0.000000045
-const λSm147, SEλSm147 = 0.000006524, 0.000000012
-const λLu176, SEλLu176 = 0.00001867, 0.00000008
-const λRe187, SEλRe187 = 0.00001666, 0.000000085
-const λRa226, SEλRa226 = 0.4332, 0.0019
-const λTh230, SEλTh230 = 0.0091705, 0.0000016
-const λTh232, SEλTh232 = 0.0000495, 0.0000025
-const λPa231, SEλPa231 = 0.021158, 0.00071
-const λU234, SEλU234 = 0.00282206, 0.00000080
-const λU235, SEλU235 = 0.00098485, 0.000000670
-const λU238, SEλU238 = 0.000155125, 0.000000083
+const λK40::AbstractFloat, SEλK40::AbstractFloat = 0.00055305, 0.00000132
+const λRb87::AbstractFloat, SEλRb87::AbstractFloat = 0.000013972, 0.000000045
+const λSm147::AbstractFloat, SEλSm147::AbstractFloat = 0.000006524, 0.000000012
+const λLu176::AbstractFloat, SEλLu176::AbstractFloat = 0.00001867, 0.00000008
+const λRe187::AbstractFloat, SEλRe187::AbstractFloat = 0.00001666, 0.000000085
+const λRa226::AbstractFloat, SEλRa226::AbstractFloat = 0.4332, 0.0019
+const λTh230::AbstractFloat, SEλTh230::AbstractFloat = 0.0091705, 0.0000016
+const λTh232::AbstractFloat, SEλTh232::AbstractFloat = 0.0000495, 0.0000025
+const λPa231::AbstractFloat, SEλPa231::AbstractFloat = 0.021158, 0.00071
+const λU234::AbstractFloat, SEλU234::AbstractFloat = 0.00282206, 0.00000080
+const λU235::AbstractFloat, SEλU235::AbstractFloat = 0.00098485, 0.000000670
+const λU238::AbstractFloat, SEλU238::AbstractFloat = 0.000155125, 0.000000083
 
 #Constant Declarations: isotope ratios
-const U238U235, SE238U235 = 137.818, 0.0225
+const U238U235::AbstractFloat, SE238U235::AbstractFloat = 137.818, 0.0225
 
 #Element properties (mass, ionic radii, charges, symbol, name)
 element_symbol_to_name = Dict()
@@ -60,7 +63,7 @@ julia> element_symbol_to_mass("He")
 4.002602
 ```
 """
-element_symbol_to_mass = Dict(
+const element_symbol_to_mass::AbstractDict = Dict{Any, AbstractFloat}(
     [('H', 1.00794), ("He", 4.002602), ("Li", 6.941), ("Be", 9.012182), ('B', 10.811),
     ('C', 12.0107), ('N', 14.0067), ('O', 15.9994), ('F', 18.9984032), ("Ne", 20.1797),
     ("Na", 22.98976928), ("Mg", 24.305), ("Al", 26.9815386), ("Si", 28.0855),
@@ -99,7 +102,7 @@ cn_eight_IR = Dict(
 )
 
 # Molecular properties
-molecular_weight_oxide = Dict(
+const molecular_weight_oxide::AbstractDict = Dict{AbstractString, AbstractFloat}(
     [
     ("H2O", 18.015), ("Li2O" , 29.879), ("BeO" , 25.0112), ("B2O3" , 69.617), ("Na2O" , 61.979), ("MgO" , 40.304),
     ("Al2O3" , 101.961), ("SiO2" , 60.083), ("P2O5" , 141.943), ("SO2" , 64.058), ("SO3" , 80.057),
@@ -121,7 +124,7 @@ molecular_weight_oxide = Dict(
 #C1 Chondrite (Palme and O'Neill 2016)
 
 # Initial Sr87/86 ratios
-Dict_SrInitial = Dict(
+const dict_sr87_sr86i::AbstractDict = Dict(
     [
     ("MDC", [1e-10, 1e-12, 0.72607, 0.00070]), ("MDCInv", [1e-10, 1e-12, 1.37727767295, 0.0013278]),
     ("Hogsbo", [1e-10, 1e-12, 0.72000, 0.000103]), ("HogsboInv", [1e-10, 1e-12, 1.38889, 0.000198688]),
