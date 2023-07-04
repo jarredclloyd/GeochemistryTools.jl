@@ -124,7 +124,7 @@ const molecular_weight_oxide::AbstractDict = Dict{AbstractString, AbstractFloat}
 #C1 Chondrite (Palme and O'Neill 2016)
 
 # Initial Sr87/86 ratios
-const dict_sr87_sr86i::AbstractDict = Dict(
+const dict_sr87_sr86i::AbstractDict = Dict{AbstractString, AbstractArray}(
     [
     ("MDC", [1e-10, 1e-12, 0.72607, 0.00070]), ("MDCInv", [1e-10, 1e-12, 1.37727767295, 0.0013278]),
     ("Hogsbo", [1e-10, 1e-12, 0.72000, 0.000103]), ("HogsboInv", [1e-10, 1e-12, 1.38889, 0.000198688]),
