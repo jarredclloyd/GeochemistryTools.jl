@@ -215,3 +215,75 @@ function MonteCarloEIV()
 
 end
 =#
+
+function mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
+    nX::Int = length(X)
+    if ρXY === nothing
+        ρXY::AbstractArray{AbstractFloat} = zeros(nX)
+    elseif length(ρXY) !== nX
+        ρXY = push!(zeros(nX - length(ρXY)))
+    end
+    β₀::AbstractFloat, β₁::AbstractFloat = coeffs(Polynomials.fit(X, Y, 1))
+    βₑ::AbstractFloat = β₁
+    σxy::AbstractArray{AbstractFloat} = ρXY .* sX .* sY
+    Ωᵢ::AbstractArray{AbstractFloat} = 1 ./ (sY .^2 .+ β₁ .^2 .* sX .^2 .- 2 .* β₁ .* σxy)
+    X̄::AbstractFloat = sum(Ωᵢ .* X) / sum(Ωᵢ)
+    Ȳ::AbstractFloat = sum(Ωᵢ .* Y) / sum(Ωᵢ)
+    U::AbstractArray{AbstractFloat} = X .- X̄
+    V::AbstractArray{AbstractFloat} = Y .- Ȳ
+    β₁ =
+        sum(Ωᵢ .^2 .* V .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- V .* σxy)) /
+        sum(Ωᵢ .^2 .* U .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- β₁ .* U .* σxy))
+    n_iterations::Int = 1
+    while (βₑ / β₁ - 1)^2 > 1e-15 && n_iterations < 1000
+        βₑ = β₁
+        β₁ =
+            sum(Ωᵢ .^2 .* V .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- V .* σxy)) /
+            sum(Ωᵢ .^2 .* U .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- β₁ .* U .* σxy))
+        n_iterations = n_iterations + 1
+    end
+    β₀ = Ȳ - β₁ * X̄
+    #= uncertainties
+    # c₁::AbstractFloat = sum(Ωᵢ .* (U .* V .* sX .^2 .- U .^2 .* σxy))
+    # c₂::AbstractFloat = sum(Ωᵢ .* (U .^2 .* sY .^2 .- V .^2 .* sX .^2))
+    # c₃::AbstractFloat = sum(Ωᵢ .* (U .* V .* sY .^2 .- V .^2 .* σxy))
+    # θ::AbstractFloat = c₁ * β₁^2 + c₂ * β₁ - c₃
+    δθᵦ₁ =
+        sum(Ωᵢ .^ 2 .* (2 .* β₁ .* (U .* V .* sX .^ 2 .- U .^ 2 .* σxy) .+ (U .^ 2 .* sY .^ 2 .- V .^ 2 .* sX .^ 2))) +
+        4 * sum(
+            Ωᵢ .^ 3 .* (σxy .- β₁ .* sX .^ 2) .* (
+                β₁ .^ 2 .* (U .* V .* sX .^ 2 .- U .^ 2 .* σxy) .+ β₁ .* (V .^ 2 .* sY .^ 2 .- V .^ 2 .* sX .^ 2) .-
+                (U .* V .* sY .^ 2 .- V .^ 2 .* U .* V .* sX .^ 2 .- U .^ 2 .* σxy)
+            ),
+        ) +
+        2 *
+        sum(Ωᵢ .^ 2 .* (-β₁ .^ 2 .* U .* sX .^ 2 .+ 2 .* β₁ .* V .* sX .^ 2 .+ U .* sY .^ 2 .- 2 .* V .* σxy)) *
+        sum(Ωᵢ .^ 2 .* V .* (σxy .- β₁ .* sX .^ 2)) / sum(Ωᵢ) +
+        2 *
+        sum(Ωᵢ .^ 2 .* (-β₁ .^ 2 .* V .* sX .^ 2 .+ 2 .* β₁ .^ 2 .* U .* σxy .- 2 .* U .* sY .^ 2 .+ V .* sY .^ 2)) *
+        sum(Ωᵢ .^ 2 .* U .* (σxy .- β₁ .* sX .^ 2)) / sum(Ωᵢ)
+    δᵢⱼ = 1 # i == j ? 1 : 0
+    δθX = sum(Ωᵢ .^2 .* (δᵢⱼ .- Ωᵢ ./ sum(Ωᵢ) .* (β₁ .^2 .* V .* sX .^2 .- 2 .* β₁ .^2 .* U .* σxy .+ 2 .* β₁ .* U .* sY .^2 .- V .* sY .^2)))
+    δθY = sum(Ωᵢ .^2 .* (δᵢⱼ .- Ωᵢ ./ sum(Ωᵢ) .* (β₁ .^2 .* U .* sX .^2 .- 2 .* β₁ .* V .* sX .^2 .- U .* sY .^2 .+ 2 .* V .* σxy)))
+    δβ₀X = (- β₁ .* Ωᵢ) ./ sum(Ωᵢ .- X̄ .* (δθX / δθᵦ₁))
+    δβ₀Y = Ωᵢ ./ sum(Ωᵢ .- X̄ .* (δθY / δθᵦ₁))
+    σᵦ₁² = (sum(δθX .^2 .* sX .^2 + δθY .^2 .* sY .^2 .+ 2 .* σxy .* δθX .* δθY) / (δθX / δθY)^2)
+    σᵦ₀² = sum(δβ₀X .^2 .* sX .^2 .* δβ₀Y .^2 .* sY .^2 .+ 2.0 * σxy .* δβ₀X .* δβ₀Y)
+    β₀SE = σᵦ₀² / √(nX)
+    β₁SE = σᵦ₁² / √(nX)
+    return println("Y = $β₀ (var: $σᵦ₀²) + $β₁ (var: $σᵦ₁²) × X")
+    =#
+
+    #=
+    x̄ = sum(Ωᵢ .* X) / sum(Ωᵢ)
+    υ::AbstractArray{AbstractFloat} = X .- x̄
+    β₁SE::AbstractFloat = √(1 / sum(Ωᵢ .* υ .^ 2))
+    β₀SE::AbstractFloat = √(1 / sum(Ωᵢ) + (x̄ * β₁SE)^2)
+    σᵦ₁ᵦ₀::AbstractFloat = - x̄ * β₁SE^2
+    χ²::AbstractFloat = sum(Ωᵢ .* (Y .- β₁ .* X .- β₀) .^ 2)
+    ν::Int = nX - 2
+    χ²ᵣ::AbstractFloat = χ² / ν
+    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
+    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX
+    =#
+end
