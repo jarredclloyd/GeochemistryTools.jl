@@ -138,7 +138,7 @@ end
 """
     ratio2agePb207U235(ratio)
 
-Compute the ²⁰⁷Pb/²³⁵U age for a given ratio. 
+Compute the ²⁰⁷Pb/²³⁵U age for a given ratio.
 Works for vectors and other arrays if column is specified.
 
 # Examples
@@ -169,7 +169,7 @@ end
 """
     ratio2agePb207Pb206(ratio)
 
-Compute the ²⁰⁷Pb/²⁰⁶Pb age for a given ratio. 
+Compute the ²⁰⁷Pb/²⁰⁶Pb age for a given ratio.
 
 Works for vectors and other arrays if column is specified.
 Uses the Newton-Raphson iterative method to solve for age with a tolerance of 1e-12 of the input ratio(s).
@@ -249,8 +249,8 @@ function agePb206U238(ratio)
     if ratio > 0
         log(ratio + 1) / λU238
     else
-        println("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data. 
-        Please check your data.")
+        throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
+        Please check your data."))
     end
 end
 
@@ -258,31 +258,29 @@ function agePb207U235(ratio)
     if ratio > 0
         log(ratio + 1) / λU235
     else
-        println("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data. 
-        Please check your data.")
+        throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
+        Please check your data."))
     end
 end
 
 function agePb207Pb206(ratio)
-    if ratio > 0
+    if ratio <= 0
+        throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
+        Please check your data."))
+    else
         t_guess = (log(ratio) + 3.21121) / 0.000586671
-        tolerance = 0.000000000001
-        ε = 1e-24
+        ε = eps()
         n_iterations = 1
-        while abs(ratio - ratioPb207Pb206(t_guess)) > tolerance && abs(ratioprimePb207Pb206(t_guess)) > ε
+        while abs(ratio - ratioPb207Pb206(t_guess)) > eps() && n_iterations < 1e6
             t_iteration = t_guess - (ratioPb207Pb206(t_guess) - ratio) / ratioprimePb207Pb206(t_guess)
             t_guess = t_iteration
-            n_iterations = n_iterations + 1
-            if n_iterations > 10000
-                t_guess = Inf
-                println("Convergence not reached within 10000 iterations!")
-                break
-            end
+            n_iterations += 1
         end
-        return t_guess
-    else
-        println("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data. 
-        Please check your data.")
+        return if n_iterations < 1e6
+            t_guess
+        else
+          warn(("Convergence at machine tolerance ($(eval(eps()))) not reached within 1e6 iterations!"))
+        end
     end
 end
 
@@ -290,8 +288,8 @@ function ageconcordia(rPb206U238, rPb207U235, rPb207Pb206)
     if rPb206U238 > 0.0 && rPb207U235 > 0.0 && rPb207Pb206 > 0.0
         # concordia age calculation goes here
     else
-        println("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data. 
-        Please check your data.")
+        throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
+        Please check your data."))
     end
 end
 
@@ -303,8 +301,8 @@ function aitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
         log(inv(U238U235) * (exp(λU235 * abs(aPb206U238)) - 1) / (exp(λU238 * abs(aPb206U238)) - 1))) /
         (log(rU238Pb206) - log(exp(λU238 * abs(aPb207Pb206)) - 1)))))
     else
-        println("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data. 
-        Please check your data.")
+        throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
+        Please check your data."))
     end
 end
 
@@ -314,7 +312,7 @@ function aitchisonW(rPb206U238, rPb207U235, aPb206U238, aPb207U235)
         signU235a = sign(aPb207U235)
         # Aitchison distance calculation (Wetherill space) goes here
     else
-        println("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data. 
-        Please check your data.")
+        throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
+        Please check your data."))
     end
 end
