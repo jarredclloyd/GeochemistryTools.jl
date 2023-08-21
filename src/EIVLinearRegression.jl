@@ -2,7 +2,7 @@
 This file contains functions for errors-in-variables linear regression.
 =#
 
-export york, yorkfit, deming, demingfit, jackknife
+export york, yorkfit, deming, demingfit, jackknife, mahon
 
 #Caller functions
 """
@@ -186,7 +186,7 @@ function york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstrac
     βᵢ::AbstractArray{AbstractFloat} = Ω .* (U ./ ωYᵢ + β₁ * V ./ ωXᵢ - (β₁ * U + V) .* ρXY ./ α)
     β₁ = sum(Ω .* βᵢ .* V) / sum(Ω .* βᵢ .* U)
     n_iterations::Int = 1
-    while (βₑ / β₁ - 1)^2 > 1e-15 && n_iterations < 1000
+    while (βₑ / β₁ - 1)^2 > 1e-12 && n_iterations < 1e6
         Ω = ωXᵢ .* ωYᵢ ./ (ωXᵢ .+ β₁^2 .* ωYᵢ .- 2 .* β₁ .* ρXY .* α)
         X̄ = sum(Ω .* X) / sum(Ω)
         Ȳ = sum(Ω .* Y) / sum(Ω)
@@ -207,7 +207,7 @@ function york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstrac
     ν::Int = nX - 2
     χ²ᵣ::AbstractFloat = χ² / ν
     pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX
+    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX, X̄, Ȳ
 end
 
 #=
@@ -216,74 +216,157 @@ function MonteCarloEIV()
 end
 =#
 
+#= Mahon regression and associated functions
+Mahon (1996) "new York regression" corrected by Stepan & Trappitsch (2023)
+=#
+
 function mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
     nX::Int = length(X)
     if ρXY === nothing
-        ρXY::AbstractArray{AbstractFloat} = zeros(nX)
+        ρXY::AbstractArray = zeros(nX)
     elseif length(ρXY) !== nX
         ρXY = push!(zeros(nX - length(ρXY)))
     end
     β₀::AbstractFloat, β₁::AbstractFloat = coeffs(Polynomials.fit(X, Y, 1))
     βₑ::AbstractFloat = β₁
-    σxy::AbstractArray{AbstractFloat} = ρXY .* sX .* sY
-    Ωᵢ::AbstractArray{AbstractFloat} = 1 ./ (sY .^2 .+ β₁ .^2 .* sX .^2 .- 2 .* β₁ .* σxy)
-    X̄::AbstractFloat = sum(Ωᵢ .* X) / sum(Ωᵢ)
-    Ȳ::AbstractFloat = sum(Ωᵢ .* Y) / sum(Ωᵢ)
-    U::AbstractArray{AbstractFloat} = X .- X̄
-    V::AbstractArray{AbstractFloat} = Y .- Ȳ
+    σxy::AbstractArray = ρXY .* sX .* sY
+    Ω::AbstractArray = 1 ./ (sY .^2 .+ β₁ .^2 .* sX .^2 .- 2 .* β₁ .* σxy)
+    X̄::AbstractFloat = sum(Ω .* X) / sum(Ω)
+    Ȳ::AbstractFloat = sum(Ω .* Y) / sum(Ω)
+    U::AbstractArray = X .- X̄
+    V::AbstractArray = Y .- Ȳ
     β₁ =
-        sum(Ωᵢ .^2 .* V .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- V .* σxy)) /
-        sum(Ωᵢ .^2 .* U .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- β₁ .* U .* σxy))
+        sum(Ω .^2 .* V .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- V .* σxy)) /
+        sum(Ω .^2 .* U .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- β₁ .* U .* σxy))
     n_iterations::Int = 1
-    while (βₑ / β₁ - 1)^2 > 1e-15 && n_iterations < 1000
+    while (βₑ / β₁ - 1)^2 > 1e-12 && n_iterations < 1e6
         βₑ = β₁
         β₁ =
-            sum(Ωᵢ .^2 .* V .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- V .* σxy)) /
-            sum(Ωᵢ .^2 .* U .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- β₁ .* U .* σxy))
+            sum(Ω .^2 .* V .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- V .* σxy)) /
+            sum(Ω .^2 .* U .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- β₁ .* U .* σxy))
         n_iterations = n_iterations + 1
     end
     β₀ = Ȳ - β₁ * X̄
-    #= uncertainties
-    # c₁::AbstractFloat = sum(Ωᵢ .* (U .* V .* sX .^2 .- U .^2 .* σxy))
-    # c₂::AbstractFloat = sum(Ωᵢ .* (U .^2 .* sY .^2 .- V .^2 .* sX .^2))
-    # c₃::AbstractFloat = sum(Ωᵢ .* (U .* V .* sY .^2 .- V .^2 .* σxy))
-    # θ::AbstractFloat = c₁ * β₁^2 + c₂ * β₁ - c₃
-    δθᵦ₁ =
-        sum(Ωᵢ .^ 2 .* (2 .* β₁ .* (U .* V .* sX .^ 2 .- U .^ 2 .* σxy) .+ (U .^ 2 .* sY .^ 2 .- V .^ 2 .* sX .^ 2))) +
-        4 * sum(
-            Ωᵢ .^ 3 .* (σxy .- β₁ .* sX .^ 2) .* (
-                β₁ .^ 2 .* (U .* V .* sX .^ 2 .- U .^ 2 .* σxy) .+ β₁ .* (V .^ 2 .* sY .^ 2 .- V .^ 2 .* sX .^ 2) .-
-                (U .* V .* sY .^ 2 .- V .^ 2 .* U .* V .* sX .^ 2 .- U .^ 2 .* σxy)
-            ),
-        ) +
+    x_intercept = -β₀ / β₁
+    δθδβ₁ = (
+        sum(Ω.^2 .* (2β₁ .* (U .* V .* sX.^2 .- U.^2 .* σxy) .+ (U.^2 .* sY.^2 .- V.^2 .* sX.^2))) +
+        4 * sum(Ω.^3 .* (σxy .- β₁ .* sX.^2) .* (
+                β₁^2 .* (U .* V .* sX.^2 .- U.^2 .* σxy) .+
+                β₁ .* (U.^2 .* sY.^2 .- V.^2 .* sX.^2) .-
+                (U .* V .* sY.^2 .- V.^2 .* σxy))) +
         2 *
-        sum(Ωᵢ .^ 2 .* (-β₁ .^ 2 .* U .* sX .^ 2 .+ 2 .* β₁ .* V .* sX .^ 2 .+ U .* sY .^ 2 .- 2 .* V .* σxy)) *
-        sum(Ωᵢ .^ 2 .* V .* (σxy .- β₁ .* sX .^ 2)) / sum(Ωᵢ) +
+        sum(Ω.^2 .* (
+            -(β₁^2) .* U .* sX.^2 .+
+            2β₁ .* V .* sX.^2 .+
+            U .* sY.^2 .- 2 .* V .* σxy)) *
+        sum(Ω.^2 .* V .* (σxy .- β₁ .* sX.^2)) /
+        sum(Ω) +
         2 *
-        sum(Ωᵢ .^ 2 .* (-β₁ .^ 2 .* V .* sX .^ 2 .+ 2 .* β₁ .^ 2 .* U .* σxy .- 2 .* U .* sY .^ 2 .+ V .* sY .^ 2)) *
-        sum(Ωᵢ .^ 2 .* U .* (σxy .- β₁ .* sX .^ 2)) / sum(Ωᵢ)
-    δᵢⱼ = 1 # i == j ? 1 : 0
-    δθX = sum(Ωᵢ .^2 .* (δᵢⱼ .- Ωᵢ ./ sum(Ωᵢ) .* (β₁ .^2 .* V .* sX .^2 .- 2 .* β₁ .^2 .* U .* σxy .+ 2 .* β₁ .* U .* sY .^2 .- V .* sY .^2)))
-    δθY = sum(Ωᵢ .^2 .* (δᵢⱼ .- Ωᵢ ./ sum(Ωᵢ) .* (β₁ .^2 .* U .* sX .^2 .- 2 .* β₁ .* V .* sX .^2 .- U .* sY .^2 .+ 2 .* V .* σxy)))
-    δβ₀X = (- β₁ .* Ωᵢ) ./ sum(Ωᵢ .- X̄ .* (δθX / δθᵦ₁))
-    δβ₀Y = Ωᵢ ./ sum(Ωᵢ .- X̄ .* (δθY / δθᵦ₁))
-    σᵦ₁² = (sum(δθX .^2 .* sX .^2 + δθY .^2 .* sY .^2 .+ 2 .* σxy .* δθX .* δθY) / (δθX / δθY)^2)
-    σᵦ₀² = sum(δβ₀X .^2 .* sX .^2 .* δβ₀Y .^2 .* sY .^2 .+ 2.0 * σxy .* δβ₀X .* δβ₀Y)
-    β₀SE = σᵦ₀² / √(nX)
-    β₁SE = σᵦ₁² / √(nX)
-    return println("Y = $β₀ (var: $σᵦ₀²) + $β₁ (var: $σᵦ₁²) × X")
-    =#
+        sum(Ω.^2 .* (
+            -(β₁^2) .* V .* sX.^2 .+
+            2(β₁^2) .* U .* σxy .-
+            2β₁ .* U .* sY.^2 .+ V .* sY.^2)) *
+        sum(Ω.^2 .* U .* (σxy .- β₁ .* sX.^2)) /
+        sum(Ω)
+    )
+    δθδX = zeros(AbstractFloat, length(X))
+    Threads.@threads for i in eachindex(X)
+        δθδX[i] = _δθδXᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
+    end
+    δθδY = zeros(AbstractFloat, length(X))
+    Threads.@threads for i in eachindex(X)
+        δθδY[i] = _δθδYᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
+    end
+    δβ₀δX = zeros(AbstractFloat, length(X))
+    Threads.@threads for i in eachindex(X)
+        δβ₀δX[i] = _δβ₀δXᵢ(i, X̄, β₁, Ω, δθδX, δθδβ₁)
+    end
+    δβ₀δY = zeros(AbstractFloat, length(X))
+    Threads.@threads for i in eachindex(X)
+        δβ₀δY[i] = _δβ₀δYᵢ(i, X̄, Ω, δθδY, δθδβ₁)
+    end
+    σβ₁² = sum(δθδX .^2 .* sX .^2 .+ δθδY .^2 .* sY .^2 .+ 2 .* σxy .* δθδX .* δθδY) / δθδβ₁^2
+    σβ₀² = sum(δβ₀δX .^ 2 .* sX .^ 2 .+ δβ₀δY .^ 2 .* sY .^ 2 .+ 2 .* σxy .* δβ₀δX .* δβ₀δY)
 
+    β₀SE = √(σβ₀²) / √(nX)
+    β₁SE = √(σβ₁²) / √(nX)
+    # return println("Y = $β₀ (± $β₀SE) + $β₁ (± $β₁SE) × X")
     #=
-    x̄ = sum(Ωᵢ .* X) / sum(Ωᵢ)
-    υ::AbstractArray{AbstractFloat} = X .- x̄
-    β₁SE::AbstractFloat = √(1 / sum(Ωᵢ .* υ .^ 2))
-    β₀SE::AbstractFloat = √(1 / sum(Ωᵢ) + (x̄ * β₁SE)^2)
-    σᵦ₁ᵦ₀::AbstractFloat = - x̄ * β₁SE^2
-    χ²::AbstractFloat = sum(Ωᵢ .* (Y .- β₁ .* X .- β₀) .^ 2)
+    σᵦ₁ᵦ₀::AbstractFloat = - x̄ * β₁SE^2, , σᵦ₁ᵦ₀
+    =#
+    χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
     ν::Int = nX - 2
     χ²ᵣ::AbstractFloat = χ² / ν
     pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX
-    =#
+    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, nX
 end
+
+function _kroneckerδ(i::Integer, j::Integer)
+    return i == j ? 1 : 0
+end
+
+function _δθδXᵢ(
+    i::Integer,
+    β₁::AbstractFloat,
+    Ω::AbstractArray,
+    U::AbstractArray,
+    V::AbstractArray,
+    sX::AbstractArray,
+    sY::AbstractArray,
+    σxy::AbstractArray,
+)
+    tempⱼ = zeros(AbstractFloat, length(Ω))
+    @simd for j in eachindex(Ω)
+        tempⱼ[j] =
+            Ω[j]^2 *
+            (_kroneckerδ(i, j) - Ω[i] / sum(Ω)) *
+            (β₁^2 * V[j] * sX[j]^2 - 2 * β₁^2 * U[j] * σxy[j] + 2 * β₁ * U[j] * sY[j]^2 - V[j] * sY[j]^2)
+    end
+    δθδXᵢ = sum(tempⱼ)
+    return δθδXᵢ
+end
+
+function _δθδYᵢ(
+    i::Integer,
+    β₁::AbstractFloat,
+    Ω::AbstractArray,
+    U::AbstractArray,
+    V::AbstractArray,
+    sX::AbstractArray,
+    sY::AbstractArray,
+    σxy::AbstractArray,
+)
+    tempⱼ = zeros(AbstractFloat, length(Ω))
+    @simd for j in eachindex(Ω)
+        tempⱼ[j] =
+            Ω[j]^2 *
+            (_kroneckerδ(i, j) - Ω[j] / sum(Ω)) *
+            (β₁^2 * U[j] * sX[j]^2 - 2 * β₁ * V[j] * sX[j]^2 - U[j] * sY[j]^2 + 2 * V[j] * σxy[j])
+    end
+    δθδYᵢ = sum(tempⱼ)
+    return δθδYᵢ
+end
+
+function _δβ₀δXᵢ(
+    i::Integer,
+    X̄::AbstractFloat,
+    β₁::AbstractFloat,
+    Ω::AbstractArray,
+    δθδX::AbstractArray,
+    δθδβ₁::AbstractFloat
+)
+    return -β₁ * Ω[i] / sum(Ω) - X̄ * δθδX[i] / δθδβ₁
+end
+
+function _δβ₀δYᵢ(
+    i::Integer,
+    X̄::AbstractFloat,
+    Ω::AbstractArray,
+    δθδY::AbstractArray,
+    δθδβ₁::AbstractFloat
+)
+    return Ω[i] / sum(Ω) - X̄ * δθδY[i] / δθδβ₁
+end
+
+# δβ₀X = (-β₁ .* Ω) ./ sum(Ω .- X̄ .* (δθX / δθδβ₁))
+# δβ₀Y = Ω ./ sum(Ω .- X̄ .* (δθY / δθδβ₁))
