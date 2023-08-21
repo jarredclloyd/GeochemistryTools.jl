@@ -186,7 +186,7 @@ function york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstrac
     βᵢ::AbstractArray{AbstractFloat} = Ω .* (U ./ ωYᵢ + β₁ * V ./ ωXᵢ - (β₁ * U + V) .* ρXY ./ α)
     β₁ = sum(Ω .* βᵢ .* V) / sum(Ω .* βᵢ .* U)
     n_iterations::Int = 1
-    while (βₑ / β₁ - 1)^2 > 1e-12 && n_iterations < 1e6
+    while (βₑ / β₁ - 1)^2 > eps() && n_iterations < 1e6
         Ω = ωXᵢ .* ωYᵢ ./ (ωXᵢ .+ β₁^2 .* ωYᵢ .- 2 .* β₁ .* ρXY .* α)
         X̄ = sum(Ω .* X) / sum(Ω)
         Ȳ = sum(Ω .* Y) / sum(Ω)
@@ -198,8 +198,9 @@ function york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstrac
         n_iterations = n_iterations + 1
     end
     β₀ = Ȳ - β₁ * X̄
-    x̄ = sum(Ω .* X) / sum(Ω)
-    υ::AbstractArray{AbstractFloat} = X .- x̄
+    xᵢ = X̄ .+ βᵢ
+    x̄ = sum(Ω .* xᵢ) / sum(Ω)
+    υ::AbstractArray{AbstractFloat} = xᵢ .- x̄
     β₁SE::AbstractFloat = √(1 / sum(Ω .* υ .^ 2))
     β₀SE::AbstractFloat = √(1 / sum(Ω) + (x̄ * β₁SE)^2)
     σᵦ₁ᵦ₀::AbstractFloat = - x̄ * β₁SE^2
@@ -217,7 +218,7 @@ end
 =#
 
 #= Mahon regression and associated functions
-Mahon (1996) "new York regression" corrected by Stepan & Trappitsch (2023)
+Mahon (1996) "new York regression" corrected by Stephan & Trappitsch (2023)
 =#
 
 function mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
@@ -239,12 +240,13 @@ function mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstra
         sum(Ω .^2 .* V .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- V .* σxy)) /
         sum(Ω .^2 .* U .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- β₁ .* U .* σxy))
     n_iterations::Int = 1
-    while (βₑ / β₁ - 1)^2 > 1e-12 && n_iterations < 1e6
+    while abs(βₑ - β₁) > eps() && n_iterations < 1e6
         βₑ = β₁
         β₁ =
             sum(Ω .^2 .* V .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- V .* σxy)) /
             sum(Ω .^2 .* U .* (U .* sY .^2 .+ β₁ .* V .* sX .^2 .- β₁ .* U .* σxy))
-        n_iterations = n_iterations + 1
+
+        n_iterations += 1
     end
     β₀ = Ȳ - β₁ * X̄
     x_intercept = -β₀ / β₁
@@ -287,13 +289,8 @@ function mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstra
     end
     σβ₁² = sum(δθδX .^2 .* sX .^2 .+ δθδY .^2 .* sY .^2 .+ 2 .* σxy .* δθδX .* δθδY) / δθδβ₁^2
     σβ₀² = sum(δβ₀δX .^ 2 .* sX .^ 2 .+ δβ₀δY .^ 2 .* sY .^ 2 .+ 2 .* σxy .* δβ₀δX .* δβ₀δY)
-
-    β₀SE = √(σβ₀²) / √(nX)
-    β₁SE = √(σβ₁²) / √(nX)
-    # return println("Y = $β₀ (± $β₀SE) + $β₁ (± $β₁SE) × X")
-    #=
-    σᵦ₁ᵦ₀::AbstractFloat = - x̄ * β₁SE^2, , σᵦ₁ᵦ₀
-    =#
+    β₀SE = √(σβ₀²)
+    β₁SE = √(σβ₁²)
     χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
     ν::Int = nX - 2
     χ²ᵣ::AbstractFloat = χ² / ν
