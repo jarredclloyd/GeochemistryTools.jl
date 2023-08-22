@@ -249,8 +249,72 @@ function mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstra
         n_iterations += 1
     end
     β₀ = Ȳ - β₁ * X̄
-    x_intercept = -β₀ / β₁
-    δθδβ₁ = (
+    # derivative calculations
+    δθδβ₁ = _δθδβ₁(β₁, Ω, U, V, sX, sY, σxy)
+    δθδX = zeros(AbstractFloat, length(X))
+    Threads.@threads for i in eachindex(X)
+        δθδX[i] = _δθδXᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
+    end
+    δθδY = zeros(AbstractFloat, length(X))
+    Threads.@threads for i in eachindex(X)
+        δθδY[i] = _δθδYᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
+    end
+    δβ₀δX = zeros(AbstractFloat, length(X))
+    Threads.@threads for i in eachindex(X)
+        δβ₀δX[i] = _δβ₀δXᵢ(i, X̄, β₁, Ω, δθδX, δθδβ₁)
+    end
+    δβ₀δY = zeros(AbstractFloat, length(X))
+    Threads.@threads for i in eachindex(X)
+        δβ₀δY[i] = _δβ₀δYᵢ(i, X̄, Ω, δθδY, δθδβ₁)
+    end
+    # variance calculations
+    σβ₁² = sum(δθδX .^2 .* sX .^2 .+ δθδY .^2 .* sY .^2 .+ 2 .* σxy .* δθδX .* δθδY) / δθδβ₁^2
+    σβ₀² = sum(δβ₀δX .^ 2 .* sX .^ 2 .+ δβ₀δY .^ 2 .* sY .^ 2 .+ 2 .* σxy .* δβ₀δX .* δβ₀δY)
+    # X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; sX ⇄ sY; X̄ ⇄ Ȳ}
+    # if calc_X_intercept != false
+        X_intercept = -β₀ / β₁
+        Ω = 1 ./ (sX .^2 .+ (1/β₁) .^2 .* sY .^2 .- 2 .* (1/β₁) .* σxy)
+        δθδβ₁ = _δθδβ₁((1/β₁), Ω, V, U, sY, sX, σxy)
+        δθδX = zeros(AbstractFloat, length(X))
+        Threads.@threads for i in eachindex(X)
+            δθδX[i] = _δθδXᵢ(i, (1/β₁), Ω, V, U, sY, sX, σxy)
+        end
+        δθδY = zeros(AbstractFloat, length(X))
+        Threads.@threads for i in eachindex(X)
+            δθδY[i] = _δθδYᵢ(i, (1/β₁), Ω, V, U, sY, sX, σxy)
+        end
+        δβ₀δX = zeros(AbstractFloat, length(X))
+        Threads.@threads for i in eachindex(X)
+            δβ₀δX[i] = _δβ₀δXᵢ(i, Ȳ, (1/β₁), Ω, δθδX, δθδβ₁)
+        end
+        δβ₀δY = zeros(AbstractFloat, length(X))
+        Threads.@threads for i in eachindex(X)
+            δβ₀δY[i] = _δβ₀δYᵢ(i, Ȳ, Ω, δθδY, δθδβ₁)
+        end
+        σX_intercept² = sum(δβ₀δX .^ 2 .* sX .^ 2 .+ δβ₀δY .^ 2 .* sY .^ 2 .+ 2 .* σxy .* δβ₀δX .* δβ₀δY)
+    # end
+    β₀SE = √(σβ₀²)
+    β₁SE = √(σβ₁²)
+    X_interceptSE = √(σX_intercept²)
+    χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
+    ν::Int = nX - 2
+    χ²ᵣ::AbstractFloat = χ² / ν
+    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
+    return β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, nX
+end
+
+function _kroneckerδ(i::Integer, j::Integer)
+    return i == j ? 1 : 0
+end
+
+function _δθδβ₁(
+    β₁::AbstractFloat,
+    Ω::AbstractArray,
+    U::AbstractArray,
+    V::AbstractArray,
+    sX::AbstractArray,
+    sY::AbstractArray,
+    σxy::AbstractArray)
         sum(Ω.^2 .* (2β₁ .* (U .* V .* sX.^2 .- U.^2 .* σxy) .+ (U.^2 .* sY.^2 .- V.^2 .* sX.^2))) +
         4 * sum(Ω.^3 .* (σxy .- β₁ .* sX.^2) .* (
                 β₁^2 .* (U .* V .* sX.^2 .- U.^2 .* σxy) .+
@@ -270,36 +334,6 @@ function mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstra
             2β₁ .* U .* sY.^2 .+ V .* sY.^2)) *
         sum(Ω.^2 .* U .* (σxy .- β₁ .* sX.^2)) /
         sum(Ω)
-    )
-    δθδX = zeros(AbstractFloat, length(X))
-    Threads.@threads for i in eachindex(X)
-        δθδX[i] = _δθδXᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
-    end
-    δθδY = zeros(AbstractFloat, length(X))
-    Threads.@threads for i in eachindex(X)
-        δθδY[i] = _δθδYᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
-    end
-    δβ₀δX = zeros(AbstractFloat, length(X))
-    Threads.@threads for i in eachindex(X)
-        δβ₀δX[i] = _δβ₀δXᵢ(i, X̄, β₁, Ω, δθδX, δθδβ₁)
-    end
-    δβ₀δY = zeros(AbstractFloat, length(X))
-    Threads.@threads for i in eachindex(X)
-        δβ₀δY[i] = _δβ₀δYᵢ(i, X̄, Ω, δθδY, δθδβ₁)
-    end
-    σβ₁² = sum(δθδX .^2 .* sX .^2 .+ δθδY .^2 .* sY .^2 .+ 2 .* σxy .* δθδX .* δθδY) / δθδβ₁^2
-    σβ₀² = sum(δβ₀δX .^ 2 .* sX .^ 2 .+ δβ₀δY .^ 2 .* sY .^ 2 .+ 2 .* σxy .* δβ₀δX .* δβ₀δY)
-    β₀SE = √(σβ₀²)
-    β₁SE = √(σβ₁²)
-    χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
-    ν::Int = nX - 2
-    χ²ᵣ::AbstractFloat = χ² / ν
-    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, nX
-end
-
-function _kroneckerδ(i::Integer, j::Integer)
-    return i == j ? 1 : 0
 end
 
 function _δθδXᵢ(
