@@ -29,7 +29,7 @@ function age2ratioPb206U238(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @simd for i in 1:nages
+        @simd for i ∈ 1:nages
             ratio[i] = ratioPb206U238(age[i])
         end
         return ratio
@@ -61,7 +61,7 @@ function age2ratioPb207U235(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @simd for i in 1:nages
+        @simd for i ∈ 1:nages
             ratio[i] = ratioPb207U235(age[i])
         end
         return ratio
@@ -93,7 +93,7 @@ function age2ratioPb207Pb206(age)
     if isa(age, Array)
         ratio = zeros(size(age))
         nages = length(age)
-        @simd for i in 1:nages
+        @simd for i ∈ 1:nages
             ratio[i] = ratioPb207Pb206(age[i])
         end
         return ratio
@@ -125,7 +125,7 @@ function ratio2agePb206U238(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @simd for i in 1:nratios
+        @simd for i ∈ 1:nratios
             age[i] = agePb206U238(ratio[i])
         end
         return age
@@ -157,7 +157,7 @@ function ratio2agePb207U235(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @simd for i in 1:nratios
+        @simd for i ∈ 1:nratios
             age[i] = agePb207U235(ratio[i])
         end
         return age
@@ -190,7 +190,7 @@ function ratio2agePb207Pb206(ratio)
     if isa(ratio, Array)
         age = zeros(size(ratio))
         nratios = length(ratio)
-        @threads for i in 1:nratios
+        @threads for i ∈ 1:nratios
             age[i] = agePb207Pb206(ratio[i])
         end
         return age
@@ -218,7 +218,7 @@ function calcaitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
     if isa(rU238Pb206, Array)
         aitchdist = zeros(size(rU238Pb206))
         ncount = length(rU238Pb206)
-        @simd for i in 1:ncount
+        @simd for i ∈ 1:ncount
             aitchdist[i] = aitchisonTW(rU238Pb206[i], rPb207Pb206[i], aPb206U238[i], aPb207Pb206[i])
         end
         return aitchdist
@@ -276,11 +276,10 @@ function agePb207Pb206(ratio)
             t_guess = t_iteration
             n_iterations += 1
         end
-        return if n_iterations < 1e6
-            t_guess
-        else
-          warn(("Convergence at machine tolerance ($(eval(eps()))) not reached within 1e6 iterations!"))
+        if n_iterations == 1e6
+            warn(("Convergence at machine tolerance ($(eval(eps()))) not reached within 1e6 iterations. Estimate is provided at a tolerance of $(eval(ratio - ratioPb207Pb206(t_guess)))"))
         end
+        return t_guess
     end
 end
 

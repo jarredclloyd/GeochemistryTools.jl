@@ -27,31 +27,26 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
     K39 -> 39, K39 -> 58) specify the desired mass by replacing ` -> ` with `_` (e.g. `K39 -> 39` to `K39_39`).
 
 # Keywords
-- `firstrow::Int`: An `Int` representing the first data row. Default value is `5`. This can be used to remove the rows
-    prior to `stabletime` if set to an appropriate value (e.g, ~110 for a 30 second gas blank).
-- `stabletime::Real`: The time (in seconds) where signal counts are stabilised. Default value is `32` (i.e. 32 seconds).
+- `first_row::Integer`: An `Integer` representing the first data row. Default value is `5`.
+- `gas_blank::Real`: The time (in seconds) where the gas blank ends. Default value is `27.5`.
+- `stable_time::Real`: The time (in seconds) where signal counts are stabilised. Default value is `32` (i.e. 32 seconds).
     This parameter is used to filter the rows when calculating the median counts per second ratio.
-- `signalend::Real`: The time (in seconds) where the data should be truncated. Default value is `Inf` (will use entire
-    signal beyond `stabletime`). It is recommended to set this to a value appropriate to your data (i.e. total signal
+- `signal_end::Real`: The time (in seconds) where the data should be truncated. Default value is `Inf` (will use entire
+    signal beyond `stable_time`). It is recommended to set this to a value appropriate to your data (i.e. total signal
     time minus ~5 [e.g. 65]) to avoid some artefacts  that may occur near the end of an ablation.
-- `trim::Bool`: Whether to trim the data to only contain values between `firstrow` and `signalend`. Default value is
-    `false`. Setting to `true` it will delete all data from the first record past `signalend` to the last record.
+- `trim::Bool`: Whether to trim the data to only contain values between `first_row` and `signal_end`. Default value is
+    `false`. Setting to `true` it will delete all data from the first record past `signal_end` to the last record.
 
-# Example
-```
-julia> load_downhole("path/to/dir", "sample_x", "Rb85", "Sr87"; firstrow = 110, stabletime = 32, signalend = 65, trim = true)
-MxN DataFrame
-
-```
 """
 function load_downhole(
     host_directory::AbstractString,
     sample::AbstractString,
     cps_column1::AbstractString,
     cps_column2::AbstractString;
-    firstrow::Int = 5,
-    stabletime::Real = 32,
-    signalend::Real = Inf,
+    first_row::Integer = 5,
+    gas_blank::Real = 27.5,
+    stable_time::Real = 32,
+    signal_end::Real = Inf,
     trim::Bool = false,
 )
     files = glob(sample * "*.csv", host_directory)
@@ -59,7 +54,7 @@ function load_downhole(
         files,
         DataFrame;
         header = 4,
-        skipto = firstrow,
+        skipto = first_row,
         types = Float64,
         footerskip = 3,
         ignoreemptyrows = true,
@@ -68,15 +63,30 @@ function load_downhole(
     data = select!(data, r"Time", r"" * cps_column1, r"" * cps_column2)
     rename!(data, ["time", cps_column1, cps_column2])
     sort!(data, :time)
-    data.ratio = data[!, cps_column1] ./ data[!, cps_column2]
+    gas_blank_cps_column1 = median(data[0 .< data.time .< gas_blank, cps_column1])
+    gas_blank_cps_column2 = median(data[0 .< data.time .< gas_blank, cps_column2])
+    insertcols!(data, cps_column1 * "_gbsub" => data[!, cps_column1] .- gas_blank_cps_column1)
+    insertcols!(data, cps_column1 * "_σ" => sqrt.(abs.(data[!, cps_column1 * "_gbsub"])))
+    insertcols!(data, cps_column2 * "_gbsub" => data[!, cps_column2] .- gas_blank_cps_column2)
+    insertcols!(data, cps_column2 * "_σ" => sqrt.(abs.(data[!, cps_column2 * "_gbsub"])))
+    data.ratio = data[!, cps_column1 * "_gbsub"] ./ data[!, cps_column2 * "_gbsub"]
     replace!(data[!, :ratio], Inf => 0)
-    mdn = median(filter(x -> x .> 0, data[stabletime .< data.time .< signalend, :ratio]))
-    data.ratio_mdn_norm = data[!, :ratio] ./ mdn
+    insertcols!(data, "ratio_σ" => sqrt.(data[!, :ratio] .^2 .*
+            (
+                (data[!, cps_column1 * "_σ"] ./ data[!, cps_column1 * "_gbsub"]) .^ 2 +
+                (data[!, cps_column2 * "_σ"] ./ data[!, cps_column2 * "_gbsub"]) .^ 2
+            )
+        )
+    )
+    data.ratio_mdn_norm = data.ratio ./ median(data[stable_time .< data.time .< signal_end, :ratio])
+    data.ratio_mdn_norm_σ = data.ratio_mdn_norm .* (data.ratio_σ ./ data.ratio)
     if trim == true
-        filter!(:time => x -> x .< signalend, data)
+        filter!(:time => x -> stable_time .< x .< signal_end, data)
     end
     metadata!(data, "name", sample)
-    metadata!(data, "stable time", stabletime)
-    metadata!(data, "signal end", signalend)
+    metadata!(data, "gas blank" * cps_column1, gas_blank_cps_column1)
+    metadata!(data, "gas blank" * cps_column2, gas_blank_cps_column2)
+    metadata!(data, "stable time", stable_time)
+    metadata!(data, "signal end", signal_end)
     return data
 end
