@@ -90,3 +90,73 @@ function load_downhole(
     metadata!(data, "signal end", signal_end)
     return data
 end
+
+
+function load_agilent(
+    host_directory::AbstractString,
+    sample::Union{Nothing, AbstractString},
+    cps_column1::AbstractString,
+    cps_column2::AbstractString;
+    date_time_format::AbstractString = "d/m/Y H:M:S",
+    first_row::Integer = 5,
+    gas_blank::Real = 27.5,
+    stable_time::Real = 32,
+    signal_end::Real = Inf,
+    trim::Bool = false
+)
+    file = glob(sample * "*.csv", host_directory)
+    data = CSV.read(file, DataFrame; header = false, limit = 3)
+    analysis_name = chop(data[1, 1]; head = findlast("b\\", data[1, 1])[2], tail = 2)
+    sample_name = chop(analysis_name; tail = length(analysis_name) - findlast(" - ", analysis_name)[1] + 1)
+    analysis_time = chop(
+        data[3, 1];
+        head = findfirst(":", data[3, 1])[1] + 1,
+        tail = length(data[3, 1]) - findnext(" u", data[3, 1], findfirst(":", data[3, 1])[1])[1] + 1,
+    )
+    analysis_time = DateTime(analysis_time, date_time_format)
+    Dates.Year(analysis_time) < Dates.Year(2000) ? analysis_time + Dates.Year(2000) : analysis_time
+    data = CSV.read(
+        file,
+        DataFrame;
+        header = 4,
+        skipto = first_row,
+        types = Float64,
+        footerskip = 3,
+        ignoreemptyrows = true,
+        normalizenames = true,
+    )
+    data = select!(data, r"Time", r"" * cps_column1, r"" * cps_column2)
+    rename!(data, ["time", cps_column1, cps_column2])
+    insertcols!(data, 1, "sample" => sample_name)
+    insertcols!(data, 2, "analysis_name" => analysis_name)
+    insertcols!(data, 3, "analysis_time" => analysis_time)
+    sort!(data, :time)
+    gas_blank_cps_column1 = median(data[0 .< data.time .< gas_blank, cps_column1])
+    gas_blank_cps_column2 = median(data[0 .< data.time .< gas_blank, cps_column2])
+    insertcols!(data, cps_column1 * "_gbsub" => data[!, cps_column1] .- gas_blank_cps_column1)
+    insertcols!(data, cps_column1 * "_σ" => sqrt.(abs.(data[!, cps_column1 * "_gbsub"])))
+    insertcols!(data, cps_column2 * "_gbsub" => data[!, cps_column2] .- gas_blank_cps_column2)
+    insertcols!(data, cps_column2 * "_σ" => sqrt.(abs.(data[!, cps_column2 * "_gbsub"])))
+    data.ratio = data[!, cps_column1 * "_gbsub"] ./ data[!, cps_column2 * "_gbsub"]
+    replace!(data[!, :ratio], Inf => 0)
+    insertcols!(
+        data,
+        "ratio_σ" =>
+            sqrt.(
+                data[!, :ratio] .^ 2 .* (
+                    (data[!, cps_column1 * "_σ"] ./ data[!, cps_column1 * "_gbsub"]) .^ 2 +
+                    (data[!, cps_column2 * "_σ"] ./ data[!, cps_column2 * "_gbsub"]) .^ 2
+                )
+            ),
+    )
+    data.ratio_mdn_norm = data.ratio ./ median(data[stable_time .< data.time .< signal_end, :ratio])
+    data.ratio_mdn_norm_σ = data.ratio_mdn_norm .* (data.ratio_σ ./ data.ratio)
+    if trim == true
+        filter!(:time => x -> stable_time .< x .< signal_end, data)
+    end
+    metadata!(data, "gas blank" * cps_column1, gas_blank_cps_column1)
+    metadata!(data, "gas blank" * cps_column2, gas_blank_cps_column2)
+    metadata!(data, "stable time", stable_time)
+    metadata!(data, "signal end", signal_end)
+    return data
+end
