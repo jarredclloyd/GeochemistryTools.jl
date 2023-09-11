@@ -30,6 +30,7 @@ using Reexport
 @reexport using Glob
 @reexport using HypothesisTests
 @reexport using Dates
+using LinearAlgebra
 using PyCall
 using Conda
 
@@ -49,6 +50,7 @@ include("ErrorInVariablesRegression/errors_in_variable_regression.jl")
 include("ErrorInVariablesRegression/eivlr_deming.jl")
 include("ErrorInVariablesRegression/eivlr_mahon.jl")
 include("ErrorInVariablesRegression/eivlr_york.jl")
+include("orthogonal_polynomials.jl")
 
 function _check_equal_length(
     a::AbstractVector,
