@@ -55,7 +55,6 @@ function load_agilent2(
         DataFrame;
         header = 4,
         skipto = first_row,
-        types = Float64,
         footerskip = 3,
         ignoreemptyrows = true,
         normalizenames = true,
@@ -114,7 +113,7 @@ function load_agilent(
     else
         files = glob(sample * "*.csv", host_directory)
     end
-    for file in files
+    @threads for file in files
         df = CSV.read(file, DataFrame; header = false, limit = 3, silencewarnings = true)
         analysis_name = chop(df[1, 1]; head = findlast("b\\", df[1, 1])[2], tail = 2)
         sample_name = chop(analysis_name; tail = length(analysis_name) - findlast(" - ", analysis_name)[1] + 1)
@@ -134,7 +133,6 @@ function load_agilent(
             DataFrame;
             header = 4,
             skipto = first_row,
-            types = Float64,
             footerskip = 3,
             ignoreemptyrows = true,
             normalizenames = true,
@@ -144,7 +142,6 @@ function load_agilent(
         insertcols!(df, 1, "sample" => sample_name)
         insertcols!(df, 2, "analysis_name" => analysis_name)
         insertcols!(df, 3, "analysis_time" => analysis_time)
-        sort!(df, :time)
         gas_blank_cps_column1 = median(df[0 .< df.time .< gas_blank, cps_column1])
         gas_blank_cps_column2 = median(df[0 .< df.time .< gas_blank, cps_column2])
         insertcols!(df, cps_column1 * "_gbsub" => df[!, cps_column1] .- gas_blank_cps_column1)
@@ -170,9 +167,8 @@ function load_agilent(
         end
         data = vcat(data, df)
     end
-    # metadata!(data, "gas blank" * cps_column1, gas_blank_cps_column1)
-    # metadata!(data, "gas blank" * cps_column2, gas_blank_cps_column2)
-    # metadata!(data, "stable time", stable_time)
-    # metadata!(data, "signal end", signal_end)
+    sort!(data, :time)
+    metadata!(data, "stable time", stable_time)
+    metadata!(data, "signal end", signal_end)
     return data
 end
