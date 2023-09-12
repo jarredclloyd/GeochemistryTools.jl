@@ -60,20 +60,49 @@ function fit_orth(
     df::AbstractDataFrame,
     x_name::Symbol,
     y_name::Symbol,
-    yσ_name::Union{Nothing,Symbol} = nothing,
+    yσ_name::Union{Nothing,Symbol} = nothing;
+    weight::AbstractString = "abs",
+    weight_transform::AbstractString = "inv",
 )
     if yσ_name !== nothing
-        return _orthogonal_LSQ(df[!, x_name], df[!, y_name], df[!, yσ_name])
+        return _orthogonal_LSQ(
+            df[!, x_name],
+            df[!, y_name],
+            df[!, yσ_name];
+            weight = weight,
+            weight_transform = weight_transform,
+        )
     else
-        return _orthogonal_LSQ(df[!, x_name], df[!, y_name])
+        return _orthogonal_LSQ(
+            df[!, x_name],
+            df[!, y_name];
+            weight = weight,
+            weight_transform = weight_transform,
+        )
     end
 end
 
-function fit_orth(A::AbstractArray; errors::Bool=false)
+function fit_orth(
+    A::AbstractArray;
+    errors::Bool = false,
+    weight::AbstractString = "abs",
+    weight_transform::AbstractString = "inv",
+)
     if errors === false
-        return _orthogonal_LSQ(A[:, 1], A[:, 2])
+        return _orthogonal_LSQ(
+            A[:, 1],
+            A[:, 2];
+            weight = weight,
+            weight_transform = weight_transform,
+        )
     elseif errors === true
-        return _orthogonal_LSQ(A[:, 1], A[:, 2], A[:, 3])
+        return _orthogonal_LSQ(
+            A[:, 1],
+            A[:, 2],
+            A[:, 3];
+            weight = weight,
+            weight_transform = weight_transform,
+        )
     end
 end
 
@@ -84,33 +113,24 @@ function polyλ(x::AbstractVector, fλ::OrthogonalPoly, order::Integer)
     return _polyλ(x, fλ.λ, fλ.β, fλ.γ, fλ.δ, fλ.ϵ, order)
 end
 
-function polyCI(
-    x,
-    fλ::OrthogonalPoly,
-    order::Integer;
-    y::Union{Nothing,AbstractArray} = nothing,
-    yσ::Union{Nothing,AbstractArray} = nothing,
-    CIlevel::AbstractFloat = 0.95,
-)
+function polyCI(x, fλ::OrthogonalPoly, order::Integer; CIlevel::AbstractFloat = 0.95)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - CIlevel) / 2)
-    if y !== nothing && yσ !== nothing
-        ω = 1 ./ (yσ ./ y) .^ 2
-    elseif yσ !== nothing
-        ω = 1 ./ yσ .^ 2
-    else
-        ω = repeat([1], length(x))
-    end
-    Ω = Diagonal(ω)
-    A = _design_matrix(x, fλ, order)
-    Σ = inv(transpose(A) * Ω * A)
-    return vec(sqrt.(sum(A .* (A * Σ); dims = 2)) .* tvalue)
+    X = _design_matrix(x, fλ, order)
+    Σ = fλ.Σ[1:(order + 1), 1:(order + 1)]
+    return vec(sqrt.(sum(X .* (X * Σ); dims = 2)) .* tvalue)
 end
 
 # primary calculation function
-function _orthogonal_LSQ(x, y, yσ::Union{Nothing,AbstractArray} = nothing)
+function _orthogonal_LSQ(
+    x::AbstractVector,
+    y::AbstractVector,
+    yσ::Union{Nothing,AbstractArray} = nothing;
+    weight::AbstractString = "abs",
+    weight_transform::AbstractString = "inv",
+)
     𝑁 = length(x)
     β = _β(x)
     γ = _γ(x)
@@ -124,11 +144,17 @@ function _orthogonal_LSQ(x, y, yσ::Union{Nothing,AbstractArray} = nothing)
         (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]),
         (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]),
     )
-    if yσ !== nothing
+    if yσ !== nothing && occursin("rel", lowercase(weight)) == true
         ω = (yσ ./ y)
-        ω = 1 ./ ω .^ 2
+    elseif yσ !== nothing && occursin("abs", lowercase(weight)) == true
+        ω = yσ
     else
         ω = repeat([1], length(x))
+    end
+    if weight_transform == "log"
+        ω = log.(ω)
+    else
+        ω = 1 ./ ω .^ 2
     end
     Ω = Diagonal(ω)
     Λ = inv(transpose(X) * Ω * X) * transpose(X) * Ω * y
@@ -146,7 +172,15 @@ function _orthogonal_LSQ(x, y, yσ::Union{Nothing,AbstractArray} = nothing)
 end
 
 # polynomial functions
-function _polyλ(x::AbstractVector, λ::AbstractVector, β::AbstractFloat, γ::AbstractVector, δ::AbstractVector, ϵ::AbstractVector, order::Integer)
+function _polyλ(
+    x::AbstractVector,
+    λ::AbstractVector,
+    β::AbstractFloat,
+    γ::AbstractVector,
+    δ::AbstractVector,
+    ϵ::AbstractVector,
+    order::Integer,
+)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
@@ -174,7 +208,17 @@ function _bayesian_information_criteria(χ²::AbstractFloat, 𝑁::Integer, orde
     return χ² + order * log(𝑁)
 end
 
-function _χ²(x::AbstractVector, y::AbstractVector, Ω::AbstractArray, λ::AbstractVector, β::AbstractFloat, γ::AbstractVector, δ::AbstractVector, ϵ::AbstractVector, order::Integer)
+function _χ²(
+    x::AbstractVector,
+    y::AbstractVector,
+    Ω::AbstractArray,
+    λ::AbstractVector,
+    β::AbstractFloat,
+    γ::AbstractVector,
+    δ::AbstractVector,
+    ϵ::AbstractVector,
+    order::Integer,
+)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
@@ -219,7 +263,13 @@ function _δ(x)
             -sum(x .^ 3) sum(x .^ 2) -sum(x)
             -sum(x .^ 4) sum(x .^ 3) -sum(x .^ 2)
         ] \ [-sum(x .^ 3); -sum(x .^ 4); -sum(x .^ 5)]
-    return real(roots(Polynomial([-vieta[3], vieta[2], -vieta[1], 1]); permute = false, scale = false))
+    return real(
+        roots(
+            Polynomial([-vieta[3], vieta[2], -vieta[1], 1]);
+            permute = false,
+            scale = false,
+        ),
+    )
 end
 
 function _ϵ(x)
@@ -230,7 +280,13 @@ function _ϵ(x)
             -sum(x .^ 5) sum(x .^ 4) -sum(x .^ 3) sum(x .^ 2)
             -sum(x .^ 6) sum(x .^ 5) -sum(x .^ 4) sum(x .^ 3)
         ] \ [-sum(x .^ 4); -sum(x .^ 5); -sum(x .^ 6); -sum(x .^ 7)]
-    return real(roots(Polynomial([vieta[4], -vieta[3], vieta[2], -vieta[1], 1]); permute = false, scale = false))
+    return real(
+        roots(
+            Polynomial([vieta[4], -vieta[3], vieta[2], -vieta[1], 1]);
+            permute = false,
+            scale = false,
+        ),
+    )
 end
 
 function _design_matrix(x, fλ, order)
