@@ -113,7 +113,7 @@ function load_agilent(
     else
         files = glob(sample * "*.csv", host_directory)
     end
-    @threads for file in files
+    for file in files
         df = CSV.read(file, DataFrame; header = false, limit = 3, silencewarnings = true)
         analysis_name = chop(df[1, 1]; head = findlast("b\\", df[1, 1])[2], tail = 2)
         sample_name = chop(analysis_name; tail = length(analysis_name) - findlast(" - ", analysis_name)[1] + 1)
