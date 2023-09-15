@@ -25,7 +25,7 @@ struct OrthogonalPoly
     γ::AbstractVector
     δ::AbstractVector
     ϵ::AbstractVector
-    Σ::AbstractArray
+    Var::AbstractArray
     order::AbstractVector
     χ²::AbstractVector
     χ²ᵣ::AbstractVector
@@ -119,8 +119,8 @@ function polyCI(x, fλ::OrthogonalPoly, order::Integer; CIlevel::AbstractFloat =
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - CIlevel) / 2)
     X = _design_matrix(x, fλ, order)
-    Σ = fλ.Σ[1:(order + 1), 1:(order + 1)]
-    return vec(sqrt.(sum(X .* (X * Σ); dims = 2)) .* tvalue)
+    Var = fλ.Var[1:(order + 1), 1:(order + 1)]
+    return vec(sqrt.(sum(X .* (X * Var); dims = 2)) .* tvalue)
 end
 
 # primary calculation function
@@ -154,12 +154,16 @@ function _orthogonal_LSQ(
     if weight_transform == "log"
         ω = log.(ω)
     else
-        ω = 1 ./ ω .^ 2
+        ω = ω .^ 2
     end
-    Ω = Diagonal(ω)
+    Ω = inv(Diagonal(ω))
     Λ = inv(transpose(X) * Ω * X) * transpose(X) * Ω * y
-    Σ = inv(transpose(X) * Ω * X)
-    Λ_SE = sqrt.([Σ[1, 1], Σ[2, 2], Σ[3, 3], Σ[4, 4], Σ[5, 5]])
+    Var = inv(transpose(X) * Ω * X)
+    ŷ = X * Λ
+    r = y .- ŷ
+    # varΒ = diag((inv(transpose(X) * Ω * X)) * ((transpose(r) * Ω * r)/(N - order[i]))) # the diagonal of (sum of squares / df) * VarCov Matrix)
+    # println(varΒ)
+    Λ_SE = sqrt.([Var[1, 1], Var[2, 2], Var[3, 3], Var[4, 4], Var[5, 5]])
     χ² = zeros(5)
     χ²ᵣ = zeros(5)
     BIC = zeros(5)
@@ -168,7 +172,7 @@ function _orthogonal_LSQ(
         χ²ᵣ[i] = _χ²ᵣ(𝑁, χ²[i], order[i])
         BIC[i] = _bayesian_information_criteria(χ²[i], 𝑁, order[i])
     end
-    return OrthogonalPoly(Λ, Λ_SE, β, γ, δ, ϵ, Σ, order, χ², χ²ᵣ, BIC)
+    return OrthogonalPoly(Λ, Λ_SE, β, γ, δ, ϵ, Var, order, χ², χ²ᵣ, BIC)
 end
 
 # polynomial functions
