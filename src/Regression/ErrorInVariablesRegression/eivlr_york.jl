@@ -77,11 +77,11 @@ function yorkfit(
         occursin("abs", lowercase.(se_type)) == true ||
         occursin("absolute", lowercase.(se_type)) == true
         if dfCols == 5
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(
+            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁 = york(
                 df[!, 1], df[!, 2] ./ se_level_in, df[!, 3], df[!, 4] ./ se_level_in, df[!, 5]
             )
         elseif dfCols == 4
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(
+            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁 = york(
                 df[!, 1], df[!, 2] ./ se_level_in, df[!, 3], df[!, 4] ./ se_level_in
             )
         else
@@ -91,7 +91,7 @@ function yorkfit(
         occursin("rel", lowercase.(se_type)) == true ||
         occursin("relative", lowercase.(se_type)) == true
         if dfCols == 5
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(
+            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁 = york(
                 df[!, 1],
                 (df[!, 2] .* df[!, 1]) ./ se_level_in,
                 df[!, 3],
@@ -99,7 +99,7 @@ function yorkfit(
                 df[!, 5],
             )
         elseif dfCols == 4
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX = york(
+            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁 = york(
                 df[!, 1], (df[!, 2] .* df[!, 1]) ./ se_level_in, df[!, 3], (df[!, 4] .* df[!, 3]) ./ se_level_in
             )
         else
@@ -111,16 +111,16 @@ function yorkfit(
     end
     β₀SE *= se_level_out
     β₁SE *= se_level_out
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX
+    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁
 end
 
 #Base functions
 function york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
-    nX::Int = length(X)
+    𝑁::Int = length(X)
     if ρXY === nothing
-        ρXY::AbstractArray{AbstractFloat} = zeros(nX)
-    elseif length(ρXY) !== nX
-        ρXY = push!(zeros(nX - length(ρXY)))
+        ρXY::AbstractArray{AbstractFloat} = zeros(𝑁)
+    elseif length(ρXY) !== 𝑁
+        ρXY = push!(zeros(𝑁 - length(ρXY)))
     end
     β₀::AbstractFloat, β₁::AbstractFloat = coeffs(Polynomials.fit(X, Y, 1))
     βₑ::AbstractFloat = β₁
@@ -154,10 +154,10 @@ function york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstrac
     β₀SE::AbstractFloat = √(1 / sum(Ω) + (x̄ * β₁SE)^2)
     σᵦ₁ᵦ₀::AbstractFloat = - x̄ * β₁SE^2
     χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
-    ν::Int = nX - 2
+    ν::Int = 𝑁 - 2
     χ²ᵣ::AbstractFloat = χ² / ν
     pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX, X̄, Ȳ
+    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁, X̄, Ȳ
 end
 
 #=

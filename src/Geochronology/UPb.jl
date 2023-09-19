@@ -269,15 +269,15 @@ function agePb207Pb206(ratio)
         Please check your data."))
     else
         t_guess = (log(ratio) + 3.21121) / 0.000586671
-        ε = eps()
+        ϵ = 1e-15
         n_iterations = 1
-        while abs(ratio - ratioPb207Pb206(t_guess)) > eps() && n_iterations < 1e6
+        while abs(ratio - ratioPb207Pb206(t_guess)) > ϵ && n_iterations < 1e6
             t_iteration = t_guess - (ratioPb207Pb206(t_guess) - ratio) / ratioprimePb207Pb206(t_guess)
             t_guess = t_iteration
             n_iterations += 1
         end
         if n_iterations == 1e6
-            warn(("Convergence at machine tolerance ($(eval(eps()))) not reached within 1e6 iterations. Estimate is provided at a tolerance of $(eval(ratio - ratioPb207Pb206(t_guess)))"))
+            warn(("Convergence at tolerance ($ϵ) not reached within 1e6 iterations. Estimate is provided at a tolerance of $(eval(ratio - ratioPb207Pb206(t_guess)))"))
         end
         return t_guess
     end

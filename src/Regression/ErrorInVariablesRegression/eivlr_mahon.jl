@@ -61,7 +61,7 @@ function _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY:
         sum(Ω .^ 2 .* V .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- V .* σxy)) /
         sum(Ω .^ 2 .* U .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- β₁ .* U .* σxy))
     n_iterations::Int = 1
-    while abs(βₑ - β₁) > eps() && n_iterations < 1e6
+    while abs(βₑ - β₁) > 1e-15 && n_iterations < 1e6
         βₑ = β₁
         β₁ =
             sum(Ω .^ 2 .* V .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- V .* σxy)) /
@@ -71,19 +71,19 @@ function _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY:
     β₀ = Ȳ - β₁ * X̄
     # derivative calculations
     δθδβ₁ = _δθδβ₁(β₁, Ω, U, V, sX, sY, σxy)
-    δθδX = zeros(AbstractFloat, length(X))
+    δθδX = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
         δθδX[i] = _δθδXᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
     end
-    δθδY = zeros(AbstractFloat, length(X))
+    δθδY = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
         δθδY[i] = _δθδYᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
     end
-    δβ₀δX = zeros(AbstractFloat, length(X))
+    δβ₀δX = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
         δβ₀δX[i] = _δβ₀δXᵢ(i, X̄, β₁, Ω, δθδX, δθδβ₁)
     end
-    δβ₀δY = zeros(AbstractFloat, length(X))
+    δβ₀δY = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
         δβ₀δY[i] = _δβ₀δYᵢ(i, X̄, Ω, δθδY, δθδβ₁)
     end
@@ -95,19 +95,19 @@ function _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY:
     X_intercept = -β₀ / β₁
     Ω = 1 ./ (sX .^ 2 .+ (1 / β₁) .^ 2 .* sY .^ 2 .- 2 .* (1 / β₁) .* σxy)
     δθδβ₁ = _δθδβ₁((1 / β₁), Ω, V, U, sY, sX, σxy)
-    δθδX = zeros(AbstractFloat, length(X))
+    δθδX = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
         δθδX[i] = _δθδXᵢ(i, (1 / β₁), Ω, V, U, sY, sX, σxy)
     end
-    δθδY = zeros(AbstractFloat, length(X))
+    δθδY = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
         δθδY[i] = _δθδYᵢ(i, (1 / β₁), Ω, V, U, sY, sX, σxy)
     end
-    δβ₀δX = zeros(AbstractFloat, length(X))
+    δβ₀δX = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
         δβ₀δX[i] = _δβ₀δXᵢ(i, Ȳ, (1 / β₁), Ω, δθδX, δθδβ₁)
     end
-    δβ₀δY = zeros(AbstractFloat, length(X))
+    δβ₀δY = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
         δβ₀δY[i] = _δβ₀δYᵢ(i, Ȳ, Ω, δθδY, δθδβ₁)
     end
@@ -120,7 +120,7 @@ function _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY:
     ν::Int = nX - 2
     χ²ᵣ::AbstractFloat = χ² / ν
     pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    return Mahon(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, nX)
+    return MahonNonFixed(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, nX)
 end
 
 function _eivlr_mahon_fixedpoint(
@@ -149,7 +149,7 @@ function _eivlr_mahon_fixedpoint(
         sum(Ω .^ 2 .* V .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- V .* σxy)) /
         sum(Ω .^ 2 .* U .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- β₁ .* U .* σxy))
     n_iterations::Int = 1
-    while abs(βₑ - β₁) > eps() && n_iterations < 1e6
+    while abs(βₑ - β₁) > 1e-15 && n_iterations < 1e6
         βₑ = β₁
         β₁ =
             sum(Ω .^ 2 .* V .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- V .* σxy)) /

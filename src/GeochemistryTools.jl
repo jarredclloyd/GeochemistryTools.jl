@@ -31,6 +31,8 @@ using Reexport
 @reexport using HypothesisTests
 @reexport using Dates
 using LinearAlgebra
+using HypergeometricFunctions
+using SpecialFunctions
 using PyCall
 using Conda
 
@@ -46,11 +48,13 @@ include("raman_spectroscopy.jl")
 include("profilometry.jl")
 include("Minerals/mineral_formulas.jl")
 include("lanthanoid_lambdas.jl")
-include("ErrorInVariablesRegression/errors_in_variable_regression.jl")
-include("ErrorInVariablesRegression/eivlr_deming.jl")
-include("ErrorInVariablesRegression/eivlr_mahon.jl")
-include("ErrorInVariablesRegression/eivlr_york.jl")
-include("orthogonal_polynomials.jl")
+include("Regression/ErrorInVariablesRegression/errors_in_variable_regression.jl")
+include("Regression/ErrorInVariablesRegression/eivlr_deming.jl")
+include("Regression/ErrorInVariablesRegression/eivlr_mahon.jl")
+include("Regression/ErrorInVariablesRegression/eivlr_york.jl")
+include("Regression/generalised_least_squares.jl")
+include("Regression/measures_of_fit.jl")
+include("Regression/orthogonal_polynomials.jl")
 
 function _check_equal_length(
     a::AbstractVector,
