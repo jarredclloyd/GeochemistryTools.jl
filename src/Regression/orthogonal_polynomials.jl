@@ -21,7 +21,7 @@ export fit_orthogonal
 export poly_orthogonal, poly_confidence, poly_prediction
 
 # stucts and base extensions
-struct OrthogonalPoly
+struct OrthogonalPolynomial <: LinearRegression
     lambda::AbstractVector
     lambda_se::AbstractArray
     beta::Real
@@ -38,7 +38,7 @@ struct OrthogonalPoly
     n_observations::Integer
 end
 
-function Base.show(io::IOContext, fit::OrthogonalPoly)
+function Base.show(io::IOContext, fit::OrthogonalPolynomial)
     println(
         io,
         "λ₀: $(round(fit.lambda[1], sigdigits = 5)) ± $(round(fit.lambda_se[1], sigdigits = 5)); p(1): χ²ᵣ = $(round(fit.reduced_chi_squared[1], sigdigits = 5)), BIC = $(round(fit.bayesian_information_criteria[1], sigdigits = 5))",
@@ -55,7 +55,7 @@ function Base.show(io::IOContext, fit::OrthogonalPoly)
         io,
         "λ₃: $(round(fit.lambda[4], sigdigits = 5)) ± $(round(fit.lambda_se[4,4], sigdigits = 5)); p(4): χ²ᵣ = $(round(fit.reduced_chi_squared[4], sigdigits = 5)), BIC = $(round(fit.bayesian_information_criteria[4], sigdigits = 5))",
     )
-    return println(
+    println(
         io,
         "λ₄: $(round(fit.lambda[5], sigdigits = 5)) ± $(round(fit.lambda_se[5,5], sigdigits = 5)); p(5): χ²ᵣ = $(round(fit.reduced_chi_squared[5], sigdigits = 5)), BIC = $(round(fit.bayesian_information_criteria[5], sigdigits = 5))",
     )
@@ -75,14 +75,10 @@ function fit_orthogonal(
             df[!, x_name],
             df[!, y_name];
             y_weights = df[!, y_weights],
-            weight_by = weight_by
+            weight_by = weight_by,
         )
     else
-        return _orthogonal_LSQ(
-            df[!, x_name],
-            df[!, y_name];
-            weight_by = weight_by
-        )
+        return _orthogonal_LSQ(df[!, x_name], df[!, y_name]; weight_by = weight_by)
     end
 end
 
@@ -92,22 +88,13 @@ function fit_orthogonal(
     weight_by::AbstractString = "abs",
 )
     if errors === false
-        return _orthogonal_LSQ(
-            A[:, 1],
-            A[:, 2];
-            weight_by = weight_by
-        )
+        return _orthogonal_LSQ(A[:, 1], A[:, 2]; weight_by = weight_by)
     elseif errors === true
-        return _orthogonal_LSQ(
-            A[:, 1],
-            A[:, 2];
-            y_weights = A[:, 3],
-            weight_by = weight_by
-        )
+        return _orthogonal_LSQ(A[:, 1], A[:, 2]; y_weights = A[:, 3], weight_by = weight_by)
     end
 end
 
-function poly_orthogonal(x::AbstractVector, fit::OrthogonalPoly, order::Integer)
+function poly_orthogonal(x::AbstractVector, fit::OrthogonalPolynomial, order::Integer)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
@@ -122,7 +109,12 @@ function poly_orthogonal(x::AbstractVector, fit::OrthogonalPoly, order::Integer)
     )
 end
 
-function poly_confidence(x, fit::OrthogonalPoly, order::Integer; ci_level::AbstractFloat = 0.95)
+function poly_confidence(
+    x,
+    fit::OrthogonalPolynomial,
+    order::Integer;
+    ci_level::AbstractFloat = 0.95,
+)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
@@ -132,14 +124,21 @@ function poly_confidence(x, fit::OrthogonalPoly, order::Integer; ci_level::Abstr
     return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue)
 end
 
-function poly_prediction(x, fit::OrthogonalPoly, order::Integer; ci_level::AbstractFloat = 0.95)
+function poly_prediction(
+    x,
+    fit::OrthogonalPolynomial,
+    order::Integer;
+    ci_level::AbstractFloat = 0.95,
+)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
     X = _design_matrix(x, fit, order)
     VarΛX = fit.variance_covariance[1:(order + 1), 1:(order + 1)]
-    return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(1 .+ X .* (X * VarΛX); dims = 2)) .* tvalue)
+    return vec(
+        sqrt.((fit.rmse[order + 1]^2) .* sum(1 .+ X .* (X * VarΛX); dims = 2)) .* tvalue,
+    )
 end
 
 # primary calculation function
@@ -176,7 +175,7 @@ function _orthogonal_LSQ(
         )
     end
     ω = ω ./ median(ω)
-    ω = 1 ./ ω .^2
+    ω = 1 ./ ω .^ 2
     Ω = Diagonal(ω)
     Λ = inv(transpose(X) * (Ω) * X) * transpose(X) * Ω * y
     VarΛX = inv(transpose(X) * (Ω) * X)
@@ -207,7 +206,22 @@ function _orthogonal_LSQ(
         χ²ᵣ[i] = ess[i] / (𝑁 - order[i])
         BIC[i] = _bayesian_information_criteria(χ²[i], 𝑁, order[i])
     end
-    return OrthogonalPoly(Λ, Λ_SE, β, γ, δ, ϵ, VarΛX, order, R², rmse, χ², χ²ᵣ, BIC, 𝑁)
+    return OrthogonalPolynomial(
+        Λ,
+        Λ_SE,
+        β,
+        γ,
+        δ,
+        ϵ,
+        VarΛX,
+        order,
+        R²,
+        rmse,
+        χ²,
+        χ²ᵣ,
+        BIC,
+        𝑁,
+    )
 end
 
 # polynomial functions
@@ -282,7 +296,7 @@ function _epsion_orthogonal(x::AbstractVector)
     )
 end
 
-function _design_matrix(x::AbstractVector, fit::OrthogonalPoly, order::Integer)
+function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Integer)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end

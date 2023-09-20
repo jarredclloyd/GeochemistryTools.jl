@@ -9,7 +9,7 @@ errors-in-variables regression algorithm of Mahon (1996) corrected by Stephan an
 
 =#
 # function exports
-export eivlr_mahon
+export _eivlr_mahon
 
 # caller functions
 """

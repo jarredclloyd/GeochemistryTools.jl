@@ -2,7 +2,7 @@
 This file contains functions for errors-in-variables linear regression.
 =#
 
-export york, yorkfit, deming, demingfit, jackknife, mahon
+export yorkfit
 
 #Caller functions
 
@@ -38,7 +38,7 @@ Journal of Physics*, 72(3), doi:https://doi.org/10.1119/1.1632486.
 function yorkfit(
     df::AbstractDataFrame;
     se_level_in::Int = 2,
-    se_level_out::Int = 2,
+    # se_level_out::Int = 2,
     se_type::AbstractString = "abs",
     initial::Any = nothing,
 )
@@ -48,9 +48,9 @@ function yorkfit(
         if isa(initial, String) == true && haskey(dict_sr87_sr86i, initial) == true
             initial = deepcopy(dict_sr87_sr86i[initial])
         elseif length(initial) == 1 && isa(initial, AbstractFloat)
-            initial = [1e-10, 1e-18, initial, 0.01]
+            initial = [1e-15, 1e-15, initial, 0.01]
         elseif length(initial) == 2 && isa(initial[1], AbstractFloat) && isa(initial[2], AbstractFloat)
-            initial = [1e-10, 1e-18, initial[1], initial[2]]
+            initial = [1e-15, 1e-15, initial[1], initial[2]]
         elseif length(initial) >= 3
             throw(ArgumentError("Only the initial ratio value and its uncertainty is required."))
         else
@@ -77,11 +77,11 @@ function yorkfit(
         occursin("abs", lowercase.(se_type)) == true ||
         occursin("absolute", lowercase.(se_type)) == true
         if dfCols == 5
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁 = york(
+            yfit = _eivlr_york(
                 df[!, 1], df[!, 2] ./ se_level_in, df[!, 3], df[!, 4] ./ se_level_in, df[!, 5]
             )
         elseif dfCols == 4
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁 = york(
+            yfit = _eivlr_york(
                 df[!, 1], df[!, 2] ./ se_level_in, df[!, 3], df[!, 4] ./ se_level_in
             )
         else
@@ -91,7 +91,7 @@ function yorkfit(
         occursin("rel", lowercase.(se_type)) == true ||
         occursin("relative", lowercase.(se_type)) == true
         if dfCols == 5
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁 = york(
+            yfit = _eivlr_york(
                 df[!, 1],
                 (df[!, 2] .* df[!, 1]) ./ se_level_in,
                 df[!, 3],
@@ -99,7 +99,7 @@ function yorkfit(
                 df[!, 5],
             )
         elseif dfCols == 4
-            β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁 = york(
+            yfit = _eivlr_york(
                 df[!, 1], (df[!, 2] .* df[!, 1]) ./ se_level_in, df[!, 3], (df[!, 4] .* df[!, 3]) ./ se_level_in
             )
         else
@@ -109,13 +109,10 @@ function yorkfit(
     if initial !== nothing
         popat!(df, dfRows + 1)
     end
-    β₀SE *= se_level_out
-    β₁SE *= se_level_out
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁
+    return yfit
 end
 
-#Base functions
-function york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
+function _eivlr_york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
     𝑁::Int = length(X)
     if ρXY === nothing
         ρXY::AbstractArray{AbstractFloat} = zeros(𝑁)
@@ -157,11 +154,7 @@ function york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::Abstrac
     ν::Int = 𝑁 - 2
     χ²ᵣ::AbstractFloat = χ² / ν
     pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    return β₀, β₀SE, β₁, β₁SE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁, X̄, Ȳ
+    x_intercept = -β₀ / β₁
+    x_intercept_se = sqrt((β₀SE / β₀)^2 + (β₁SE / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁))
+    return York(β₀, β₀SE, β₁, β₁SE, x_intercept, x_intercept_se, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁, X̄, Ȳ)
 end
-
-#=
-function MonteCarloEIV()
-
-end
-=#
