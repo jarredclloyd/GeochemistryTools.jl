@@ -165,7 +165,7 @@ function load_agilent(
         if trim == true
             filter!(:time => x -> stable_time .< x .< signal_end, df)
         end
-        data = vcat(data, df)
+        append!(data, df)
     end
     sort!(data, :time)
     metadata!(data, "stable time", stable_time)
