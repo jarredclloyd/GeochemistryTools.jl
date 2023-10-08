@@ -23,8 +23,13 @@ export geomean_zeros, geovar_zeros
 function geomean_zeros(a::AbstractVector)
     N = length(a)
     N2 = count(a .> 0)
-    G₊ = geomean(a[a[:] .> 0, :])
-    return (N2 / N) * G₊
+    if N2 > 0
+        G₊ = geomean(a[a[:] .> 0, :])
+        G = (N2 / N) * G₊
+    else
+        G = 0
+    end
+    return G
 end
 
 """

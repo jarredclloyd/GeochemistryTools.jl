@@ -42,6 +42,21 @@ Stephan, T & Trappitsch, R (2023) 'Reliable uncertainties: Error correlation, ro
 regressions ∈ three-isotope plots and beyond', *International Journal of Mass Spectrometry*, 491:117053.
 https://doi.org/10.1016/j.ijms.2023]].117053
 """
+function _eivlr_mahon(df::AbstractDataFrame;
+        se_level_in::Int = 2,
+        se_level_out::Int = 2,
+        se_type::AbstractString = "abs",
+        initial::Any = nothing,
+)
+end
+
+"""
+
+    _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
+
+Compute line of best fit using the "Mahon" errors-in-variables regression algorithm.
+
+"""
 function _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
     nX::Int = length(X)
     if ρXY === nothing
@@ -60,15 +75,24 @@ function _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY:
     β₁ =
         sum(Ω .^ 2 .* V .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- V .* σxy)) /
         sum(Ω .^ 2 .* U .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- β₁ .* U .* σxy))
-    n_iterations::Int = 1
+    n_iterations::Integer = 1
     while abs(βₑ - β₁) > 1e-15 && n_iterations < 1e6
         βₑ = β₁
+        Ω = 1 ./ (sY .^ 2 .+ βₑ .^ 2 .* sX .^ 2 .- 2 .* βₑ .* σxy)
+        X̄ = sum(Ω .* X) / sum(Ω)
+        Ȳ = sum(Ω .* Y) / sum(Ω)
+        U = X .- X̄
+        V = Y .- Ȳ
         β₁ =
             sum(Ω .^ 2 .* V .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- V .* σxy)) /
             sum(Ω .^ 2 .* U .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- β₁ .* U .* σxy))
         n_iterations += 1
     end
     β₀ = Ȳ - β₁ * X̄
+    χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
+    ν::Int = nX - 2
+    χ²ᵣ::AbstractFloat = χ² / ν
+    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
     # derivative calculations
     δθδβ₁ = _δθδβ₁(β₁, Ω, U, V, sX, sY, σxy)
     δθδX = zeros(AbstractFloat, nX)
@@ -94,14 +118,14 @@ function _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY:
     # if calc_X_intercept != false
     X_intercept = -β₀ / β₁
     Ω = 1 ./ (sX .^ 2 .+ (1 / β₁) .^ 2 .* sY .^ 2 .- 2 .* (1 / β₁) .* σxy)
-    δθδβ₁ = _δθδβ₁((1 / β₁), Ω, V, U, sY, sX, σxy)
+    δθδβ₁ = _δθδβ₁((1 / β₁), Ω, U, V, sY, sX, σxy)
     δθδX = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
-        δθδX[i] = _δθδXᵢ(i, (1 / β₁), Ω, V, U, sY, sX, σxy)
+        δθδX[i] = _δθδXᵢ(i, (1 / β₁), Ω, U, V, sY, sX, σxy)
     end
     δθδY = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
-        δθδY[i] = _δθδYᵢ(i, (1 / β₁), Ω, V, U, sY, sX, σxy)
+        δθδY[i] = _δθδYᵢ(i, (1 / β₁), Ω, U, V, sY, sX, σxy)
     end
     δβ₀δX = zeros(AbstractFloat, nX)
     Threads.@threads for i ∈ eachindex(X)
@@ -116,11 +140,8 @@ function _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY:
     β₀SE = √(σβ₀²)
     β₁SE = √(σβ₁²)
     X_interceptSE = √(σX_intercept²)
-    χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
-    ν::Int = nX - 2
-    χ²ᵣ::AbstractFloat = χ² / ν
-    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    return MahonNonFixed(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, nX)
+    σᵦ₁ᵦ₀::AbstractFloat = -X̄ * β₁SE^2
+    return MahonNonFixed(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX)
 end
 
 function _eivlr_mahon_fixedpoint(
@@ -151,12 +172,21 @@ function _eivlr_mahon_fixedpoint(
     n_iterations::Int = 1
     while abs(βₑ - β₁) > 1e-15 && n_iterations < 1e6
         βₑ = β₁
+        Ω = 1 ./ (sY .^ 2 .+ βₑ .^ 2 .* sX .^ 2 .- 2 .* βₑ .* σxy)
+        X̄ = sum(Ω .* X) / sum(Ω)
+        Ȳ = sum(Ω .* Y) / sum(Ω)
+        U = X .- X̄
+        V = Y .- Ȳ
         β₁ =
             sum(Ω .^ 2 .* V .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- V .* σxy)) /
             sum(Ω .^ 2 .* U .* (U .* sY .^ 2 .+ β₁ .* V .* sX .^ 2 .- β₁ .* U .* σxy))
         n_iterations += 1
     end
     β₀ = Ȳ - β₁ * X̄
+    χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
+    ν::Int = nX - 2
+    χ²ᵣ::AbstractFloat = χ² / ν
+    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
     # derivative calculations
     δθδβ₁ = _δθδβ₁_fp(β₁, Ω, U, V, sX, sY, σxy)
     δθδX = _δθδXᵢ_fp(β₁, Ω, U, V, sX, sY, σxy)
@@ -180,11 +210,7 @@ function _eivlr_mahon_fixedpoint(
     β₀SE = √(σβ₀²)
     β₁SE = √(σβ₁²)
     X_interceptSE = √(σX_intercept²)
-    χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
-    ν::Int = nX - 1
-    χ²ᵣ::AbstractFloat = χ² / ν
-    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    return Mahon(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, nX)
+    return Mahon(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX)
 end
 
 function _kroneckerδ(i::Integer, j::Integer)

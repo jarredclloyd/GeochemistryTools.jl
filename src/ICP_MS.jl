@@ -114,9 +114,10 @@ function load_agilent(
         files = glob(sample * "*.csv", host_directory)
     end
     for file in files
-        df = CSV.read(file, DataFrame; header = false, limit = 3, silencewarnings = true)
+        df = CSV.read(file, DataFrame; header = false, limit = 3, silencewarnings = true, delim = ',')
         analysis_name = chop(df[1, 1]; head = findlast("b\\", df[1, 1])[2], tail = 2)
-        sample_name = chop(analysis_name; tail = length(analysis_name) - findlast(" - ", analysis_name)[1] + 1)
+        sample_name = chop(analysis_name; tail = length(analysis_name) - findlast("-", analysis_name)[1] +1)
+        sample_name = rstrip(sample_name, ' ')
         analysis_time = chop(
             df[3, 1];
             head = findfirst(":", df[3, 1])[1] + 1,
@@ -136,14 +137,15 @@ function load_agilent(
             footerskip = 3,
             ignoreemptyrows = true,
             normalizenames = true,
+            delim = ','
         )
         df = select!(df, r"Time", r"" * cps_column1, r"" * cps_column2)
         rename!(df, ["time", cps_column1, cps_column2])
         insertcols!(df, 1, "sample" => sample_name)
         insertcols!(df, 2, "analysis_name" => analysis_name)
         insertcols!(df, 3, "analysis_time" => analysis_time)
-        gas_blank_cps_column1 = median(df[0 .< df.time .< gas_blank, cps_column1])
-        gas_blank_cps_column2 = median(df[0 .< df.time .< gas_blank, cps_column2])
+        gas_blank_cps_column1 = geomean_zeros(df[0 .< df.time .< gas_blank, cps_column1])
+        gas_blank_cps_column2 = geomean_zeros(df[0 .< df.time .< gas_blank, cps_column2])
         insertcols!(df, cps_column1 * "_gbsub" => df[!, cps_column1] .- gas_blank_cps_column1)
         insertcols!(df, cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])))
         insertcols!(df, cps_column2 * "_gbsub" => df[!, cps_column2] .- gas_blank_cps_column2)

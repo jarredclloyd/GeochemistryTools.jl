@@ -31,9 +31,10 @@ julia> york(df, 2, "abs"; initial = "MDCInv")
 
 ```
 
-# Reference
+# References
 York D. et al. 2004 "Unified equations for the slope, intercept, and standard errors of the best straight line", *American
 Journal of Physics*, 72(3), doi:https://doi.org/10.1119/1.1632486.
+
 """
 function yorkfit(
     df::AbstractDataFrame;
