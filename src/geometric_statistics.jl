@@ -13,7 +13,7 @@ www.arpapress.com/Volumes/Vol11Issue3/IJRRAS_11_3_08.pdf
 
 =#
 # function exports
-export geomean_zeros, geovar_zeros
+export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros
 
 """
     geomean_zeros(a, ϵ=1e-5; algorithm ="habib")
@@ -43,13 +43,28 @@ function geovar_zeros(a::AbstractVector)
     N = length(a)
     N2 = count(a .> 0)
     if N2 > 0
-        G₊ = geomean(a[a[:] .> 0, :])
-        var₊ = var(log.(a[a[:] .> 0, :]))
-        varG = (N2 / N)^2 * (var₊ / N2) * G₊^2
+        var₊ = exp(var(log.(a[a[:] .> 0, :])))
+        varG = (N2 / N) * var₊
     else
         varG = 0
     end
     return varG
+end
+
+function geostd_zeros(a::AbstractVector)
+    return sqrt(geovar_zeros(a))
+end
+
+function geosem_zeros(a::AbstractVector)
+    N = length(a)
+    N2 = count(a .> 0)
+    if N2 > 0
+        sem₊ = exp(sem(log.(a[a[:] .> 0, :])))
+        semG = (N2 / N) * sem₊
+    else
+        semG = 0
+    end
+    return semG
 end
 
 """
