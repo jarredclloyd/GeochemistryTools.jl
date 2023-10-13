@@ -204,8 +204,8 @@ function load_agilent2(
     data = select!(data, r"Time", r"" * cps_column1, r"" * cps_column2)
     rename!(data, ["time", cps_column1, cps_column2])
     sort!(data, :time)
-    gas_blank_cps_column1 = median(data[0 .< data.time .< gas_blank, cps_column1])
-    gas_blank_cps_column2 = median(data[0 .< data.time .< gas_blank, cps_column2])
+    gas_blank_cps_column1 = geomean_zeros(data[0 .< data.time .< gas_blank, cps_column1])
+    gas_blank_cps_column2 = geomean_zeros(data[0 .< data.time .< gas_blank, cps_column2])
     insertcols!(
         data,
         cps_column1 * "_gbsub" => data[!, cps_column1] .- gas_blank_cps_column1,
