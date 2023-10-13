@@ -16,10 +16,9 @@ www.arpapress.com/Volumes/Vol11Issue3/IJRRAS_11_3_08.pdf
 export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros
 
 """
-    geomean_zeros(a, ϵ=1e-5; algorithm ="habib")
+    geomean_zeros(a::AbstractVector)
 
     Computes the geometric mean for x ≥ 0.
-        Two algorithms are available: `"habib"` or `"cruz_kreft"`
 """
 function geomean_zeros(a::AbstractVector)
     N = length(a)
