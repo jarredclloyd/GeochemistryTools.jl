@@ -109,18 +109,25 @@ function load_agilent(
         insertcols!(df, 3, "analysis_time" => analysis_time)
         gas_blank_cps_column1 = geomean_zeros(df[0 .< df.time .< gas_blank, cps_column1])
         gas_blank_cps_column2 = geomean_zeros(df[0 .< df.time .< gas_blank, cps_column2])
-        insertcols!(
+        transform!(
             df,
-            cps_column1 * "_gbsub" => df[!, cps_column1] .- gas_blank_cps_column1,
+            Cols(cps_column1, :time) =>
+                ByRow(
+                    (value, time) ->
+                        time < mean([gas_blank, stable_time]) ? value : value - gas_blank_cps_column1,
+                ) => cps_column1 * "_gbsub",
         )
         insertcols!(df, cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])))
-        insertcols!(
+        transform!(
             df,
-            cps_column2 * "_gbsub" => df[!, cps_column2] .- gas_blank_cps_column2,
+            Cols(cps_column2, :time) =>
+                ByRow(
+                    (value, time) ->
+                        time < mean([gas_blank, stable_time]) ? value : value - gas_blank_cps_column2,
+                ) => cps_column2 * "_gbsub",
         )
         insertcols!(df, cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])))
         df.ratio = df[!, cps_column1 * "_gbsub"] ./ df[!, cps_column2 * "_gbsub"]
-        replace!(df[!, :ratio], Inf => 0)
         insertcols!(
             df,
             "ratio_σ" =>
@@ -206,18 +213,31 @@ function load_agilent2(
     sort!(data, :time)
     gas_blank_cps_column1 = geomean_zeros(data[0 .< data.time .< gas_blank, cps_column1])
     gas_blank_cps_column2 = geomean_zeros(data[0 .< data.time .< gas_blank, cps_column2])
-    insertcols!(
-        data,
-        cps_column1 * "_gbsub" => data[!, cps_column1] .- gas_blank_cps_column1,
+    transform!(
+        df,
+        Cols(cps_column1, :time) =>
+            ByRow(
+                (value, time) -> if time < mean([gas_blank, stable_time])
+                    value
+                else
+                    value - gas_blank_cps_column1
+                end,
+            ) => cps_column1 * "_gbsub",
     )
-    insertcols!(data, cps_column1 * "_σ" => sqrt.(abs.(data[!, cps_column1 * "_gbsub"])))
-    insertcols!(
-        data,
-        cps_column2 * "_gbsub" => data[!, cps_column2] .- gas_blank_cps_column2,
+    insertcols!(df, cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])))
+    transform!(
+        df,
+        Cols(cps_column2, :time) =>
+            ByRow(
+                (value, time) -> if time < mean([gas_blank, stable_time])
+                    value
+                else
+                    value - gas_blank_cps_column2
+                end,
+            ) => cps_column2 * "_gbsub",
     )
-    insertcols!(data, cps_column2 * "_σ" => sqrt.(abs.(data[!, cps_column2 * "_gbsub"])))
-    data.ratio = data[!, cps_column1 * "_gbsub"] ./ data[!, cps_column2 * "_gbsub"]
-    replace!(data[!, :ratio], Inf => 0)
+    insertcols!(df, cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])))
+    data.ratio = exp(log.(data[!, cps_column1 * "_gbsub"]) ./ log.(data[!, cps_column2 * "_gbsub"]))
     insertcols!(
         data,
         "ratio_σ" =>
