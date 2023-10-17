@@ -152,7 +152,7 @@ function _eivlr_york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::
     β₀SE::AbstractFloat = √(1 / sum(Ω) + (x̄ * β₁SE)^2)
     σᵦ₁ᵦ₀::AbstractFloat = - x̄ * β₁SE^2
     χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
-    ν::Int = 𝑁 - 2
+    ν::Int = 𝑁 > 2 ? 𝑁 - 2 : 1
     χ²ᵣ::AbstractFloat = χ² / ν
     pval::AbstractFloat = ccdf(Chisq(ν), χ²)
     x_intercept = -β₀ / β₁

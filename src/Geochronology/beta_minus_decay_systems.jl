@@ -20,7 +20,7 @@ function ageRbSr(
     β₀SE::AbstractFloat = 0.0,
     σᵦ₁ᵦ₀::AbstractFloat = 0.0;
     inverse::Bool = false,
-    SElevel_in::Int = 2,
+    SElevel_in::Int = 1,
     SElevel_out::Int = 2,
 )
     if inverse == false
