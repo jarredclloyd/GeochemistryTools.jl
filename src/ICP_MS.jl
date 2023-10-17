@@ -188,75 +188,72 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
     `false`. Setting to `true` it will delete all data from the first record past `signal_end` to the last record.
 """
 function load_agilent2(
-    host_directory::AbstractString,
-    sample::AbstractString,
-    cps_column1::AbstractString,
-    cps_column2::AbstractString;
+    host_directory::AbstractString,;
+    sample::Union{Nothing,AbstractString} = nothing,
+    date_time_format::AbstractString = "d/m/Y H:M:S",
     first_row::Integer = 5,
     gas_blank::Real = 27.5,
     stable_time::Real = 32,
     signal_end::Real = Inf,
     trim::Bool = false,
+    aggregate_all::Bool = false,
 )
-    files = glob(sample * "*.csv", host_directory)
-    data = CSV.read(
-        files,
-        DataFrame;
-        header = 4,
-        skipto = first_row,
-        footerskip = 3,
-        ignoreemptyrows = true,
-        normalizenames = true,
-    )
-    data = select!(data, r"Time", r"" * cps_column1, r"" * cps_column2)
-    rename!(data, ["time", cps_column1, cps_column2])
-    sort!(data, :time)
-    gas_blank_cps_column1 = geomean_zeros(data[0 .< data.time .< gas_blank, cps_column1])
-    gas_blank_cps_column2 = geomean_zeros(data[0 .< data.time .< gas_blank, cps_column2])
-    transform!(
-        df,
-        Cols(cps_column1, :time) =>
-            ByRow(
-                (value, time) -> if time < mean([gas_blank, stable_time])
-                    value
-                else
-                    value - gas_blank_cps_column1
-                end,
-            ) => cps_column1 * "_gbsub",
-    )
-    insertcols!(df, cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])))
-    transform!(
-        df,
-        Cols(cps_column2, :time) =>
-            ByRow(
-                (value, time) -> if time < mean([gas_blank, stable_time])
-                    value
-                else
-                    value - gas_blank_cps_column2
-                end,
-            ) => cps_column2 * "_gbsub",
-    )
-    insertcols!(df, cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])))
-    data.ratio = exp(log.(data[!, cps_column1 * "_gbsub"]) ./ log.(data[!, cps_column2 * "_gbsub"]))
-    insertcols!(
-        data,
-        "ratio_σ" =>
-            sqrt.(
-                data[!, :ratio] .^ 2 .* (
-                    (data[!, cps_column1 * "_σ"] ./ data[!, cps_column1 * "_gbsub"]) .^ 2 +
-                    (data[!, cps_column2 * "_σ"] ./ data[!, cps_column2 * "_gbsub"]) .^ 2
-                )
+    if aggregate_all === false && sample === nothing
+        throw(
+            ArgumentError(
+                "Either `sample` needs to be specified or aggregate_all needs to be true",
             ),
-    )
-    data.ratio_mdn_norm =
-        data.ratio ./ median(data[stable_time .< data.time .< signal_end, :ratio])
-    data.ratio_mdn_norm_σ = data.ratio_mdn_norm .* (data.ratio_σ ./ data.ratio)
-    if trim == true
-        filter!(:time => x -> stable_time .< x .< signal_end, data)
+        )
     end
-    metadata!(data, "name", sample)
-    metadata!(data, "gas blank" * cps_column1, gas_blank_cps_column1)
-    metadata!(data, "gas blank" * cps_column2, gas_blank_cps_column2)
+    data = DataFrame()
+    if aggregate_all === true
+        files = glob("*.csv", host_directory)
+    else
+        files = glob(sample * "*.csv", host_directory)
+    end
+    for file in files
+        df = CSV.read(
+            file,
+            DataFrame;
+            header = false,
+            limit = 3,
+            silencewarnings = true,
+            delim = ',',
+        )
+        analysis_name = chop(df[1, 1]; head = findlast("b\\", df[1, 1])[2], tail = 2)
+        sample_name = chop(
+            analysis_name;
+            tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
+        )
+        sample_name = rstrip(sample_name, ' ')
+        analysis_time = chop(
+            df[3, 1];
+            head = findfirst(":", df[3, 1])[1] + 1,
+            tail = length(df[3, 1]) -
+                   findnext(" u", df[3, 1], findfirst(":", df[3, 1])[1])[1] + 1,
+        )
+        analysis_time = DateTime(analysis_time, date_time_format)
+        if Dates.Year(analysis_time) < Dates.Year(2000)
+            analysis_time = analysis_time + Dates.Year(2000)
+        else
+            analysis_time = analysis_time
+        end
+        df = CSV.read(
+            file,
+            DataFrame;
+            header = 4,
+            skipto = first_row,
+            footerskip = 3,
+            ignoreemptyrows = true,
+            normalizenames = true,
+            delim = ',',
+        )
+        rename!(df, "Time_Sec_" => "time")
+        insertcols!(df, 1, "sample" => sample_name)
+        insertcols!(df, 2, "analysis_name" => analysis_name)
+        insertcols!(df, 3, "analysis_time" => analysis_time)
+        append!(data, df)
+    end
     metadata!(data, "stable time", stable_time)
     metadata!(data, "signal end", signal_end)
     return data
