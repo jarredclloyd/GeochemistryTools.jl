@@ -1,7 +1,7 @@
 name = "GeochemistryTools"
 uuid = "353b66c2-bbc9-4dac-8f82-6fcd8c646e7a"
 authors = ["Jarred C Lloyd"]
-version = "0.1.0"
+version = "0.0.1-DEV"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
@@ -27,7 +27,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [compat]
-julia = "1.6"
+julia = "1.6.7"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
