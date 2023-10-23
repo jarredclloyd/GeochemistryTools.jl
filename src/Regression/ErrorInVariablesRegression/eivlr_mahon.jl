@@ -276,7 +276,7 @@ function _δθδYᵢ(
     @simd for j ∈ eachindex(Ω)
         tempⱼ[j] =
             Ω[j]^2 *
-            (_kroneckerδ(i, j) - Ω[j] / sum(Ω)) *
+            (_kroneckerδ(i, j) - Ω[i] / sum(Ω)) *
             (β₁^2 * U[j] * sX[j]^2 - 2 * β₁ * V[j] * sX[j]^2 - U[j] * sY[j]^2 + 2 * V[j] * σxy[j])
     end
     δθδYᵢ = sum(tempⱼ)
