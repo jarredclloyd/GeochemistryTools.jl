@@ -22,10 +22,22 @@ struct York <: ErrorsInVariablesRegression
 end
 
 function Base.show(io::IOContext, F::York)
-    println(io, "βₒ: $(round(F.beta0, sigdigits = 5)) ± $(round(F.beta0_se, sigdigits = 5))")
-    println(io, "β₁: $(round(F.beta1, sigdigits = 5)) ± $(round(F.beta1_se, sigdigits = 5))")
-    println(io, "x_intercept: $(round(F.x_intercept, sigdigits = 5)) ± $(round(F.x_intercept_se, sigdigits = 5))")
-    println(io, "χ²ᵣ (MSWD): $(round(F.reduced_chi_squared, sigdigits = 3)); p-value: $(round(F.p_value, sigdigits = 5))")
+    println(
+        io,
+        "βₒ: $(round(F.beta0, sigdigits = 5)) ± $(round(F.beta0_se, sigdigits = 5))",
+    )
+    println(
+        io,
+        "β₁: $(round(F.beta1, sigdigits = 5)) ± $(round(F.beta1_se, sigdigits = 5))",
+    )
+    println(
+        io,
+        "x_intercept: $(round(F.x_intercept, sigdigits = 5)) ± $(round(F.x_intercept_se, sigdigits = 5))",
+    )
+    println(
+        io,
+        "χ²ᵣ (MSWD): $(round(F.reduced_chi_squared, sigdigits = 3)); p-value: $(round(F.p_value, sigdigits = 5))",
+    )
     println(io, "no. observations: $(F.n_observations)")
 end
 
@@ -43,10 +55,22 @@ struct MahonNonFixed <: ErrorsInVariablesRegression
 end
 
 function Base.show(io::IOContext, F::MahonNonFixed)
-    println(io, "βₒ: $(round(F.beta0, sigdigits = 5)) ± $(round(F.beta0_se, sigdigits = 5))")
-    println(io, "β₁: $(round(F.beta1, sigdigits = 5)) ± $(round(F.beta1_se, sigdigits = 5))")
-    println(io, "x_intercept: $(round(F.x_intercept, sigdigits = 5)) ± $(round(F.x_intercept_se, sigdigits = 5))")
-    println(io, "χ²ᵣ (MSWD): $(round(F.reduced_chi_squared, sigdigits = 3)); p-value: $(round(F.p_value, sigdigits = 5))")
+    println(
+        io,
+        "βₒ: $(round(F.beta0, sigdigits = 5)) ± $(round(F.beta0_se, sigdigits = 5))",
+    )
+    println(
+        io,
+        "β₁: $(round(F.beta1, sigdigits = 5)) ± $(round(F.beta1_se, sigdigits = 5))",
+    )
+    println(
+        io,
+        "x_intercept: $(round(F.x_intercept, sigdigits = 5)) ± $(round(F.x_intercept_se, sigdigits = 5))",
+    )
+    println(
+        io,
+        "χ²ᵣ (MSWD): $(round(F.reduced_chi_squared, sigdigits = 3)); p-value: $(round(F.p_value, sigdigits = 5))",
+    )
     println(io, "no. observations: $(F.n_observations)")
 end
 
@@ -82,7 +106,7 @@ function Base.show(io::IOContext, F::MahonFixed)
         "χ²ᵣ (MSWD): $(round(F.reduced_chi_squared, sigdigits = 3)); p-value: $(round(F.p_value, sigdigits = 5))",
     )
     println(io, "no. observations: $(F.n_observations)")
-    println(io, "FixedPoint: $(F.FixedPoint)")
+    println(io, "fixed point: $(F.fixed_point)")
 end
 
 struct GeneralisedLeastSquares <: LinearRegression
@@ -96,11 +120,14 @@ end
 
 function Base.show(io::IOContext, F::GeneralisedLeastSquares)
     for i in eachindex(F.btea)
-        println(io, "β$(i - 1): $(round.(F.beta[i]; digits = 5)) ± $(round.(F.beta_se[i]; digits = 5))")
+        println(
+            io,
+            "β$(i - 1): $(round.(F.beta[i]; digits = 5)) ± $(round.(F.beta_se[i]; digits = 5))",
+        )
     end
     println(io, "R²: $(round(F.r_squared; digits = 4))")
     println(io, "RMSE = $(round(F.rmse; digits=4))")
-    return println(io, "no. observations: $(F.n_observations)")
+    println(io, "no. observations: $(F.n_observations)")
 end
 
 """
@@ -112,22 +139,26 @@ Input df as a DataFrame of 4 of 5 columns wide with column order (X, sX, Y, sY, 
 Algorithms available are '"mahon"' and '"york"'.
 
 # Keywords
-- `se_level_in::Integer`: Standard error level of input data. Provide as a positive integer.
-- `se_type::AbstractString`: Standard error type as a string of value `"abs"` OR `"rel"`. Values equal to
+
+  - `se_level_in::Integer`: Standard error level of input data. Provide as a positive integer.
+  - `se_type::AbstractString`: Standard error type as a string of value `"abs"` OR `"rel"`. Values equal to
     `'a'`, `"absolute"`, `'r'`, and `"relative"` will also work. Case insensitive.
-- `initial::Any`: A value for the y-intercept. Can be input as a string key from an appropriate dictionary, as a single
+  - `initial::Any`: A value for the y-intercept. Can be input as a string key from an appropriate dictionary, as a single
     numeric value, or as a vector of the initial and its standard error (same `se_level_in` as input data). E.g. initial =
-        "MDCInv", initial = 0.72, OR initial = [0.72, 0.01].
-    - Dictionaries available are `dict_sr87_sr86i`
-    - For a full list of available keys in any dictionary type `keys(<dict_name>)`
+    "MDCInv", initial = 0.72, OR initial = [0.72, 0.01].
+
+      + Dictionaries available are `dict_sr87_sr86i`
+      + For a full list of available keys in any dictionary type `keys(<dict_name>)`
 
 # Example
+
 ```julia-repl
 julia> fit_eivlr(df, "mahon"; se_level_in = 2, se_type = "abs", initial = "MDCInv")
 
 ```
 
 # References
+
 York D. et al. 2004 "Unified equations for the slope, intercept, and standard errors of the best straight line", *American
 Journal of Physics*, 72(3), doi:https://doi.org/10.1119/1.1632486.
 
@@ -149,13 +180,35 @@ function fit_eivlr(
     dfRows::Integer = nrow(df)
     if initial !== nothing
         if isa(initial, String) == true && haskey(dict_sr87_sr86i, initial) == true
-            initial = deepcopy(dict_sr87_sr86i[initial])
+            if algorithm .== "mahon"
+                initial = [
+                    0,
+                    0,
+                    deepcopy(dict_sr87_sr86i[initial])[1],
+                    deepcopy(dict_sr87_sr86i[initial])[2] * se_level_in,
+                ]
+            else
+                initial = [
+                    1e-16,
+                    1e-16,
+                    deepcopy(dict_sr87_sr86i[initial])[1],
+                    deepcopy(dict_sr87_sr86i[initial])[2] * se_level_in,
+                ]
+            end
         elseif length(initial) == 1 && isa(initial, AbstractFloat)
-            initial = [1e-15, 1e-15, initial, 0.01]
+            if algorithm .== "mahon"
+                initial = [0, 0, initial, initial * 0.1]
+            else
+                initial = [1e-16, 1e-16, initial, initial * 0.1]
+            end
         elseif length(initial) == 2 &&
                isa(initial[1], AbstractFloat) &&
                isa(initial[2], AbstractFloat)
-            initial = [1e-15, 1e-15, initial[1], initial[2]]
+            if algorithm .== "mahon"
+                initial = [0, 0, initial[1], initial[2]]
+            else
+                initial = [1e-16, 1e-16, initial[1], initial[2]]
+            end
         elseif length(initial) >= 3
             throw(
                 ArgumentError(
@@ -251,7 +304,7 @@ function affine_ci(
 )
     ν = fit.n_observations - 2
     tvalue = cquantile(TDist(ν), (1 - ci_level) / 2)
-    return vec(sqrt.(abs.(fit.reduced_chi_squared  .* (x * fit.covariance_beta)))) .* tvalue
+    return vec(sqrt.(abs.(fit.reduced_chi_squared .* (x * fit.covariance_beta)))) .* tvalue
 end
 
 function affine_pi(
@@ -261,5 +314,6 @@ function affine_pi(
 )
     ν = fit.n_observations - 2
     tvalue = cquantile(TDist(ν), (1 - ci_level) / 2)
-    return vec(sqrt.(abs.(fit.reduced_chi_squared .* (1 .+ x .* fit.covariance_beta)))) .* tvalue
+    return vec(sqrt.(abs.(fit.reduced_chi_squared .* (1 .+ x .* fit.covariance_beta)))) .*
+           tvalue
 end
