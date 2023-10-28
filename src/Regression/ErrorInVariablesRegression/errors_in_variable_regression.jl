@@ -1,5 +1,5 @@
 export fit_eivlr, affine_prediction, affine_ci, affine_pi
-
+export LinearRegression, ErrorsInVariablesRegression
 abstract type LinearRegression <: Any end
 abstract type ErrorsInVariablesRegression <: LinearRegression end
 
