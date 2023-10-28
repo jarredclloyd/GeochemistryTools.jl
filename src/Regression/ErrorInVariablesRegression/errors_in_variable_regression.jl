@@ -179,7 +179,7 @@ function fit_eivlr(
     dfCols::Integer = ncol(df)
     dfRows::Integer = nrow(df)
     if initial !== nothing
-        if isa(initial, String) == true && haskey(dict_sr87_sr86i, initial) == true
+        if isa(initial, AbstractString) == true && haskey(dict_sr87_sr86i, initial) == true
             if algorithm .== "mahon"
                 initial = [
                     0,
