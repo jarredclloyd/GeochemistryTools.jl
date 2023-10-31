@@ -1,4 +1,5 @@
-using LinearAlgebra
+export errorellipse
+
 function covmat_rho(sx, sy, rxy; se_level_in = 2)
     sxy = @. rxy * (sx /se_level_in) * (sy / se_level_in)
     A =@. [(sx /se_level_in)^2 sxy; sxy (sy / se_level_in)^2]
@@ -13,14 +14,13 @@ function getellipsepoints(centre, xradius, yradius, θ)
     r_ellipse = [ellipse_x_r ellipse_y_r] * R
     x = @. centre[1] + r_ellipse[:, 1]
     y = @. centre[2] + r_ellipse[:, 2]
-    return zip(x,y)
+    return hcat(x, y)
 end
 
 function getellipsepoints(centre, Σ, confidence = 0.95)
     quant = quantile(Chisq(2), confidence) |> sqrt
     smallesttegv = eigmin(Σ)
-    largestegv = eigmax(Σ)
-    idxmax = findmax(eigvals(Σ))[2]
+    largestegv, idxmax = findmax(eigvals(Σ))
 
     rx = quant * sqrt(largestegv)
     ry = quant * sqrt(smallesttegv)
