@@ -119,9 +119,8 @@ function _eivlr_mahon(
     # variance calculations
     σβ₁² = sum(@.(δθδX^2 * sX^2 + δθδY^2 * sY^2 + 2 * σxy * δθδX * δθδY)) / δθδβ₁^2
     σβ₀² = sum(@.(δβ₀δX^2 * sX^2 + δβ₀δY^2 * sY^2 + 2 * σxy * δβ₀δX * δβ₀δY))
-    # X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; sX ⇄ sY; X̄ ⇄ Ȳ}
-    # if calc_X_intercept != false
     X_intercept = -β₀ / β₁
+    #= X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; sX ⇄ sY; X̄ ⇄ Ȳ}
     Ω = @.(1 / (sX^2 + (1 / β₁)^2 * sY^2 - 2 * (1 / β₁) * σxy))
     δθδβ₁ = _δθδβ₁((1 / β₁), Ω, U, V, sY, sX, σxy)
     δθδX = zeros(AbstractFloat, nX)
@@ -140,12 +139,12 @@ function _eivlr_mahon(
     Threads.@threads for i ∈ eachindex(X)
         δβ₀δY[i] = _δβ₀δYᵢ(i, Ȳ, Ω, δθδY, δθδβ₁)
     end
-    σX_intercept² = sum(@.(δβ₀δX^2 * sX^2 + δβ₀δY^2 * sY^2 + 2 * σxy * δβ₀δX * δβ₀δY))
-    # end
+    σX_intercept² = sum(@.(δβ₀δX^2 * sY^2 + δβ₀δY^2 * sX^2 + 2 * σxy * δβ₀δX * δβ₀δY))
+    =#
     β₀SE = √(σβ₀²)
     β₁SE = √(σβ₁²)
-    X_interceptSE = √(σX_intercept²)
     σᵦ₁ᵦ₀::AbstractFloat = -X̄ * σβ₁²
+    X_interceptSE = sqrt((β₀SE / β₀)^2 + (β₁SE / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁)) #=√(σX_intercept²)=#
     return MahonNonFixed(
         β₀,
         β₀SE,
@@ -212,9 +211,9 @@ function _eivlr_mahon_fixedpoint(
     # variance calculations
     σβ₁² = sum(@.(δθδX^2 * sX^2 + δθδY^2 * sY^2 + 2 * σxy * δθδX * δθδY)) / δθδβ₁^2
     σβ₀² = σβ₁² * X₀Y₀[1]
-    # X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; sX ⇄ sY; X̄ ⇄ Ȳ}
-    # if calc_X_intercept != false
     X_intercept = -β₀ / β₁
+    #= X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; sX ⇄ sY; X̄ ⇄ Ȳ}
+    # if calc_X_intercept != false
     Ω = @.(1 / (sX^2 + (1 / β₁)^2 * sY^2 - 2 * (1 / β₁) * σxy))
     δθδβ₁ = _δθδβ₁_fp((1 / β₁), Ω, V, U, sY, sX, σxy)
     δθδX = _δθδXᵢ_fp((1 / β₁), Ω, V, U, sY, sX, σxy)
@@ -222,11 +221,11 @@ function _eivlr_mahon_fixedpoint(
     δβ₀δX = _δβ₀δXᵢ_fp(Ȳ, δθδX, δθδβ₁)
     δβ₀δY = _δβ₀δYᵢ_fp(Ȳ, δθδY, δθδβ₁)
     σX_intercept² = sum(@.(δβ₀δX^2 * sX^2 + δβ₀δY^2 * sY^2 + 2 * σxy * δβ₀δX * δβ₀δY))
-    # end
+    =#
     β₀SE = √(σβ₀²)
     β₁SE = √(σβ₁²)
-    X_interceptSE = √(σX_intercept²)
     σᵦ₁ᵦ₀::AbstractFloat = -X̄ * σβ₁²
+    X_interceptSE = sqrt((β₀SE / β₀)^2 + (β₁SE / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁)) #=√(σX_intercept²)=#
     return MahonFixed(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX, X₀Y₀)
 end
 
