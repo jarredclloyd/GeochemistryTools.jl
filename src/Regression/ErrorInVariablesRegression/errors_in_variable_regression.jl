@@ -1,4 +1,4 @@
-export fit_eivlr, affine_prediction, affine_ci, affine_pi
+export fit_eivlr, affine_prediction, affine_standarderror, affine_confidenceinterval, affine_predictioninterval
 export LinearRegression, ErrorsInVariablesRegression
 abstract type LinearRegression <: Any end
 abstract type ErrorsInVariablesRegression <: LinearRegression end
@@ -297,23 +297,30 @@ function affine_prediction(x::AbstractVector, fit::ErrorsInVariablesRegression)
     return fit.beta0 .+ x .* fit.beta1
 end
 
-function affine_ci(
+function affine_standarderror(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
-    ci_level::AbstractFloat = 0.95,
+    se_level::Integer = 1,
+)
+    return vec(sqrt.(abs.(fit.reduced_chi_squared .* (x * fit.covariance_beta)))) .* se_level
+end
+function affine_confidenceinterval(
+    x::AbstractVector,
+    fit::ErrorsInVariablesRegression;
+    confidence_level::AbstractFloat = 0.95,
 )
     ν = fit.n_observations - 2
-    tvalue = cquantile(TDist(ν), (1 - ci_level) / 2)
+    tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
     return vec(sqrt.(abs.(fit.reduced_chi_squared .* (x * fit.covariance_beta)))) .* tvalue
 end
 
-function affine_pi(
+function affine_predictioninterval(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
-    ci_level::AbstractFloat = 0.95,
+    confidence_level::AbstractFloat = 0.95,
 )
     ν = fit.n_observations - 2
-    tvalue = cquantile(TDist(ν), (1 - ci_level) / 2)
+    tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
     return vec(sqrt.(abs.(fit.reduced_chi_squared .* (1 .+ x .* fit.covariance_beta)))) .*
            tvalue
 end
