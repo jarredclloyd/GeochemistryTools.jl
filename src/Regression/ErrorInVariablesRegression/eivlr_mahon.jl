@@ -145,7 +145,7 @@ function _eivlr_mahon(
     β₀SE = √(σβ₀²)
     β₁SE = √(σβ₁²)
     X_interceptSE = √(σX_intercept²)
-    σᵦ₁ᵦ₀::AbstractFloat = -X̄ * β₁SE^2
+    σᵦ₁ᵦ₀::AbstractFloat = -X̄ * σβ₁²
     return MahonNonFixed(
         β₀,
         β₀SE,
@@ -226,7 +226,7 @@ function _eivlr_mahon_fixedpoint(
     β₀SE = √(σβ₀²)
     β₁SE = √(σβ₁²)
     X_interceptSE = √(σX_intercept²)
-    σᵦ₁ᵦ₀::AbstractFloat = -X̄ * β₁SE^2
+    σᵦ₁ᵦ₀::AbstractFloat = -X̄ * σβ₁²
     return MahonFixed(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX, X₀Y₀)
 end
 
