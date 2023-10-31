@@ -44,3 +44,9 @@ function _chi_squared(
     χ² = transpose(r) * Ω * r
     return χ²
 end
+
+function _reduced_chi_squared_ci(dof::Integer, confidence_level::AbstractFloat=0.95)
+    lower_χ²ᵣ = cquantile(Chisq(dof), 1 - (1 - confidence_level) / 2) / dof
+    upper_χ²ᵣ = cquantile(Chisq(dof), (1 - confidence_level)/2) / dof
+    return(lower_χ²ᵣ, upper_χ²ᵣ)
+end
