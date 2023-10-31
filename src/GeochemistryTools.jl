@@ -56,6 +56,7 @@ include("Regression/generalised_least_squares.jl")
 include("Regression/measures_of_fit.jl")
 include("Regression/orthogonal_polynomials.jl")
 include("geometric_statistics.jl")
+include("error_ellipse.jl")
 
 function _check_equal_length(
     a::AbstractVector,
