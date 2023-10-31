@@ -2,7 +2,7 @@
 This file contains various decay system equations for calculation of ratios and ages (Rb—Sr).
 =#
 
-export ageRbSr, RbSrAgeNorm, RbSrAgeInv, confidenceInterval, inflateCI, inflate_se
+export ageRbSr, RbSrAgeNorm, RbSrAgeInv, confidence_interval, inflate_ci, inflate_se
 
 #Rb-Sr
 """
@@ -84,7 +84,7 @@ function ageRbSr(
     return age, age_se
 end
 
-function ageRbSr(fit::ErrorsInVariablesRegression; inverse = true, se_level_out::Int = 2)
+function ageRbSr(fit::ErrorsInVariablesRegression; inverse = true, se_level_out::Integer = 2)
     if inverse == false
         age, age_se = RbSrAgeNorm(fit.beta1, fit.beta1_se)
         age_se = se_level_out * age_se
@@ -131,13 +131,13 @@ function RbSrAgeInv(
     return date, date_se
 end
 
-function confidenceInterval(se, n; se_level = 1, ci_level = 0.95)
+function confidence_interval(se, n; se_level = 1, ci_level = 0.95)
     return (se / se_level) * cquantile(TDist(n - 2), (1 - ci_level) / 2)
 end
 
 function inflate_se(se, χ²ᵣ)
     return se * sqrt(χ²ᵣ)
 end
-function inflateCI(se, χ²ᵣ, n; se_level = 1, ci_level = 0.95)
+function inflate_ci(se, χ²ᵣ, n; se_level = 1, ci_level = 0.95)
     return (se / se_level) * cquantile(TDist(n - 2), (1 - ci_level) / 2) * sqrt(χ²ᵣ)
 end
