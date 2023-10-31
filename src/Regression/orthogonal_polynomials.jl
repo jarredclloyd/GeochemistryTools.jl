@@ -18,7 +18,7 @@ https://doi.org/10.1007/s11004-021-09959-5
 =#
 # function exports
 export fit_orthogonal
-export poly_orthogonal, poly_confidence, poly_prediction
+export poly_orthogonal, poly_confidenceinterval, poly_predictioninterval, poly_standarderror
 
 # stucts and base extensions
 struct OrthogonalPolynomial <: LinearRegression
@@ -109,7 +109,21 @@ function poly_orthogonal(x::AbstractVector, fit::OrthogonalPolynomial, order::In
     )
 end
 
-function poly_confidence(
+function poly_standarderror(
+    x,
+    fit::OrthogonalPolynomial,
+    order::Integer;
+    se_level::Integer = 2,
+)
+    if order < 0
+        throw(ArgumentError("Polynomial order must be positive"))
+    end
+    X = _design_matrix(x, fit, order)
+    VarΛX = fit.variance_covariance[1:(order + 1), 1:(order + 1)]
+    return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level)
+end
+
+function poly_confidenceinterval(
     x,
     fit::OrthogonalPolynomial,
     order::Integer;
@@ -124,7 +138,7 @@ function poly_confidence(
     return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue)
 end
 
-function poly_prediction(
+function poly_predictioninterval(
     x,
     fit::OrthogonalPolynomial,
     order::Integer;
