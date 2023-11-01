@@ -95,7 +95,7 @@ function _eivlr_mahon(
     end
     β₀ = Ȳ - β₁ * X̄
     χ²::AbstractFloat = sum(@. (Ω * (Y - β₁ * X - β₀)^2))
-    ν::Int = nX - 2
+    ν::Int = nX > 2 ? nX - 2 : 1
     χ²ᵣ::AbstractFloat = χ² / ν
     pval::AbstractFloat = ccdf(Chisq(ν), χ²)
     # derivative calculations
@@ -199,7 +199,7 @@ function _eivlr_mahon_fixedpoint(
     end
     β₀ = Ȳ - β₁ * X̄
     χ²::AbstractFloat = sum(@.(Ω * (Y - β₁ * X - β₀)^2))
-    ν::Int = nX - 2
+    ν::Int = nX > 2 ? nX - 2 : 1
     χ²ᵣ::AbstractFloat = χ² / ν
     pval::AbstractFloat = ccdf(Chisq(ν), χ²)
     # derivative calculations
