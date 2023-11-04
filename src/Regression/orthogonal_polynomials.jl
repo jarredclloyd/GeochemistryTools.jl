@@ -41,23 +41,23 @@ end
 function Base.show(io::IOContext, fit::OrthogonalPolynomial)
     println(
         io,
-        "λ₀: $(round(fit.lambda[1], sigdigits = 5)) ± $(round(fit.lambda_se[1], sigdigits = 5)); p(1): χ²ᵣ = $(round(fit.reduced_chi_squared[1], sigdigits = 5)), BIC = $(round(fit.bayesian_information_criteria[1], sigdigits = 5))",
+        "λ₀: $(round(fit.lambda[1], sigdigits = 5))",
     )
     println(
         io,
-        "λ₁: $(round(fit.lambda[2], sigdigits = 5)) ± $(round(fit.lambda_se[2,2], sigdigits = 5)); p(2): χ²ᵣ = $(round(fit.reduced_chi_squared[2], sigdigits = 5)), BIC = $(round(fit.bayesian_information_criteria[2], sigdigits = 5))",
+        "λ₁: $(round(fit.lambda[2], sigdigits = 5))",
     )
     println(
         io,
-        "λ₂: $(round(fit.lambda[3], sigdigits = 5)) ± $(round(fit.lambda_se[3,3], sigdigits = 5)); p(3): χ²ᵣ = $(round(fit.reduced_chi_squared[3], sigdigits = 5)), BIC = $(round(fit.bayesian_information_criteria[3], sigdigits = 5))",
+        "λ₂: $(round(fit.lambda[3], sigdigits = 5))",
     )
     println(
         io,
-        "λ₃: $(round(fit.lambda[4], sigdigits = 5)) ± $(round(fit.lambda_se[4,4], sigdigits = 5)); p(4): χ²ᵣ = $(round(fit.reduced_chi_squared[4], sigdigits = 5)), BIC = $(round(fit.bayesian_information_criteria[4], sigdigits = 5))",
+        "λ₃: $(round(fit.lambda[4], sigdigits = 5))",
     )
     println(
         io,
-        "λ₄: $(round(fit.lambda[5], sigdigits = 5)) ± $(round(fit.lambda_se[5,5], sigdigits = 5)); p(5): χ²ᵣ = $(round(fit.reduced_chi_squared[5], sigdigits = 5)), BIC = $(round(fit.bayesian_information_criteria[5], sigdigits = 5))",
+        "λ₄: $(round(fit.lambda[5], sigdigits = 5))",
     )
 end
 
@@ -188,24 +188,24 @@ function _orthogonal_LSQ(
             ),
         )
     end
-    ω = ω ./ median(ω)
+    ω = ω ./ mean(ω)
     ω = 1 ./ ω .^ 2
     Ω = Diagonal(ω)
     Λ = inv(transpose(X) * (Ω) * X) * transpose(X) * Ω * y
     VarΛX = inv(transpose(X) * (Ω) * X)
-    ess = zeros(5)
+    rss = zeros(5)
     @simd for i ∈ eachindex(order)
-        @inbounds ess[i] =
+        @inbounds rss[i] =
             transpose((y .- (X[:, 1:i] * Λ[1:i]))) * Ω * (y .- (X[:, 1:i] * Λ[1:i]))
     end
     Λ_SE = zeros(5, 5)
-    mse = ess ./ (𝑁 .- order)
+    mse = rss ./ (𝑁 .- (order .+ 1))
     @simd for i ∈ eachindex(order)
         @inbounds Λ_SE[1:i, i] = sqrt.(diag(VarΛX[1:i, 1:i] * (mse[i])))
     end
     tss = transpose((y .- mean(y))) * Ω * (y .- mean(y))
     rmse = sqrt.(mse)
-    R² = 1 .- (ess ./ tss)
+    R² = 1 .- (rss ./ tss)
     for i ∈ eachindex(R²)
         if R²[i] < 0
             R²[i] = 0
@@ -216,8 +216,8 @@ function _orthogonal_LSQ(
     χ²ᵣ = zeros(5)
     BIC = zeros(5)
     for i ∈ eachindex(order)
-        χ²[i] = ess[i]
-        χ²ᵣ[i] = ess[i] / (𝑁 - order[i])
+        χ²[i] = rss[i]
+        χ²ᵣ[i] = rss[i] / (𝑁 - i)
         BIC[i] = _bayesian_information_criteria(χ²[i], 𝑁, order[i])
     end
     return OrthogonalPolynomial(
