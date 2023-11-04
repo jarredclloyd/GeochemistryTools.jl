@@ -51,6 +51,8 @@ function load_agilent(
     signal_end::Real = Inf,
     trim::Bool = false,
     aggregate_all::Bool = false,
+    normalise::Bool = true,
+    normalisation::AbstractString = "gmean"
 )
     if aggregate_all === false && sample === nothing
         throw(
@@ -138,9 +140,18 @@ function load_agilent(
                     )
                 ),
         )
-        df.ratio_mdn_norm =
-            df.ratio ./ median(df[stable_time .< df.time .< signal_end, :ratio])
-        df.ratio_mdn_norm_σ = df.ratio_mdn_norm .* (df.ratio_σ ./ df.ratio)
+        if normalise == true
+            if normalisation == "gmean"
+                alg = geomean_zeros
+            elseif normalisation == "median"
+                alg = median
+            elseif normalisation == "amean"
+                alg = mean
+            end
+            df.ratio_norm =
+            df.ratio ./ alg(df[stable_time .< df.time .< signal_end, :ratio])
+            df.ratio_norm_σ = df.ratio_norm .* (df.ratio_σ ./ df.ratio)
+        end
         if trim == true
             filter!(:time => x -> stable_time .< x .< signal_end, df)
         end
