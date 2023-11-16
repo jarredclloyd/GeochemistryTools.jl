@@ -249,7 +249,7 @@ Dictionaries currently available are `dict_sr87_sr86i`
        occursin("abs", lowercase.(se_type)) == true ||
        occursin("absolute", lowercase.(se_type)) == true
         if dfCols == 5
-            yfit = alg(
+            eivlr = alg(
                 df[!, 1],
                 df[!, 2] ./ se_level_in,
                 df[!, 3],
@@ -257,7 +257,7 @@ Dictionaries currently available are `dict_sr87_sr86i`
                 df[!, 5],
             )
         elseif dfCols == 4
-            yfit = alg(df[!, 1], df[!, 2] ./ se_level_in, df[!, 3], df[!, 4] ./ se_level_in)
+            eivlr = alg(df[!, 1], df[!, 2] ./ se_level_in, df[!, 3], df[!, 4] ./ se_level_in)
         else
             throw(
                 ArgumentError("Column width is not equal to 4 or 5. Some data is missing."),
@@ -267,7 +267,7 @@ Dictionaries currently available are `dict_sr87_sr86i`
            occursin("rel", lowercase.(se_type)) == true ||
            occursin("relative", lowercase.(se_type)) == true
         if dfCols == 5
-            yfit = alg(
+            eivlr = alg(
                 df[!, 1],
                 (df[!, 2] .* df[!, 1]) ./ se_level_in,
                 df[!, 3],
@@ -275,7 +275,7 @@ Dictionaries currently available are `dict_sr87_sr86i`
                 df[!, 5],
             )
         elseif dfCols == 4
-            yfit = alg(
+            eivlr = alg(
                 df[!, 1],
                 (df[!, 2] .* df[!, 1]) ./ se_level_in,
                 df[!, 3],
@@ -290,7 +290,7 @@ Dictionaries currently available are `dict_sr87_sr86i`
     if initial !== nothing
         popat!(df, dfRows + 1)
     end
-    return yfit
+    return eivlr
 end
 
 function affine_prediction(x::AbstractVector, fit::ErrorsInVariablesRegression)
