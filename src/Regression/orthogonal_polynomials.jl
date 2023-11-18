@@ -18,7 +18,7 @@ https://doi.org/10.1007/s11004-021-09959-5
 =#
 # function exports
 export fit_orthogonal
-export poly_orthogonal, poly_confidenceinterval, poly_predictioninterval, poly_standarderror
+export poly_orthogonal, poly_confidenceband, poly_predictionband, poly_standarderror
 
 # stucts and base extensions
 struct OrthogonalPolynomial <: LinearRegression
@@ -123,7 +123,7 @@ function poly_standarderror(
     return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level)
 end
 
-function poly_confidenceinterval(
+function poly_confidenceband(
     x,
     fit::OrthogonalPolynomial,
     order::Integer;
@@ -138,7 +138,7 @@ function poly_confidenceinterval(
     return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue)
 end
 
-function poly_predictioninterval(
+function poly_predictionband(
     x,
     fit::OrthogonalPolynomial,
     order::Integer;

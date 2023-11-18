@@ -1,4 +1,4 @@
-export fit_eivlr, affine_prediction, affine_standarderror, affine_confidenceinterval, affine_predictioninterval
+export fit_eivlr, affine_prediction, affine_standarderror, affine_confidenceband, affine_predictionband
 export LinearRegression, ErrorsInVariablesRegression
 abstract type LinearRegression <: Any end
 abstract type ErrorsInVariablesRegression <: LinearRegression end
@@ -304,7 +304,7 @@ function affine_standarderror(
 )
     return vec(sqrt.(abs.(fit.reduced_chi_squared .* (x * fit.covariance_beta)))) .* se_level
 end
-function affine_confidenceinterval(
+function affine_confidenceband(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
     confidence_level::AbstractFloat = 0.95,
@@ -314,7 +314,7 @@ function affine_confidenceinterval(
     return vec(sqrt.(abs.(fit.reduced_chi_squared .* (x * fit.covariance_beta)))) .* tvalue
 end
 
-function affine_predictioninterval(
+function affine_predictionband(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
     confidence_level::AbstractFloat = 0.95,
