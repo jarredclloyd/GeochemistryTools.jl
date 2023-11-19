@@ -302,7 +302,9 @@ function affine_standarderror(
     fit::ErrorsInVariablesRegression;
     se_level::Integer = 1,
 )
-    return vec(sqrt.(abs.(fit.reduced_chi_squared .* (x * fit.covariance_beta)))) .* se_level
+    X = hcat(repeat([1.0], length(x)), x)
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit. covariance_beta fit.beta1_se^2]
+    return vec(sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* se_level)
 end
 function affine_confidenceband(
     x::AbstractVector,
@@ -311,7 +313,9 @@ function affine_confidenceband(
 )
     ν = fit.n_observations - 2
     tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
-    return vec(sqrt.(abs.(fit.reduced_chi_squared .* (x * fit.covariance_beta)))) .* tvalue
+    X = hcat(repeat([1.0], length(x)), x)
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
+    return vec(sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* tvalue)
 end
 
 function affine_predictionband(
@@ -321,6 +325,9 @@ function affine_predictionband(
 )
     ν = fit.n_observations - 2
     tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
-    return vec(sqrt.(abs.(fit.reduced_chi_squared .* (1 .+ x .* fit.covariance_beta)))) .*
-           tvalue
+    X = hcat(repeat([1.0], length(x)), x)
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
+    return vec(
+        sqrt.(fit.reduced_chi_squared .* sum(1 .+ X .* (X * VarCovar); dims = 2)) .* tvalue,
+    )
 end
