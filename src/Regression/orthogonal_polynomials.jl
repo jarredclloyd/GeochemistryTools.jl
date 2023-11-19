@@ -212,13 +212,9 @@ function _orthogonal_LSQ(
         end
     end
     R² = _olkin_pratt.(R², 𝑁, order)
-    χ² = zeros(5)
-    χ²ᵣ = zeros(5)
     BIC = zeros(5)
     for i ∈ eachindex(order)
-        χ²[i] = rss[i]
-        χ²ᵣ[i] = rss[i] / (𝑁 - i)
-        BIC[i] = _bayesian_information_criteria(χ²[i], 𝑁, order[i])
+        BIC[i] = _bayesian_information_criteria(rss[i], 𝑁, order[i])
     end
     return OrthogonalPolynomial(
         Λ,
@@ -231,8 +227,8 @@ function _orthogonal_LSQ(
         order,
         R²,
         rmse,
-        χ²,
-        χ²ᵣ,
+        rss,
+        mse,
         BIC,
         𝑁,
     )
