@@ -47,8 +47,7 @@ function _GLS(
             ),
         )
     end
-    ω = ω ./ median(ω)
-    ω = 1 ./ ω .^ 2
+    ω = 1 ./ (ω ./ mean(ω)) .^2
     Ω = Diagonal(ω)
     X = _design_matrix(x, order)
     C = inv(transpose(X) * Ω * X)

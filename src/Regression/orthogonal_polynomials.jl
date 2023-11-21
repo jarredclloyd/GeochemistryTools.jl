@@ -174,7 +174,7 @@ function _orthogonal_LSQ(
     β = _beta_orthogonal(x)
     γ = _gamma_orthogonal(x)
     δ = _delta_orthogonal(x)
-    ϵ = _epsion_orthogonal(x)
+    ϵ = _epsilon_orthogonal(x)
     order = [0, 1, 2, 3, 4]
     X = hcat(
         repeat([1.0], 𝑁),
@@ -196,31 +196,37 @@ function _orthogonal_LSQ(
             ),
         )
     end
-    ω = ω ./ mean(ω)
-    ω = 1 ./ ω .^ 2
+    ω = 1 ./ (ω ./ mean(ω)) .^2
     Ω = Diagonal(ω)
+    Xᵀ = transpose(X)
     if rm_outlier === true
-        VarΛX = inv(transpose(X) * (Ω) * X)
-        Λ = VarΛX * transpose(X) * Ω * y
-        Ĥ = X * VarΛX * transpose(X) * (Ω)
+        VarΛX = inv(Xᵀ * (Ω) * X)
+        Λ = VarΛX * Xᵀ * Ω * y
+        Xvar = VarΛX * Xᵀ
+        leverage = Vector{AbstractFloat}(undef, size(X, 1))
+        Threads.@threads for i ∈ 1:size(X,1)
+            leverage[i] = sum(view(X, i, :) .* view(Xvar, :, i))
+        end
+        leverage .= leverage .* ω
         mse4 = (transpose((y .- (X * Λ))) * Ω * (y .- (X * Λ))) / (𝑁 .- 5)
-        studentised_residuals = (y .- (X * Λ)) ./ (sqrt.(mse4 .* (1 .- diag(Ĥ))))
-        X = @view X[Not(studentised_residuals .>= 3), :]
-        y = @view y[Not(studentised_residuals .>= 3)]
-        ω = @view ω[Not(studentised_residuals .>= 3)]
+        studentised_residuals = (y .- (X * Λ)) ./ (sqrt.(mse4 .* (1 .- leverage)))
+        X = view(X, Not(studentised_residuals .>= 3), :)
+        y = y[Not(studentised_residuals .>= 3)]
+        ω = ω[Not(studentised_residuals .>= 3)]
+        Xᵀ = transpose(X)
+        Ω = Diagonal(ω)
     end
-    Ω = Diagonal(ω)
-    VarΛX = inv(transpose(X) * (Ω) * X)
-    Λ = VarΛX * transpose(X) * Ω * y
+    VarΛX = inv(Xᵀ * (Ω) * X)
+    Λ = VarΛX * Xᵀ * Ω * y
     rss = zeros(5)
     @simd for i ∈ eachindex(order)
         @inbounds rss[i] =
-            transpose((y .- (X[:, 1:i] * Λ[1:i]))) * Ω * (y .- (X[:, 1:i] * Λ[1:i]))
+            transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) * Ω * (y .- (view(X, :, 1:i) * Λ[1:i]))
     end
     mse = rss ./ (𝑁 .- (order .+ 1))
     Λ_SE = zeros(5, 5)
     @simd for i ∈ eachindex(order)
-        @inbounds Λ_SE[1:i, i] = sqrt.(diag(VarΛX[1:i, 1:i] * (mse[i])))
+        @inbounds Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
     end
     tss = transpose((y .- mean(y))) * Ω * (y .- mean(y))
     rmse = sqrt.(mse)
@@ -312,7 +318,7 @@ function _delta_orthogonal(x::AbstractVector)
     )
 end
 
-function _epsion_orthogonal(x::AbstractVector)
+function _epsilon_orthogonal(x::AbstractVector)
     vieta =
         [
             -sum(x .^ 3) sum(x .^ 2) -sum(x) length(x)
