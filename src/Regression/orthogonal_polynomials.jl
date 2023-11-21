@@ -40,26 +40,11 @@ struct OrthogonalPolynomial <: LinearRegression
 end
 
 function Base.show(io::IOContext, fit::OrthogonalPolynomial)
-    println(
-        io,
-        "λ₀: $(round(fit.lambda[1], sigdigits = 5))",
-    )
-    println(
-        io,
-        "λ₁: $(round(fit.lambda[2], sigdigits = 5))",
-    )
-    println(
-        io,
-        "λ₂: $(round(fit.lambda[3], sigdigits = 5))",
-    )
-    println(
-        io,
-        "λ₃: $(round(fit.lambda[4], sigdigits = 5))",
-    )
-    println(
-        io,
-        "λ₄: $(round(fit.lambda[5], sigdigits = 5))",
-    )
+    println(io, "λ₀: $(round(fit.lambda[1], sigdigits = 5))")
+    println(io, "λ₁: $(round(fit.lambda[2], sigdigits = 5))")
+    println(io, "λ₂: $(round(fit.lambda[3], sigdigits = 5))")
+    println(io, "λ₃: $(round(fit.lambda[4], sigdigits = 5))")
+    println(io, "λ₄: $(round(fit.lambda[5], sigdigits = 5))")
 end
 
 # call functions
@@ -70,6 +55,7 @@ function fit_orthogonal(
     y_name::Symbol;
     y_weights::Union{Nothing,Symbol} = nothing,
     weight_by::AbstractString = "abs",
+    rm_outlier::Bool = false,
 )
     if y_weights !== nothing
         return _orthogonal_LSQ(
@@ -77,9 +63,15 @@ function fit_orthogonal(
             df[!, y_name];
             y_weights = df[!, y_weights],
             weight_by = weight_by,
+            rm_outlier = rm_outlier,
         )
     else
-        return _orthogonal_LSQ(df[!, x_name], df[!, y_name]; weight_by = weight_by)
+        return _orthogonal_LSQ(
+            df[!, x_name],
+            df[!, y_name];
+            weight_by = weight_by,
+            rm_outlier = rm_outlier,
+        )
     end
 end
 
@@ -87,11 +79,23 @@ function fit_orthogonal(
     A::AbstractArray;
     errors::Bool = false,
     weight_by::AbstractString = "abs",
+    rm_outlier::Bool = false,
 )
     if errors === false
-        return _orthogonal_LSQ(A[:, 1], A[:, 2]; weight_by = weight_by)
+        return _orthogonal_LSQ(
+            A[:, 1],
+            A[:, 2];
+            weight_by = weight_by,
+            rm_outlier = rm_outlier,
+        )
     elseif errors === true
-        return _orthogonal_LSQ(A[:, 1], A[:, 2]; y_weights = A[:, 3], weight_by = weight_by)
+        return _orthogonal_LSQ(
+            A[:, 1],
+            A[:, 2];
+            y_weights = A[:, 3],
+            weight_by = weight_by,
+            rm_outlier = rm_outlier,
+        )
     end
 end
 
@@ -121,7 +125,9 @@ function poly_standarderror(
     end
     X = _design_matrix(x, fit, order)
     VarΛX = fit.variance_covariance[1:(order + 1), 1:(order + 1)]
-    return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level)
+    return vec(
+        sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level,
+    )
 end
 
 function poly_confidenceband(
@@ -162,6 +168,7 @@ function _orthogonal_LSQ(
     y::AbstractVector;
     y_weights::Union{Nothing,AbstractArray} = nothing,
     weight_by::AbstractString = "abs",
+    rm_outlier::Bool = false,
 )
     𝑁 = length(x)
     β = _beta_orthogonal(x)
@@ -192,27 +199,39 @@ function _orthogonal_LSQ(
     ω = ω ./ mean(ω)
     ω = 1 ./ ω .^ 2
     Ω = Diagonal(ω)
-    Λ = inv(transpose(X) * (Ω) * X) * transpose(X) * Ω * y
+    if rm_outlier === true
+        VarΛX = inv(transpose(X) * (Ω) * X)
+        Λ = VarΛX * transpose(X) * Ω * y
+        Ĥ = X * VarΛX * transpose(X) * (Ω)
+        mse4 = (transpose((y .- (X * Λ))) * Ω * (y .- (X * Λ))) / (𝑁 .- 5)
+        studentised_residuals = (y .- (X * Λ)) ./ (sqrt.(mse4 .* (1 .- diag(Ĥ))))
+        X = @view X[Not(studentised_residuals .>= 3), :]
+        y = @view y[Not(studentised_residuals .>= 3)]
+        ω = @view ω[Not(studentised_residuals .>= 3)]
+    end
+    Ω = Diagonal(ω)
     VarΛX = inv(transpose(X) * (Ω) * X)
+    Λ = VarΛX * transpose(X) * Ω * y
     rss = zeros(5)
     @simd for i ∈ eachindex(order)
         @inbounds rss[i] =
             transpose((y .- (X[:, 1:i] * Λ[1:i]))) * Ω * (y .- (X[:, 1:i] * Λ[1:i]))
     end
-    Λ_SE = zeros(5, 5)
     mse = rss ./ (𝑁 .- (order .+ 1))
+    Λ_SE = zeros(5, 5)
     @simd for i ∈ eachindex(order)
         @inbounds Λ_SE[1:i, i] = sqrt.(diag(VarΛX[1:i, 1:i] * (mse[i])))
     end
     tss = transpose((y .- mean(y))) * Ω * (y .- mean(y))
     rmse = sqrt.(mse)
-    R² = 1 .- (rss ./ tss)
+    R² = 1 .- (rss ./ (tss))
     for i ∈ eachindex(R²)
         if R²[i] < 0
             R²[i] = 0
+        else
+            R²[i] = _olkin_pratt.(R²[i], 𝑁, order[i] + 1)
         end
     end
-    R² = _olkin_pratt.(R², 𝑁, order)
     AIC = zeros(5)
     BIC = zeros(5)
     for i ∈ eachindex(order)
