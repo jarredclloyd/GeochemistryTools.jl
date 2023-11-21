@@ -9,11 +9,19 @@ function _chi_squared_reduced(χ²::Real, 𝑁::Integer, predictors::Integer)
 end
 
 
-function _bayesian_information_criteria(χ²::AbstractFloat, 𝑁::Integer, order::Integer)
+function _bayesian_information_criteria(rss::AbstractFloat, 𝑁::Integer, order::Integer)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    return χ² + order * log(𝑁)
+    return 𝑁 * log(rss / 𝑁) + order * log(𝑁) + 𝑁 * log(2π) + 𝑁
+end
+
+
+function _akaike_information_criteria(rss::AbstractFloat, 𝑁::Integer, order::Integer)
+    if order < 0
+        throw(ArgumentError("Polynomial order must be positive"))
+    end
+    return 𝑁 * log(rss / 𝑁) + 2 * order + (2 * order *(order + 1)) / (𝑁 - order - 1) + 𝑁 * log(2π) + 𝑁
 end
 
 function _chi_squared(

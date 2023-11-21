@@ -34,6 +34,7 @@ struct OrthogonalPolynomial <: LinearRegression
     rmse::AbstractVector
     chi_squared::AbstractVector
     reduced_chi_squared::AbstractVector
+    akaike_information_criteria::AbstractVector
     bayesian_information_criteria::AbstractVector
     n_observations::Integer
 end
@@ -212,8 +213,10 @@ function _orthogonal_LSQ(
         end
     end
     R² = _olkin_pratt.(R², 𝑁, order)
+    AIC = zeros(5)
     BIC = zeros(5)
     for i ∈ eachindex(order)
+        AIC[i] = _akaike_information_criteria(rss[i], 𝑁, order[i])
         BIC[i] = _bayesian_information_criteria(rss[i], 𝑁, order[i])
     end
     return OrthogonalPolynomial(
@@ -229,6 +232,7 @@ function _orthogonal_LSQ(
         rmse,
         rss,
         mse,
+        AIC,
         BIC,
         𝑁,
     )
