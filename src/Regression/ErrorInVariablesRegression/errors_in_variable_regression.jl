@@ -119,7 +119,7 @@ struct GeneralisedLeastSquares <: LinearRegression
 end
 
 function Base.show(io::IOContext, F::GeneralisedLeastSquares)
-    for i in eachindex(F.btea)
+    for i in eachindex(F.beta)
         println(
             io,
             "β$(i - 1): $(round.(F.beta[i]; digits = 5)) ± $(round.(F.beta_se[i]; digits = 5))",
