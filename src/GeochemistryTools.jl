@@ -30,6 +30,7 @@ using Reexport
 @reexport using Glob
 @reexport using HypothesisTests
 @reexport using Dates
+@reexport using SparseArrays
 using LinearAlgebra
 using HypergeometricFunctions
 using SpecialFunctions

@@ -124,7 +124,7 @@ function poly_standarderror(
         throw(ArgumentError("Polynomial order must be positive"))
     end
     X = _design_matrix(x, fit, order)
-    VarΛX = fit.variance_covariance[1:(order + 1), 1:(order + 1)]
+    VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
         sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level,
     )
@@ -141,7 +141,7 @@ function poly_confidenceband(
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
     X = _design_matrix(x, fit, order)
-    VarΛX = fit.variance_covariance[1:(order + 1), 1:(order + 1)]
+    VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue)
 end
 
@@ -156,7 +156,7 @@ function poly_predictionband(
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
     X = _design_matrix(x, fit, order)
-    VarΛX = fit.variance_covariance[1:(order + 1), 1:(order + 1)]
+    VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
         sqrt.((fit.rmse[order + 1]^2) .* sum(1 .+ X .* (X * VarΛX); dims = 2)) .* tvalue,
     )
@@ -204,27 +204,29 @@ function _orthogonal_LSQ(
         Λ = VarΛX * Xᵀ * Ω * y
         Xvar = VarΛX * Xᵀ
         leverage = Vector{AbstractFloat}(undef, size(X, 1))
-        Threads.@threads for i ∈ 1:size(X,1)
-            leverage[i] = sum(view(X, i, :) .* view(Xvar, :, i))
+        Threads.@threads for i ∈ axes(X,1)
+            @inbounds leverage[i] = sum(view(X, i, :) .* view(Xvar, :, i))
         end
         leverage .= leverage .* ω
-        mse4 = (transpose((y .- (X * Λ))) * Ω * (y .- (X * Λ))) / (𝑁 .- 5)
-        studentised_residuals = (y .- (X * Λ)) ./ (sqrt.(mse4 .* (1 .- leverage)))
+        residuals = y .- (X * Λ)
+        mse4 = (transpose(residuals) * Ω * residuals) / (𝑁 .- 5)
+        studentised_residuals = @.(residuals / (sqrt(mse4 * (1 - leverage))))
         X = view(X, Not(studentised_residuals .>= 3), :)
         y = y[Not(studentised_residuals .>= 3)]
         ω = ω[Not(studentised_residuals .>= 3)]
         Xᵀ = transpose(X)
         Ω = Diagonal(ω)
+        𝑁 = length(x)
     end
     VarΛX = inv(Xᵀ * (Ω) * X)
     Λ = VarΛX * Xᵀ * Ω * y
-    rss = zeros(5)
+    rss = Vector{Real}(undef, 5)
     @simd for i ∈ eachindex(order)
         @inbounds rss[i] =
             transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) * Ω * (y .- (view(X, :, 1:i) * Λ[1:i]))
     end
     mse = rss ./ (𝑁 .- (order .+ 1))
-    Λ_SE = zeros(5, 5)
+    Λ_SE = spzeros(5, 5)
     @simd for i ∈ eachindex(order)
         @inbounds Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
     end
@@ -232,17 +234,17 @@ function _orthogonal_LSQ(
     rmse = sqrt.(mse)
     R² = 1 .- (rss ./ (tss))
     for i ∈ eachindex(R²)
-        if R²[i] < 0
-            R²[i] = 0
+        @inbounds if R²[i] < 0
+            @inbounds R²[i] = 0
         else
-            R²[i] = _olkin_pratt.(R²[i], 𝑁, order[i] + 1)
+            @inbounds R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
         end
     end
-    AIC = zeros(5)
-    BIC = zeros(5)
+    AIC = Vector{Real}(undef, 5)
+    BIC = Vector{Real}(undef, 5)
     for i ∈ eachindex(order)
-        AIC[i] = _akaike_information_criteria(rss[i], 𝑁, order[i])
-        BIC[i] = _bayesian_information_criteria(rss[i], 𝑁, order[i])
+        @inbounds AIC[i] = _akaike_information_criteria(rss[i], 𝑁, order[i])
+        @inbounds BIC[i] = _bayesian_information_criteria(rss[i], 𝑁, order[i])
     end
     return OrthogonalPolynomial(
         Λ,
