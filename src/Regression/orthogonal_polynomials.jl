@@ -22,20 +22,20 @@ export poly_orthogonal, poly_confidenceband, poly_predictionband, poly_standarde
 
 # stucts and base extensions
 struct OrthogonalPolynomial <: LinearRegression
-    lambda::AbstractVector
-    lambda_se::AbstractArray
-    beta::Real
-    gamma::AbstractVector
-    delta::AbstractVector
-    epsilon::AbstractVector
-    variance_covariance::AbstractArray
-    order::AbstractVector
-    r_squared::AbstractVector
-    rmse::AbstractVector
-    chi_squared::AbstractVector
-    reduced_chi_squared::AbstractVector
-    akaike_information_criteria::AbstractVector
-    bayesian_information_criteria::AbstractVector
+    lambda::Vector{Float64}
+    lambda_se::SparseMatrixCSC{Float64}
+    beta::Float64
+    gamma::Vector{Float64}
+    delta::Vector{Float64}
+    epsilon::Vector{Float64}
+    variance_covariance::Symmetric{Float64,Matrix{Float64}}
+    order::Vector{Integer}
+    r_squared::Vector{Float64}
+    rmse::Vector{Float64}
+    chi_squared::Vector{Float64}
+    reduced_chi_squared::Vector{Float64}
+    akaike_information_criteria::Vector{Float64}
+    bayesian_information_criteria::Vector{Float64}
     n_observations::Integer
 end
 
@@ -123,7 +123,7 @@ function poly_standarderror(
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    X = _design_matrix(x, fit, order)
+    X::Matrix{Float64} = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
         sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level,
@@ -140,7 +140,7 @@ function poly_confidenceband(
         throw(ArgumentError("Polynomial order must be positive"))
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
-    X = _design_matrix(x, fit, order)
+    X::Matrix{Float64} = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue)
 end
@@ -155,7 +155,7 @@ function poly_predictionband(
         throw(ArgumentError("Polynomial order must be positive"))
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
-    X = _design_matrix(x, fit, order)
+    X::Matrix{Float64} = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
         sqrt.((fit.rmse[order + 1]^2) .* sum(1 .+ X .* (X * VarΛX); dims = 2)) .* tvalue,
@@ -170,13 +170,13 @@ function _orthogonal_LSQ(
     weight_by::AbstractString = "abs",
     rm_outlier::Bool = false,
 )
-    𝑁 = length(x)
-    β = _beta_orthogonal(x)
-    γ = _gamma_orthogonal(x)
-    δ = _delta_orthogonal(x)
-    ϵ = _epsilon_orthogonal(x)
-    order = [0, 1, 2, 3, 4]
-    X = hcat(
+    𝑁::Integer = length(x)
+    β::Float64 = _beta_orthogonal(x)
+    γ::Vector{Float64} = _gamma_orthogonal(x)
+    δ::Vector{Float64} = _delta_orthogonal(x)
+    ϵ::Vector{Float64} = _epsilon_orthogonal(x)
+    order::Vector{Integer} = [0, 1, 2, 3, 4]
+    X::Matrix{Float64} = hcat(
         repeat([1.0], 𝑁),
         (x .- β),
         (x .- γ[1]) .* (x .- γ[2]),
@@ -184,7 +184,7 @@ function _orthogonal_LSQ(
         (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]),
     )
     if y_weights === nothing
-        ω = repeat([1.0], length(y))
+        ω::Vector{Float64} = repeat([1.0], length(y))
     elseif occursin("abs", lowercase(weight_by)) === true
         ω = y_weights
     elseif occursin("rel", lowercase(weight_by)) == true
@@ -197,20 +197,20 @@ function _orthogonal_LSQ(
         )
     end
     ω = 1 ./ (ω ./ mean(ω)) .^2
-    Ω = Diagonal(ω)
-    Xᵀ = transpose(X)
+    Ω::Diagonal{Float64, Vector{Float64}} = Diagonal(ω)
+    Xᵀ::Transpose{Float64, Matrix{Float64}} = transpose(X)
     if rm_outlier === true
-        VarΛX = inv(Xᵀ * (Ω) * X)
-        Λ = VarΛX * Xᵀ * Ω * y
-        Xvar = VarΛX * Xᵀ
-        leverage = Vector{AbstractFloat}(undef, size(X, 1))
-        Threads.@threads for i ∈ axes(X,1)
+        VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
+        Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
+        Xvar::Matrix{Float64} = VarΛX * Xᵀ
+        leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
+        Threads.@threads for i::Integer ∈ axes(X,1)
             @inbounds leverage[i] = sum(view(X, i, :) .* view(Xvar, :, i))
         end
         leverage .= leverage .* ω
-        residuals = y .- (X * Λ)
-        mse4 = (transpose(residuals) * Ω * residuals) / (𝑁 .- 5)
-        studentised_residuals = @.(residuals / (sqrt(mse4 * (1 - leverage))))
+        residuals::Vector{Float64} = y .- (X * Λ)
+        mse4::Float64 = (transpose(residuals) * Ω * residuals) / (𝑁 .- 5)
+        studentised_residuals::Vector{Float64} = @.(residuals / (sqrt(mse4 * (1 - leverage))))
         X = view(X, Not(studentised_residuals .>= 3), :)
         y = y[Not(studentised_residuals .>= 3)]
         ω = ω[Not(studentised_residuals .>= 3)]
@@ -218,34 +218,32 @@ function _orthogonal_LSQ(
         Ω = Diagonal(ω)
         𝑁 = length(x)
     end
-    VarΛX = inv(Xᵀ * (Ω) * X)
+    VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
     Λ = VarΛX * Xᵀ * Ω * y
-    rss = Vector{Real}(undef, 5)
-    @simd for i ∈ eachindex(order)
-        @inbounds rss[i] =
+    @inbounds rss::Vector{Float64} = Vector{Float64}(undef, 5)
+    @inbounds for i ∈ eachindex(order)
+        rss[i] =
             transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) * Ω * (y .- (view(X, :, 1:i) * Λ[1:i]))
     end
-    mse = rss ./ (𝑁 .- (order .+ 1))
-    Λ_SE = spzeros(5, 5)
-    @simd for i ∈ eachindex(order)
-        @inbounds Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
+    @inbounds mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
+    Λ_SE = spzeros(Float64, 5, 5)
+    @inbounds for i ∈ eachindex(order)
+        Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
     end
-    tss = transpose((y .- mean(y))) * Ω * (y .- mean(y))
-    rmse = sqrt.(mse)
-    R² = 1 .- (rss ./ (tss))
-    for i ∈ eachindex(R²)
-        @inbounds if R²[i] < 0
-            @inbounds R²[i] = 0
+    @inbounds tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
+    @inbounds rmse::Vector{Float64} = sqrt.(mse)
+    @inbounds R²::Vector{Float64} = 1 .- (rss ./ (tss))
+    @inbounds for i ∈ eachindex(R²)
+        if R²[i] < 0
+            R²[i] = 0
         else
-            @inbounds R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
+            R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
         end
     end
-    AIC = Vector{Real}(undef, 5)
-    BIC = Vector{Real}(undef, 5)
-    for i ∈ eachindex(order)
-        @inbounds AIC[i] = _akaike_information_criteria(rss[i], 𝑁, order[i])
-        @inbounds BIC[i] = _bayesian_information_criteria(rss[i], 𝑁, order[i])
-    end
+    AIC::Vector{Float64} = Vector{Float64}(undef, 5)
+    BIC::Vector{Float64} = Vector{Float64}(undef, 5)
+    @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
+    @inbounds BIC = _bayesian_information_criteria.(rss, 𝑁, order)
     return OrthogonalPolynomial(
         Λ,
         Λ_SE,
@@ -300,12 +298,12 @@ function _beta_orthogonal(x::AbstractVector)
 end
 
 function _gamma_orthogonal(x::AbstractVector)
-    vieta = [-sum(x) length(x); -(sum(x .^ 2)) sum(x)] \ [-sum(x .^ 2); -sum(x .^ 3)]
+    vieta::Vector{Float64} = [-sum(x) length(x); -(sum(x .^ 2)) sum(x)] \ [-sum(x .^ 2); -sum(x .^ 3)]
     return real(roots(Polynomial([vieta[2], -vieta[1], 1]); permute = false, scale = false))
 end
 
 function _delta_orthogonal(x::AbstractVector)
-    vieta =
+    vieta::Vector{Float64} =
         [
             -sum(x .^ 2) sum(x) -length(x)
             -sum(x .^ 3) sum(x .^ 2) -sum(x)
@@ -321,7 +319,7 @@ function _delta_orthogonal(x::AbstractVector)
 end
 
 function _epsilon_orthogonal(x::AbstractVector)
-    vieta =
+    vieta::Vector{Float64} =
         [
             -sum(x .^ 3) sum(x .^ 2) -sum(x) length(x)
             -sum(x .^ 4) sum(x .^ 3) -sum(x .^ 2) sum(x)
@@ -342,7 +340,7 @@ function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Int
         throw(ArgumentError("Polynomial order must be positive"))
     end
     if order == 0
-        X = repeat([1.0], length(x))
+        X::Matrix{Float64} = repeat([1.0], length(x))
     elseif order == 1
         X = hcat(repeat([1.0], length(x)), (x .- fit.beta))
     elseif order == 2

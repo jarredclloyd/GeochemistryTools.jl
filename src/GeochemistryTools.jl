@@ -31,7 +31,7 @@ using Reexport
 @reexport using HypothesisTests
 @reexport using Dates
 @reexport using SparseArrays
-using LinearAlgebra
+@reexport using LinearAlgebra
 using HypergeometricFunctions
 using SpecialFunctions
 using PyCall
