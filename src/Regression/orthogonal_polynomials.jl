@@ -199,33 +199,49 @@ function _orthogonal_LSQ(
     ω = 1 ./ (ω ./ mean(ω)) .^2
     Ω::Diagonal{Float64, Vector{Float64}} = Diagonal(ω)
     Xᵀ::Transpose{Float64, Matrix{Float64}} = transpose(X)
+    rss::Vector{Float64} = Vector{Float64}(undef, 5)
+    AIC::Vector{Float64} = Vector{Float64}(undef, 5)
     if rm_outlier === true
-        VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
-        Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
-        Xvar::Matrix{Float64} = VarΛX * Xᵀ
-        leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
-        Threads.@threads for i::Integer ∈ axes(X,1)
-            @inbounds leverage[i] = sum(view(X, i, :) .* view(Xvar, :, i))
+        𝑁prev::Integer = 0
+        n_iterations::Integer = 0
+        while 𝑁prev - 𝑁 != 0 && n_iterations < 10
+            VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
+            Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
+            @inbounds for i ∈ eachindex(order)
+                rss[i] =
+                    transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) *
+                    Ω *
+                    (y .- (view(X, :, 1:i) * Λ[1:i]))
+            end
+            @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
+            minAIC::Integer = findmin(AIC)[2]
+            Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
+            leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
+            Threads.@threads for i::Integer ∈ axes(X, 1)
+                @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
+            end
+            leverage .= leverage .* ω
+            residuals::Vector{Float64} = y .- (view(X, :, 1:minAIC) * Λ[1:minAIC])
+            @inbounds mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
+            studentised_residuals::Vector{Float64} =
+                @.(residuals / (sqrt(mse[minAIC] * (1 - leverage))))
+            X = view(X, Not(studentised_residuals .>= 3), :)
+            y = y[Not(studentised_residuals .>= 3)]
+            ω = ω[Not(studentised_residuals .>= 3)]
+            Xᵀ = transpose(X)
+            Ω = Diagonal(ω)
+            𝑁prev = 𝑁
+            𝑁 = size(X, 1)
+            n_iterations += 1
         end
-        leverage .= leverage .* ω
-        residuals::Vector{Float64} = y .- (X * Λ)
-        mse4::Float64 = (transpose(residuals) * Ω * residuals) / (𝑁 .- 5)
-        studentised_residuals::Vector{Float64} = @.(residuals / (sqrt(mse4 * (1 - leverage))))
-        X = view(X, Not(studentised_residuals .>= 3), :)
-        y = y[Not(studentised_residuals .>= 3)]
-        ω = ω[Not(studentised_residuals .>= 3)]
-        Xᵀ = transpose(X)
-        Ω = Diagonal(ω)
-        𝑁 = length(x)
     end
     VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
     Λ = VarΛX * Xᵀ * Ω * y
-    @inbounds rss::Vector{Float64} = Vector{Float64}(undef, 5)
     @inbounds for i ∈ eachindex(order)
         rss[i] =
             transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) * Ω * (y .- (view(X, :, 1:i) * Λ[1:i]))
     end
-    @inbounds mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
+    @inbounds mse = rss ./ (𝑁 .- (order .+ 1))
     Λ_SE = spzeros(Float64, 5, 5)
     @inbounds for i ∈ eachindex(order)
         Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
@@ -240,7 +256,6 @@ function _orthogonal_LSQ(
             R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
         end
     end
-    AIC::Vector{Float64} = Vector{Float64}(undef, 5)
     BIC::Vector{Float64} = Vector{Float64}(undef, 5)
     @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
     @inbounds BIC = _bayesian_information_criteria.(rss, 𝑁, order)
@@ -367,4 +382,8 @@ function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Int
         )
     end
     return X
+end
+
+function _squaredmahalanobis(n, hii)
+    return (n-1)*(hii - 1/n)
 end
