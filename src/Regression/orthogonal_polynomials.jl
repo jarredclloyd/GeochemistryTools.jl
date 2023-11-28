@@ -387,3 +387,118 @@ end
 function _squaredmahalanobis(n, hii)
     return (n-1)*(hii - 1/n)
 end
+
+
+function _orthogonal_LSQ_QR(
+    x::AbstractVector,
+    y::AbstractVector;
+    y_weights::Union{Nothing,AbstractArray} = nothing,
+    weight_by::AbstractString = "abs",
+    rm_outlier::Bool = false,
+)
+    𝑁::Integer = length(x)
+    β::Float64 = _beta_orthogonal(x)
+    γ::Vector{Float64} = _gamma_orthogonal(x)
+    δ::Vector{Float64} = _delta_orthogonal(x)
+    ϵ::Vector{Float64} = _epsilon_orthogonal(x)
+    order::Vector{Integer} = [0, 1, 2, 3, 4]
+    X::Matrix{Float64} = hcat(
+        repeat([1.0], 𝑁),
+        (x .- β),
+        (x .- γ[1]) .* (x .- γ[2]),
+        (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]),
+        (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]),
+    )
+    if y_weights === nothing
+        ω::Vector{Float64} = repeat([1.0], length(y))
+    elseif occursin("abs", lowercase(weight_by)) === true
+        ω = y_weights
+    elseif occursin("rel", lowercase(weight_by)) == true
+        ω = y_weights ./ y
+    else
+        throw(
+            ArgumentError(
+                "Value of 'weight_by' is unrecognised. String should contain either 'rel' or 'abs'.",
+            ),
+        )
+    end
+    ω = 1 ./ (ω ./ mean(ω)) .^ 2
+    Ω::Diagonal{Float64,Vector{Float64}} = Diagonal(ω)
+    cholesky!(Ω)
+    F::LinearAlgebra.QRCompactWY{Float64,Matrix{Float64},Matrix{Float64}} = qr(Ω * X)
+    Λ::Vector{Float64} = F.R \ (transpose(Matrix(F.Q)) * y)
+    VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(transpose(F.R) * F.R)
+    rss::Vector{Float64} = Vector{Float64}(undef, 5)
+    AIC::Vector{Float64} = Vector{Float64}(undef, 5)
+    @inbounds for i ∈ eachindex(order)
+        rss[i] =
+            transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) *
+            Diagonal(ω) *
+            (y .- (view(X, :, 1:i) * Λ[1:i]))
+    end
+    @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
+    @inbounds mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
+    if rm_outlier === true
+        𝑁prev::Integer = 0
+        n_iterations::Integer = 0
+        while 𝑁prev - 𝑁 != 0 && n_iterations < 10
+            minAIC::Integer = findmin(AIC)[2]
+            Xᵀ = transpose(X)
+            Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
+            leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
+            Threads.@threads for i::Integer ∈ axes(X, 1)
+                @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
+            end
+            leverage .= leverage .* ω
+            residuals::Vector{Float64} = y .- (view(X, :, 1:minAIC) * Λ[1:minAIC])
+            @inbounds mse = rss ./ (𝑁 .- (order .+ 1))
+            studentised_residuals::Vector{Float64} =
+                @.(residuals / (sqrt(mse[minAIC] * (1 - leverage))))
+            X = view(X, Not(studentised_residuals .>= 3), :)
+            y = y[Not(studentised_residuals .>= 3)]
+            ω = ω[Not(studentised_residuals .>= 3)]
+            𝑁prev = 𝑁
+            𝑁 = size(X, 1)
+            n_iterations += 1
+            Ω = Diagonal(ω)
+            cholesky!(Ω)
+            F = qr(Ω * X)
+            Λ = F.R \ (transpose(Matrix(F.Q)) * y)
+            VarΛX = Symmetric(transpose(F.R) * F.R)
+        end
+    end
+    Λ_SE = spzeros(Float64, 5, 5)
+    @inbounds for i ∈ eachindex(order)
+        Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
+    end
+    @inbounds tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
+    @inbounds rmse::Vector{Float64} = sqrt.(mse)
+    @inbounds R²::Vector{Float64} = 1 .- (rss ./ (tss))
+    @inbounds for i ∈ eachindex(R²)
+        if R²[i] < 0
+            R²[i] = 0
+        else
+            R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
+        end
+    end
+    BIC::Vector{Float64} = Vector{Float64}(undef, 5)
+    @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
+    @inbounds BIC = _bayesian_information_criteria.(rss, 𝑁, order)
+    return OrthogonalPolynomial(
+        Λ,
+        Λ_SE,
+        β,
+        γ,
+        δ,
+        ϵ,
+        VarΛX,
+        order,
+        R²,
+        rmse,
+        rss,
+        mse,
+        AIC,
+        BIC,
+        𝑁,
+    )
+end
