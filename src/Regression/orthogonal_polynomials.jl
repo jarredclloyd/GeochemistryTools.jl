@@ -200,8 +200,7 @@ function _orthogonal_LSQ(
             ),
         )
     end
-    ω = 1 ./ (ω ./ mean(ω)) .^ 2
-    Ω::Diagonal{Float64,Vector{Float64}} = Diagonal(ω)
+    Ω::Diagonal{Float64,Vector{Float64}} = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
     Xᵀ::Transpose{Float64,Matrix{Float64}} = transpose(X)
     rss::Vector{Float64} = Vector{Float64}(undef, 5)
     AIC::Vector{Float64} = Vector{Float64}(undef, 5)
@@ -216,7 +215,7 @@ function _orthogonal_LSQ(
     @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
     if rm_outlier === true
         𝑁prev::Integer = 0
-        n_iterations::Integer = 0
+        n_iterations::Integer = 1
         n_outliers = 0
         while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
             minAIC::Integer = findmin(AIC)[2]
@@ -226,17 +225,16 @@ function _orthogonal_LSQ(
             Threads.@threads for i ∈ axes(X, 1)
                 @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
             end
-            @inbounds leverage .= leverage .* ω
+            @inbounds leverage .*= ω
             @inbounds residuals::Vector{Float64} = y .- (view(X, :, 1:minAIC) * Λ[1:minAIC])
             @inbounds mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
-            studentised_residuals::Vector{Float64} =
-                @.(residuals / (sqrt(mse[minAIC] * (1 - leverage))))
-            n_outliers += length(y[studentised_residuals .≥ 3])
-            X = view(X, Not(studentised_residuals .≥ 3), :)
-            y = y[Not(studentised_residuals .≥ 3)]
-            ω = ω[Not(studentised_residuals .≥ 3)]
+            @inbounds residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
+            @inbounds n_outliers += length(y[residuals .≥ 3])
+            @inbounds X = view(X, Not(residuals .≥ 3), :)
+            @inbounds y = y[Not(residuals .≥ 3)]
+            @inbounds ω = ω[Not(residuals .≥ 3)]
             Xᵀ = transpose(X)
-            Ω = Diagonal(ω)
+            Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
             𝑁prev = 𝑁
             𝑁 = size(X, 1)
             n_iterations += 1
@@ -250,7 +248,9 @@ function _orthogonal_LSQ(
                 @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
             end
         end
-        println("Determined $n_outliers outliers for current fit in $n_iterations pass(es)")
+        println(
+            "Determined $n_outliers $(n_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
+        )
     end
     @inbounds mse = rss ./ (𝑁 .- (order .+ 1))
     Λ_SE = spzeros(Float64, 5, 5)
