@@ -44,7 +44,7 @@ function Base.show(io::IOContext, fit::OrthogonalPolynomial)
     println(io, "λ₁: $(round(fit.lambda[2], sigdigits = 5))")
     println(io, "λ₂: $(round(fit.lambda[3], sigdigits = 5))")
     println(io, "λ₃: $(round(fit.lambda[4], sigdigits = 5))")
-    println(io, "λ₄: $(round(fit.lambda[5], sigdigits = 5))")
+    return println(io, "λ₄: $(round(fit.lambda[5], sigdigits = 5))")
 end
 
 # call functions
@@ -171,13 +171,17 @@ function _orthogonal_LSQ(
     rm_outlier::Bool = false,
 )
     𝑁::Integer = length(x)
-    β::Float64 = _beta_orthogonal(x)
-    γ::Vector{Float64} = _gamma_orthogonal(x)
-    δ::Vector{Float64} = _delta_orthogonal(x)
-    ϵ::Vector{Float64} = _epsilon_orthogonal(x)
+    x_sums::Vector{Float64} = Vector{Float64}(undef, 7)
+    @simd for i ∈ eachindex(x_sums)
+        x_sums[i] = sum(x .^ i)
+    end
+    β::Float64 = _beta_orthogonal(𝑁, x_sums)
+    γ::Vector{Float64} = _gamma_orthogonal(𝑁, x_sums)
+    δ::Vector{Float64} = _delta_orthogonal(𝑁, x_sums)
+    ϵ::Vector{Float64} = _epsilon_orthogonal(𝑁, x_sums)
     order::Vector{Integer} = [0, 1, 2, 3, 4]
     X::Matrix{Float64} = hcat(
-        repeat([1.0], 𝑁),
+        fill(1.0, 𝑁),
         (x .- β),
         (x .- γ[1]) .* (x .- γ[2]),
         (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]),
@@ -196,50 +200,57 @@ function _orthogonal_LSQ(
             ),
         )
     end
-    ω = 1 ./ (ω ./ mean(ω)) .^2
-    Ω::Diagonal{Float64, Vector{Float64}} = Diagonal(ω)
-    Xᵀ::Transpose{Float64, Matrix{Float64}} = transpose(X)
+    ω = 1 ./ (ω ./ mean(ω)) .^ 2
+    Ω::Diagonal{Float64,Vector{Float64}} = Diagonal(ω)
+    Xᵀ::Transpose{Float64,Matrix{Float64}} = transpose(X)
     rss::Vector{Float64} = Vector{Float64}(undef, 5)
     AIC::Vector{Float64} = Vector{Float64}(undef, 5)
+    VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
+    Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
+    @inbounds for i ∈ eachindex(order)
+        rss[i] =
+            transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) *
+            Ω *
+            (y .- (view(X, :, 1:i) * Λ[1:i]))
+    end
+    @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
     if rm_outlier === true
         𝑁prev::Integer = 0
         n_iterations::Integer = 0
-        while 𝑁prev - 𝑁 != 0 && n_iterations < 10
-            VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
-            Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
-            @inbounds for i ∈ eachindex(order)
-                rss[i] =
-                    transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) *
-                    Ω *
-                    (y .- (view(X, :, 1:i) * Λ[1:i]))
-            end
-            @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
+        n_outliers = 0
+        while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
             minAIC::Integer = findmin(AIC)[2]
-            Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
+            @inbounds Xvar::Matrix{Float64} =
+                view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
             leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
-            Threads.@threads for i::Integer ∈ axes(X, 1)
+            Threads.@threads for i ∈ axes(X, 1)
                 @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
             end
-            leverage .= leverage .* ω
-            residuals::Vector{Float64} = y .- (view(X, :, 1:minAIC) * Λ[1:minAIC])
+            @inbounds leverage .= leverage .* ω
+            @inbounds residuals::Vector{Float64} = y .- (view(X, :, 1:minAIC) * Λ[1:minAIC])
             @inbounds mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
             studentised_residuals::Vector{Float64} =
                 @.(residuals / (sqrt(mse[minAIC] * (1 - leverage))))
-            X = view(X, Not(studentised_residuals .>= 3), :)
-            y = y[Not(studentised_residuals .>= 3)]
-            ω = ω[Not(studentised_residuals .>= 3)]
+            n_outliers += length(y[studentised_residuals .≥ 3])
+            X = view(X, Not(studentised_residuals .≥ 3), :)
+            y = y[Not(studentised_residuals .≥ 3)]
+            ω = ω[Not(studentised_residuals .≥ 3)]
             Xᵀ = transpose(X)
             Ω = Diagonal(ω)
             𝑁prev = 𝑁
             𝑁 = size(X, 1)
             n_iterations += 1
+            VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
+            Λ = VarΛX * Xᵀ * Ω * y
+            @inbounds for i ∈ eachindex(order)
+                rss[i] =
+                    transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) *
+                    Ω *
+                    (y .- (view(X, :, 1:i) * Λ[1:i]))
+                @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
+            end
         end
-    end
-    VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
-    Λ = VarΛX * Xᵀ * Ω * y
-    @inbounds for i ∈ eachindex(order)
-        rss[i] =
-            transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) * Ω * (y .- (view(X, :, 1:i) * Λ[1:i]))
+        println("Determined $n_outliers outliers for current fit in $n_iterations pass(es)")
     end
     @inbounds mse = rss ./ (𝑁 .- (order .+ 1))
     Λ_SE = spzeros(Float64, 5, 5)
@@ -257,7 +268,6 @@ function _orthogonal_LSQ(
         end
     end
     BIC::Vector{Float64} = Vector{Float64}(undef, 5)
-    @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
     @inbounds BIC = _bayesian_information_criteria.(rss, 𝑁, order)
     return OrthogonalPolynomial(
         Λ,
@@ -308,46 +318,33 @@ function _poly_orthogonal(
 end
 
 # functions for parameter calculations
-function _beta_orthogonal(x::AbstractVector)
-    return 1 / length(x) * sum(x)
+function _beta_orthogonal(N::Integer, sums::AbstractVector)
+    return 1 / N * sums[1]
 end
 
-function _gamma_orthogonal(x::AbstractVector)
-    vieta::Vector{Float64} = [-sum(x) length(x); -(sum(x .^ 2)) sum(x)] \ [-sum(x .^ 2); -sum(x .^ 3)]
-    return real(roots(Polynomial([vieta[2], -vieta[1], 1]); permute = false, scale = false))
+function _gamma_orthogonal(N::Integer, sums::AbstractVector)
+    vieta::Vector{Float64} = [-sums[1] N; -sums[2] sums[1]] \ [-sums[2]; -sums[3]]
+    return real(PolynomialRoots.roots(([vieta[2], -vieta[1], 1])))
 end
 
-function _delta_orthogonal(x::AbstractVector)
+function _delta_orthogonal(N::Integer, sums::AbstractVector)
     vieta::Vector{Float64} =
         [
-            -sum(x .^ 2) sum(x) -length(x)
-            -sum(x .^ 3) sum(x .^ 2) -sum(x)
-            -sum(x .^ 4) sum(x .^ 3) -sum(x .^ 2)
-        ] \ [-sum(x .^ 3); -sum(x .^ 4); -sum(x .^ 5)]
-    return real(
-        roots(
-            Polynomial([-vieta[3], vieta[2], -vieta[1], 1]);
-            permute = false,
-            scale = false,
-        ),
-    )
+            -sums[2] sums[1] -N
+            -sums[3] sums[2] -sums[1]
+            -sums[4] sums[3] -sums[2]
+        ] \ [-sums[3]; -sums[4]; -sums[5]]
+    return real(PolynomialRoots.roots(([-vieta[3], vieta[2], -vieta[1], 1])))
 end
-
-function _epsilon_orthogonal(x::AbstractVector)
+function _epsilon_orthogonal(N::Integer, sums::AbstractVector)
     vieta::Vector{Float64} =
         [
-            -sum(x .^ 3) sum(x .^ 2) -sum(x) length(x)
-            -sum(x .^ 4) sum(x .^ 3) -sum(x .^ 2) sum(x)
-            -sum(x .^ 5) sum(x .^ 4) -sum(x .^ 3) sum(x .^ 2)
-            -sum(x .^ 6) sum(x .^ 5) -sum(x .^ 4) sum(x .^ 3)
-        ] \ [-sum(x .^ 4); -sum(x .^ 5); -sum(x .^ 6); -sum(x .^ 7)]
-    return real(
-        roots(
-            Polynomial([vieta[4], -vieta[3], vieta[2], -vieta[1], 1]);
-            permute = false,
-            scale = false,
-        ),
-    )
+            -sums[3] sums[2] -sums[1] N
+            -sums[4] sums[3] -sums[2] sums[1]
+            -sums[5] sums[4] -sums[3] sums[2]
+            -sums[6] sums[5] -sums[4] sums[3]
+        ] \ [-sums[4]; -sums[5]; -sums[6]; -sums[7]]
+    return real(PolynomialRoots.roots(([vieta[4], -vieta[3], vieta[2], -vieta[1], 1])))
 end
 
 function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Integer)
@@ -385,120 +382,5 @@ function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Int
 end
 
 function _squaredmahalanobis(n, hii)
-    return (n-1)*(hii - 1/n)
-end
-
-
-function _orthogonal_LSQ_QR(
-    x::AbstractVector,
-    y::AbstractVector;
-    y_weights::Union{Nothing,AbstractArray} = nothing,
-    weight_by::AbstractString = "abs",
-    rm_outlier::Bool = false,
-)
-    𝑁::Integer = length(x)
-    β::Float64 = _beta_orthogonal(x)
-    γ::Vector{Float64} = _gamma_orthogonal(x)
-    δ::Vector{Float64} = _delta_orthogonal(x)
-    ϵ::Vector{Float64} = _epsilon_orthogonal(x)
-    order::Vector{Integer} = [0, 1, 2, 3, 4]
-    X::Matrix{Float64} = hcat(
-        repeat([1.0], 𝑁),
-        (x .- β),
-        (x .- γ[1]) .* (x .- γ[2]),
-        (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]),
-        (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]),
-    )
-    if y_weights === nothing
-        ω::Vector{Float64} = repeat([1.0], length(y))
-    elseif occursin("abs", lowercase(weight_by)) === true
-        ω = y_weights
-    elseif occursin("rel", lowercase(weight_by)) == true
-        ω = y_weights ./ y
-    else
-        throw(
-            ArgumentError(
-                "Value of 'weight_by' is unrecognised. String should contain either 'rel' or 'abs'.",
-            ),
-        )
-    end
-    ω = 1 ./ (ω ./ mean(ω)) .^ 2
-    Ω::Diagonal{Float64,Vector{Float64}} = Diagonal(ω)
-    cholesky!(Ω)
-    F::LinearAlgebra.QRCompactWY{Float64,Matrix{Float64},Matrix{Float64}} = qr(Ω * X)
-    Λ::Vector{Float64} = F.R \ (transpose(Matrix(F.Q)) * y)
-    VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(transpose(F.R) * F.R)
-    rss::Vector{Float64} = Vector{Float64}(undef, 5)
-    AIC::Vector{Float64} = Vector{Float64}(undef, 5)
-    @inbounds for i ∈ eachindex(order)
-        rss[i] =
-            transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) *
-            Diagonal(ω) *
-            (y .- (view(X, :, 1:i) * Λ[1:i]))
-    end
-    @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
-    @inbounds mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
-    if rm_outlier === true
-        𝑁prev::Integer = 0
-        n_iterations::Integer = 0
-        while 𝑁prev - 𝑁 != 0 && n_iterations < 10
-            minAIC::Integer = findmin(AIC)[2]
-            Xᵀ = transpose(X)
-            Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
-            leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
-            Threads.@threads for i::Integer ∈ axes(X, 1)
-                @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
-            end
-            leverage .= leverage .* ω
-            residuals::Vector{Float64} = y .- (view(X, :, 1:minAIC) * Λ[1:minAIC])
-            @inbounds mse = rss ./ (𝑁 .- (order .+ 1))
-            studentised_residuals::Vector{Float64} =
-                @.(residuals / (sqrt(mse[minAIC] * (1 - leverage))))
-            X = view(X, Not(studentised_residuals .>= 3), :)
-            y = y[Not(studentised_residuals .>= 3)]
-            ω = ω[Not(studentised_residuals .>= 3)]
-            𝑁prev = 𝑁
-            𝑁 = size(X, 1)
-            n_iterations += 1
-            Ω = Diagonal(ω)
-            cholesky!(Ω)
-            F = qr(Ω * X)
-            Λ = F.R \ (transpose(Matrix(F.Q)) * y)
-            VarΛX = Symmetric(transpose(F.R) * F.R)
-        end
-    end
-    Λ_SE = spzeros(Float64, 5, 5)
-    @inbounds for i ∈ eachindex(order)
-        Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
-    end
-    @inbounds tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
-    @inbounds rmse::Vector{Float64} = sqrt.(mse)
-    @inbounds R²::Vector{Float64} = 1 .- (rss ./ (tss))
-    @inbounds for i ∈ eachindex(R²)
-        if R²[i] < 0
-            R²[i] = 0
-        else
-            R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
-        end
-    end
-    BIC::Vector{Float64} = Vector{Float64}(undef, 5)
-    @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
-    @inbounds BIC = _bayesian_information_criteria.(rss, 𝑁, order)
-    return OrthogonalPolynomial(
-        Λ,
-        Λ_SE,
-        β,
-        γ,
-        δ,
-        ϵ,
-        VarΛX,
-        order,
-        R²,
-        rmse,
-        rss,
-        mse,
-        AIC,
-        BIC,
-        𝑁,
-    )
+    return (n - 1) * (hii - 1 / n)
 end

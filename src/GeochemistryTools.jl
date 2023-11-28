@@ -36,6 +36,7 @@ using HypergeometricFunctions
 using SpecialFunctions
 using PyCall
 using Conda
+using PolynomialRoots
 
 import Base: getindex, setindex!
 import Base.Threads: @spawn, @threads, @simd
