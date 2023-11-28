@@ -169,6 +169,7 @@ function _orthogonal_LSQ(
     y_weights::Union{Nothing,AbstractArray} = nothing,
     weight_by::AbstractString = "abs",
     rm_outlier::Bool = false,
+    verbose::Bool = false,
 )
     𝑁::Integer = length(x)
     x_sums::Vector{Float64} = Vector{Float64}(undef, 7)
@@ -248,9 +249,11 @@ function _orthogonal_LSQ(
                 @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
             end
         end
-        println(
-            "Determined $n_outliers $(n_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
-        )
+        if verbose == true
+            println(
+                "Determined $n_outliers $(n_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
+            )
+        end
     end
     @inbounds mse = rss ./ (𝑁 .- (order .+ 1))
     Λ_SE = spzeros(Float64, 5, 5)
