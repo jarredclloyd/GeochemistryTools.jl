@@ -2,7 +2,7 @@
 
 Author: Jarred C Lloyd: https://github.com/jarredclloyd
 Created: 2023-09-08
-Edited: 2023-09-19
+Edited: 2023-11-29
 
 This source file contains functions to compute orthogonal polynomial fits (up to pₙ(5)) and
 their uncertainties. These are based on the equations provided in Bevington & Robinson 2003,
@@ -48,7 +48,45 @@ function Base.show(io::IOContext, fit::OrthogonalPolynomial)
 end
 
 # call functions
+"""
 
+    fit_orthogonal(df::AbstractDataFrame,
+    x_name::Symbol,
+    y_name::Symbol;
+    [y_weights::Union{Nothing,Symbol} = nothing,
+    weight_by::AbstractString = "abs",
+    rm_outlier::Bool = false,
+    verbose::Bool = false])
+
+Compute an orthogonal polynomial that represent some X and Y data.
+
+Input df as a DataFrame of 4 of 5 columns wide with column order (X, sX, Y, sY, [ρXY]).
+
+# Keywords
+- `y_weights::Union{Nothing,Symbol}`: Weights for y values (e.g. absolute uncertainties).
+- 'weight_by::AbstractString': Weight pre-scaling, values of "rel" or "abs" (default) are
+    accepted. If "rel" transforms weights to relative weights.
+- 'rm_outlier::Bool': When set to true, will remove outliers (studentised residuals ≥ 3,
+    based on fit with minimum akaike information criteria value).
+- 'verbose::Bool': When set to true will print the number of outliers determined during N passes.
+
+# References
+
+Bevington, PR & Robinson, DK (2003) 'Data reduction and error analysis for the physical
+sciences', 3rd ed., McGraw-Hill, ISBN: 9780072472271
+
+Anenburg, M & Williams, MJ (2022) 'Quantifying the Tetrad Effect, Shape Components, and
+Ce–Eu–Gd Anomalies in Rare Earth Element Patterns', *Mathematical Geosciences*, 54(1):47–70.
+https://doi.org/10.1007/s11004-021-09959-5
+
+Akaike, H (1974) 'A new look at the statistical model identification',
+*IEEE Transactions on Automatic Control*, 19(6):716–723.
+https://doi.org/10.1109/TAC.1974.1100705
+
+Karch, J (2020) 'Improving on Adjusted R-Squared', *Collabra: Psychology*, 6(1):45.
+https://doi.org/10.1525/collabra.343
+
+"""
 function fit_orthogonal(
     df::AbstractDataFrame,
     x_name::Symbol,
@@ -56,6 +94,7 @@ function fit_orthogonal(
     y_weights::Union{Nothing,Symbol} = nothing,
     weight_by::AbstractString = "abs",
     rm_outlier::Bool = false,
+    verbose::Bool = false
 )
     if y_weights !== nothing
         return _orthogonal_LSQ(
@@ -64,6 +103,7 @@ function fit_orthogonal(
             y_weights = df[!, y_weights],
             weight_by = weight_by,
             rm_outlier = rm_outlier,
+            verbose = verbose
         )
     else
         return _orthogonal_LSQ(
@@ -71,6 +111,7 @@ function fit_orthogonal(
             df[!, y_name];
             weight_by = weight_by,
             rm_outlier = rm_outlier,
+            verbose = verbose
         )
     end
 end
@@ -80,6 +121,7 @@ function fit_orthogonal(
     errors::Bool = false,
     weight_by::AbstractString = "abs",
     rm_outlier::Bool = false,
+    verbose::Bool = false
 )
     if errors === false
         return _orthogonal_LSQ(
@@ -87,6 +129,7 @@ function fit_orthogonal(
             A[:, 2];
             weight_by = weight_by,
             rm_outlier = rm_outlier,
+            verbose = verbose
         )
     elseif errors === true
         return _orthogonal_LSQ(
@@ -95,6 +138,7 @@ function fit_orthogonal(
             y_weights = A[:, 3],
             weight_by = weight_by,
             rm_outlier = rm_outlier,
+            verbose = verbose
         )
     end
 end
@@ -215,9 +259,10 @@ function _orthogonal_LSQ(
     AIC = _akaike_information_criteria.(rss, 𝑁, order)
     if rm_outlier === true
         𝑁prev::Integer = 0
-        n_iterations::Integer = 1
+        n_iterations::Integer = 0
         n_outliers::Integer = 0
         while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
+            n_iterations += 1
             minAIC::Int64 = findmin(AIC)[2]
             Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
             leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
@@ -245,7 +290,6 @@ function _orthogonal_LSQ(
                     rss[i] = transpose(residuals) * Ω * (residuals)
                 end
                 AIC = _akaike_information_criteria.(rss, 𝑁, order)
-                n_iterations += 1
             end
             𝑁prev = 𝑁
             𝑁 = size(X, 1)
