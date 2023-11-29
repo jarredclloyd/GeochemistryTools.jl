@@ -180,7 +180,7 @@ function _orthogonal_LSQ(
     γ::Vector{Float64} = _gamma_orthogonal(𝑁, x_sums)
     δ::Vector{Float64} = _delta_orthogonal(𝑁, x_sums)
     ϵ::Vector{Float64} = _epsilon_orthogonal(𝑁, x_sums)
-    order::Vector{Integer} = [0, 1, 2, 3, 4]
+    order::Vector{Int64} = [0, 1, 2, 3, 4]
     X::Matrix{Float64} = hcat(
         fill(1.0, 𝑁),
         (x .- β),
@@ -188,8 +188,8 @@ function _orthogonal_LSQ(
         (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]),
         (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]),
     )
-    if y_weights === nothing
-        ω::Vector{Float64} = repeat([1.0], length(y))
+     if y_weights === nothing
+        ω::Vector{Float64} = fill(1.0, length(y))
     elseif occursin("abs", lowercase(weight_by)) === true
         ω = y_weights
     elseif occursin("rel", lowercase(weight_by)) == true
@@ -207,47 +207,48 @@ function _orthogonal_LSQ(
     AIC::Vector{Float64} = Vector{Float64}(undef, 5)
     VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
     Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
-    @inbounds for i ∈ eachindex(order)
+    @inbounds @simd for i ∈ eachindex(order)
+        residuals::Vector{Float64} = (y .- (view(X, :, 1:i) * Λ[1:i]))
         rss[i] =
-            transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) *
-            Ω *
-            (y .- (view(X, :, 1:i) * Λ[1:i]))
+            transpose(residuals) * Ω * (residuals)
     end
-    @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
+    AIC = _akaike_information_criteria.(rss, 𝑁, order)
     if rm_outlier === true
         𝑁prev::Integer = 0
         n_iterations::Integer = 1
-        n_outliers = 0
+        n_outliers::Integer = 0
         while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
-            minAIC::Integer = findmin(AIC)[2]
-            @inbounds Xvar::Matrix{Float64} =
-                view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
+            minAIC::Int64 = findmin(AIC)[2]
+            Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
             leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
             Threads.@threads for i ∈ axes(X, 1)
                 @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
             end
-            @inbounds leverage .*= ω
-            @inbounds residuals::Vector{Float64} = y .- (view(X, :, 1:minAIC) * Λ[1:minAIC])
-            @inbounds mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
-            @inbounds residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
-            @inbounds n_outliers += length(y[residuals .≥ 3])
-            @inbounds X = view(X, Not(residuals .≥ 3), :)
-            @inbounds y = y[Not(residuals .≥ 3)]
-            @inbounds ω = ω[Not(residuals .≥ 3)]
-            Xᵀ = transpose(X)
-            Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
+            leverage .*= ω
+            studentised_residuals::Vector{Float64} =
+                y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
+            mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
+            studentised_residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
+            outlier_inds::Vector{Int64} = findall(studentised_residuals .≥ 3)
+            n_outliers += length(outlier_inds)
+            if n_outliers > 0
+                X = view(X, Not(outlier_inds), :) # high allocs
+                y = y[Not(outlier_inds)] # high allocs
+                ω = ω[Not(outlier_inds)] # high allocs
+                Xᵀ = transpose(X)
+                Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
+
+                VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
+                Λ = VarΛX * Xᵀ * Ω * y
+                @inbounds @simd for i ∈ eachindex(order)
+                    residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
+                    rss[i] = transpose(residuals) * Ω * (residuals)
+                end
+                AIC = _akaike_information_criteria.(rss, 𝑁, order)
+                n_iterations += 1
+            end
             𝑁prev = 𝑁
             𝑁 = size(X, 1)
-            n_iterations += 1
-            VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
-            Λ = VarΛX * Xᵀ * Ω * y
-            @inbounds for i ∈ eachindex(order)
-                rss[i] =
-                    transpose((y .- (view(X, :, 1:i) * Λ[1:i]))) *
-                    Ω *
-                    (y .- (view(X, :, 1:i) * Λ[1:i]))
-                @inbounds AIC = _akaike_information_criteria.(rss, 𝑁, order)
-            end
         end
         if verbose == true
             println(
@@ -255,14 +256,15 @@ function _orthogonal_LSQ(
             )
         end
     end
-    @inbounds mse = rss ./ (𝑁 .- (order .+ 1))
-    Λ_SE = spzeros(Float64, 5, 5)
+    mse = rss ./ (𝑁 .- (order .+ 1))
+    Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
     @inbounds for i ∈ eachindex(order)
         Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
     end
-    @inbounds tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
-    @inbounds rmse::Vector{Float64} = sqrt.(mse)
-    @inbounds R²::Vector{Float64} = 1 .- (rss ./ (tss))
+    sparse(Λ_SE)
+    tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
+    rmse::Vector{Float64} = sqrt.(mse)
+    R²::Vector{Float64} = 1 .- (rss ./ (tss))
     @inbounds for i ∈ eachindex(R²)
         if R²[i] < 0
             R²[i] = 0
@@ -271,7 +273,7 @@ function _orthogonal_LSQ(
         end
     end
     BIC::Vector{Float64} = Vector{Float64}(undef, 5)
-    @inbounds BIC = _bayesian_information_criteria.(rss, 𝑁, order)
+    BIC = _bayesian_information_criteria.(rss, 𝑁, order)
     return OrthogonalPolynomial(
         Λ,
         Λ_SE,
