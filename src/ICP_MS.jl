@@ -269,3 +269,40 @@ function load_agilent2(
     metadata!(data, "signal end", signal_end)
     return data
 end
+
+
+function automatic_laser_times(
+    time,
+    signal;
+    bandwidth = ceil(Integer, sqrt(length(signal))),
+)
+    pvalue_JB = pvalue(JarqueBeraTest(signal; adjusted = true))
+    if pvalue_JB > 0.05
+        println("no signal detected")
+    else
+        z = Array{Float64}(undef, length(signal), 5)
+        for i in eachindex(signal)
+            z[i, 1] = if i < bandwidth
+                geomean_zeros(signal[begin:i])
+            else
+                geomean_zeros(signal[(i - bandwidth + 1):i])
+            end
+            z[i, 2] = if i < bandwidth
+                geovar_zeros(signal[begin:i])
+            else
+                geovar_zeros(signal[(i - bandwidth + 1):i])
+            end
+            z[i, 3] = if i < bandwidth
+                -(z[i, 1], z[begin, 1]) / -(time[i], time[begin])
+            else
+                -(z[i, 1], z[i - bandwidth + 1, 1]) / -(time[i], time[i - bandwidth + 1])
+            end
+            z[i, 4] = i < 3 ? Inf : -(z[i, 3], z[i - 1, 3])
+            z[i, 5] = i < 3 ? Inf : pvalue(OneSampleTTest(z[2:i, 2], mean(z[2:(i - 1), 2])))
+        end
+        z[1, 2:3] .= -Inf
+        laser_start = time[findmin(z[:, 5])[2]]
+        stable_signal = time[findmin(z[:, 4])[2]]
+        return (laser_start, stable_signal)
+    end
+end
