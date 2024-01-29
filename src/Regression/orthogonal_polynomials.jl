@@ -86,6 +86,9 @@ https://doi.org/10.1109/TAC.1974.1100705
 Karch, J (2020) 'Improving on Adjusted R-Squared', *Collabra: Psychology*, 6(1):45.
 https://doi.org/10.1525/collabra.343
 
+Burnham, KP & Anderson, DR (2002) 'Model selection and multimodel inference: A practical
+information-theoretic approach', 2nd ed., Springer, ISBN: 978-0-387-95364-9
+
 """
 function fit_orthogonal(
     df::AbstractDataFrame,
@@ -256,7 +259,7 @@ function _orthogonal_LSQ(
         rss[i] =
             transpose(residuals) * Ω * (residuals)
     end
-    AIC = _akaike_information_criteria.(rss, 𝑁, order)
+    AIC = _akaike_information_criteria.(rss, 𝑁, order .+ 2) # +2 corrects order for β₀ and δ²
     if rm_outlier === true
         𝑁prev::Integer = 0
         n_iterations::Integer = 0
@@ -282,14 +285,13 @@ function _orthogonal_LSQ(
                 ω = ω[Not(outlier_inds)] # high allocs
                 Xᵀ = transpose(X)
                 Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
-
                 VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
                 Λ = VarΛX * Xᵀ * Ω * y
                 @inbounds @simd for i ∈ eachindex(order)
                     residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
                     rss[i] = transpose(residuals) * Ω * (residuals)
                 end
-                AIC = _akaike_information_criteria.(rss, 𝑁, order)
+                AIC = _akaike_information_criteria.(rss, 𝑁, order .+ 2)
             end
             𝑁prev = 𝑁
             𝑁 = size(X, 1)
@@ -317,7 +319,7 @@ function _orthogonal_LSQ(
         end
     end
     BIC::Vector{Float64} = Vector{Float64}(undef, 5)
-    BIC = _bayesian_information_criteria.(rss, 𝑁, order)
+    BIC = _bayesian_information_criteria.(rss, 𝑁, order .+ 2)
     return OrthogonalPolynomial(
         Λ,
         Λ_SE,
