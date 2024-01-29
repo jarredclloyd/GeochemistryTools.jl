@@ -119,7 +119,7 @@ end
 function fit_orthogonal(
     A::AbstractArray;
     errors::Bool = false,
-    weight_by::AbstractString = "abs",
+    weight_by::AbstractString = "rel",
     rm_outlier::Bool = false,
     verbose::Bool = false
 )
@@ -224,7 +224,7 @@ function _orthogonal_LSQ(
     γ::Vector{Float64} = _gamma_orthogonal(𝑁, x_sums)
     δ::Vector{Float64} = _delta_orthogonal(𝑁, x_sums)
     ϵ::Vector{Float64} = _epsilon_orthogonal(𝑁, x_sums)
-    order::Vector{Int64} = [0, 1, 2, 3, 4]
+    order::Vector{Integer} = [0, 1, 2, 3, 4]
     X::Matrix{Float64} = hcat(
         fill(1.0, 𝑁),
         (x .- β),
@@ -263,7 +263,7 @@ function _orthogonal_LSQ(
         n_outliers::Integer = 0
         while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
             n_iterations += 1
-            minAIC::Int64 = findmin(AIC)[2]
+            minAIC::Integer = findmin(AIC)[2]
             Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
             leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
             Threads.@threads for i ∈ axes(X, 1)
@@ -274,7 +274,7 @@ function _orthogonal_LSQ(
                 y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
             mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
             studentised_residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
-            outlier_inds::Vector{Int64} = findall(studentised_residuals .≥ 3)
+            outlier_inds::Vector{Integer} = findall(studentised_residuals .≥ 3)
             n_outliers += length(outlier_inds)
             if n_outliers > 0
                 X = view(X, Not(outlier_inds), :) # high allocs
