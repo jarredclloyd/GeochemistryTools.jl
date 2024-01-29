@@ -276,12 +276,13 @@ function automatic_laser_times(
     signal;
     bandwidth = ceil(Integer, sqrt(length(signal))/2),
 )
-    medians = Vector{Float64}(undef, cld(length(signal) / bandwidth))
+    medians = Vector{Float64}(undef, cld(length(signal), bandwidth))
     for i in eachindex(medians)
-        medians[i] = median(signal[begin * i * bandwidth:i * bandwidth])
+        medians[i] = median(signal[round(Int, max((i - 1) * bandwidth, firstindex(signal))):round(Int, min(i * bandwidth, lastindex(signal)))])
     end
-    pvalue_KS = pvalue(ApproximateTwoSampleKSTest(medians[begin: end / 2], medians[end / 2:end]))
-    if pvalue_KS > 0.05
+    pvalue_KS = pvalue(ApproximateTwoSampleKSTest(medians[begin: round(Int, end / 2)], medians[round(Int, end / 2):end]))
+    pvalue_JB = pvalue(JarqueBeraTest(signal))
+    if pvalue_KS > 0.05 || pvalue_JB > 0.05
         println("no signal detected")
     else
         z = Array{Float64}(undef, length(signal), 5)
