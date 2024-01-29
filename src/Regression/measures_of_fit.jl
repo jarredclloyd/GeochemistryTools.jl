@@ -1,27 +1,27 @@
-function _olkin_pratt(R²::AbstractFloat, 𝑁::Integer, predictors::Integer)
+function _olkin_pratt(R²::AbstractFloat, 𝑛::Integer, predictors::Integer)
     z = 1 - R²
-    _₂F₁ = HypergeometricFunctions._₂F₁positive(1, 1, (𝑁 - predictors + 1) / 2, z)
-    return 1 - ((𝑁 - 3) / (𝑁 - predictors + 1) * z) * _₂F₁
+    _₂F₁ = HypergeometricFunctions._₂F₁positive(1, 1, (𝑛 - predictors + 1) / 2, z)
+    return 1 - ((𝑛 - 3) / (𝑛 - predictors + 1) * z) * _₂F₁
 end
 
-function _chi_squared_reduced(χ²::Real, 𝑁::Integer, predictors::Integer)
-    return χ² / (𝑁 - predictors)
+function _chi_squared_reduced(χ²::Real, 𝑛::Integer, predictors::Integer)
+    return χ² / (𝑛 - predictors)
 end
 
 
-function _bayesian_information_criteria(rss::Real, 𝑁::Integer, order::Integer)
+function _bayesian_information_criteria(rss::Real, 𝑛::Integer, order::Integer)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    return 𝑁 * log(rss / 𝑁) + order * log(𝑁) + 𝑁 * log(2π) + 𝑁
+    return 𝑛 * log(rss / 𝑛) + order * log(𝑛) + 𝑛 * log(2π) + 𝑛
 end
 
 
-function _akaike_information_criteria(rss::Real, 𝑁::Integer, order::Integer)
+function _akaike_information_criteria(rss::Real, 𝑛::Integer, order::Integer)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    return 𝑁 * log(rss / 𝑁) + 2 * order + (2 * order *(order + 1)) / (𝑁 - order - 1) + 𝑁 * log(2π) + 𝑁
+    return 𝑛 * log(rss / 𝑛) + 2 * order + ((2 * order * (order + 1)) / (𝑛 - order - 1))
 end
 
 function _chi_squared(
