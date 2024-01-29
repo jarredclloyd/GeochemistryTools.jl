@@ -92,7 +92,7 @@ function fit_orthogonal(
     x_name::Symbol,
     y_name::Symbol;
     y_weights::Union{Nothing,Symbol} = nothing,
-    weight_by::AbstractString = "abs",
+    weight_by::AbstractString = "rel",
     rm_outlier::Bool = false,
     verbose::Bool = false
 )
@@ -211,7 +211,7 @@ function _orthogonal_LSQ(
     x::AbstractVector,
     y::AbstractVector;
     y_weights::Union{Nothing,AbstractArray} = nothing,
-    weight_by::AbstractString = "abs",
+    weight_by::AbstractString = "rel",
     rm_outlier::Bool = false,
     verbose::Bool = false,
 )
