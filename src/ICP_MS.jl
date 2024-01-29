@@ -274,10 +274,14 @@ end
 function automatic_laser_times(
     time,
     signal;
-    bandwidth = ceil(Integer, sqrt(length(signal))),
+    bandwidth = ceil(Integer, sqrt(length(signal))/2),
 )
-    pvalue_JB = pvalue(JarqueBeraTest(signal; adjusted = true))
-    if pvalue_JB > 0.05
+    medians = Vector{Float64}(undef, cld(length(signal) / bandwidth))
+    for i in eachindex(medians)
+        medians[i] = median(signal[begin * i * bandwidth:i * bandwidth])
+    end
+    pvalue_KS = pvalue(ApproximateTwoSampleKSTest(medians[begin: end / 2], medians[end / 2:end]))
+    if pvalue_KS > 0.05
         println("no signal detected")
     else
         z = Array{Float64}(undef, length(signal), 5)
@@ -297,12 +301,12 @@ function automatic_laser_times(
             else
                 -(z[i, 1], z[i - bandwidth + 1, 1]) / -(time[i], time[i - bandwidth + 1])
             end
-            z[i, 4] = i < 3 ? Inf : -(z[i, 3], z[i - 1, 3])
+            z[i, 4] = i < 3 ? -Inf : -(z[i, 3], z[i - 1, 3])
             z[i, 5] = i < 3 ? Inf : pvalue(OneSampleTTest(z[2:i, 2], mean(z[2:(i - 1), 2])))
         end
         z[1, 2:3] .= -Inf
         laser_start = time[findmin(z[:, 5])[2]]
-        stable_signal = time[findmin(z[:, 4])[2]]
-        return (laser_start, stable_signal)
+        aerosol_arrival = time[findmax(z[:, 4])[2]]
+        return (laser_start, aerosol_arrival, z) # remove z when algorithm finalised
     end
 end
