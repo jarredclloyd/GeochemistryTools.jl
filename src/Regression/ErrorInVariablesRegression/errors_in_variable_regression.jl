@@ -136,7 +136,7 @@ end
 Compute line of best fit using an errors-in-variables linear regression algorithm.
 
 Input df as a DataFrame of 4 of 5 columns wide with column order (X, sX, Y, sY, [ρXY]).
-Algorithms available are '"mahon"' and '"york"'.
+Algorithms available are `"mahon"` and `"york"`.
 
 # Keywords
 
