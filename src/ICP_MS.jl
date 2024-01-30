@@ -2,7 +2,7 @@
 This file contains tools for (Agilent) ICP-MS data
 =#
 
-export load_agilent, load_agilent2
+export load_agilent, load_agilent2, automatic_laser_times
 
 """
     load_agilent(args...; kwargs...)
@@ -46,6 +46,7 @@ function load_agilent(
     sample::Union{Nothing,AbstractString} = nothing,
     date_time_format::AbstractString = "d/m/Y H:M:S",
     first_row::Integer = 5,
+    automatic_times::Bool = true,
     gas_blank::Real = 27.5,
     stable_time::Real = 32,
     signal_end::Real = Inf,
@@ -104,58 +105,75 @@ function load_agilent(
             normalizenames = true,
             delim = ',',
         )
-        df = select!(df, r"Time", r"" * cps_column1, r"" * cps_column2)
-        rename!(df, ["time", cps_column1, cps_column2])
-        insertcols!(df, 1, "sample" => sample_name)
-        insertcols!(df, 2, "analysis_name" => analysis_name)
-        insertcols!(df, 3, "analysis_time" => analysis_time)
-        gas_blank_cps_column1 = geomean_zeros(df[0 .< df.time .< gas_blank, cps_column1])
-        gas_blank_cps_column2 = geomean_zeros(df[0 .< df.time .< gas_blank, cps_column2])
-        transform!(
-            df,
-            Cols(cps_column1, :time) =>
-                ByRow(
-                    (value, time) ->
-                        time < mean([gas_blank, stable_time]) ? value : value - gas_blank_cps_column1,
-                ) => cps_column1 * "_gbsub",
-        )
-        insertcols!(df, cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])))
-        transform!(
-            df,
-            Cols(cps_column2, :time) =>
-                ByRow(
-                    (value, time) ->
-                        time < mean([gas_blank, stable_time]) ? value : value - gas_blank_cps_column2,
-                ) => cps_column2 * "_gbsub",
-        )
-        insertcols!(df, cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])))
-        df.ratio = df[!, cps_column1 * "_gbsub"] ./ df[!, cps_column2 * "_gbsub"]
-        insertcols!(
-            df,
-            "ratio_σ" =>
-                sqrt.(
-                    df[!, :ratio] .^ 2 .* (
-                        (df[!, cps_column1 * "_σ"] ./ df[!, cps_column1 * "_gbsub"]) .^ 2 +
-                        (df[!, cps_column2 * "_σ"] ./ df[!, cps_column2 * "_gbsub"]) .^ 2
-                    )
-                ),
-        )
-        if normalise == true
-            if normalisation == "gmean"
-                alg = geomean_zeros
-            elseif normalisation == "median"
-                alg = median
-            elseif normalisation == "amean"
-                alg = mean
+        if automatic_times == true
+            transform!(df, AsTable(Not(1)) => ByRow(sum) => :total_signal)
+            auto_times =  automatic_laser_times(df[:,1], df[:, :total_signal])
+            if !isnothing(auto_times) == true
+                gas_blank_ind = auto_times[1][1]
+                laser_time = auto_times[2][2]
+                stable_time = auto_times[4][2]
+                signal_end = auto_times[5][2]
             end
-            df.ratio_norm =
-            df.ratio ./ alg(df[stable_time .< df.time .< signal_end, :ratio])
-            df.ratio_norm_σ = df.ratio_norm .* (df.ratio_σ ./ df.ratio)
+        else
+            gas_blank_ind = findlast(≤(gas_blank), df[!,1])
+            laser_time = middle(gas_blank, stable_time)
         end
-        if trim == true
-            filter!(:time => x -> stable_time .< x .< signal_end, df)
+        if automatic_times == true && isnothing(auto_times) == true
+            throw(ErrorException("no signal detected"))
+        else
+            df = select!(df, r"Time", r"" * cps_column1, r"" * cps_column2)
+            rename!(df, ["time", cps_column1, cps_column2])
+            insertcols!(df, 1, "sample" => sample_name)
+            insertcols!(df, 2, "analysis_name" => analysis_name)
+            insertcols!(df, 3, "analysis_time" => analysis_time)
+            gas_blank_cps_column1 = geomean_zeros(df[begin:gas_blank_ind, cps_column1])
+            gas_blank_cps_column2 = geomean_zeros(df[begin:gas_blank_ind, cps_column2])
+            transform!(
+                df,
+                Cols(cps_column1, :time) =>
+                    ByRow(
+                        (value, time) ->
+                            time ≤ laser_time ? value : value - gas_blank_cps_column1,
+                    ) => cps_column1 * "_gbsub",
+            )
+            insertcols!(df, cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])))
+            transform!(
+                df,
+                Cols(cps_column2, :time) =>
+                    ByRow(
+                        (value, time) ->
+                            time ≤ laser_time ? value : value - gas_blank_cps_column2,
+                    ) => cps_column2 * "_gbsub",
+            )
+            insertcols!(df, cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])))
+            df.ratio = df[!, cps_column1 * "_gbsub"] ./ df[!, cps_column2 * "_gbsub"]
+            insertcols!(
+                df,
+                "ratio_σ" =>
+                    sqrt.(
+                        df[!, :ratio] .^ 2 .* (
+                            (df[!, cps_column1 * "_σ"] ./ df[!, cps_column1 * "_gbsub"]) .^ 2 +
+                            (df[!, cps_column2 * "_σ"] ./ df[!, cps_column2 * "_gbsub"]) .^ 2
+                        )
+                    ),
+            )
+            if normalise == true
+                if normalisation == "gmean"
+                    alg = geomean_zeros
+                elseif normalisation == "median"
+                    alg = median
+                elseif normalisation == "amean"
+                    alg = mean
+                end
+                df.ratio_norm =
+                df.ratio ./ alg(df[stable_time .≤ df.time .≤ signal_end, :ratio])
+                df.ratio_norm_σ = df.ratio_norm .* (df.ratio_σ ./ df.ratio)
+            end
+            if trim == true
+                filter!(:time => x -> stable_time .≤ x .≤ signal_end, df)
+            end
+            append!(data, df)
         end
-        append!(data, df)
     end
     sort!(data, :time)
     metadata!(data, "stable time", stable_time)
@@ -274,9 +292,11 @@ end
 function automatic_laser_times(
     time,
     signal;
-    bandwidth = ceil(Integer, sqrt(length(signal))/2),
+    bandwidth::Integer = ceil(Integer, sqrt(length(signal))/2),
+    verbose::Bool = false,
+
 )
-    medians = Vector{Float64}(undef, cld(length(signal), bandwidth))
+medians = Vector{Float64}(undef, cld(length(signal), bandwidth))
     for i in eachindex(medians)
         medians[i] = median(signal[round(Int, max((i - 1) * bandwidth, firstindex(signal))):round(Int, min(i * bandwidth, lastindex(signal)))])
     end
@@ -285,7 +305,7 @@ function automatic_laser_times(
     if pvalue_KS > 0.05 || pvalue_JB > 0.05
         println("no signal detected")
     else
-        z = Array{Float64}(undef, length(signal), 5)
+        z = Array{Float64}(undef, length(signal), 3)
         for i in eachindex(signal)
             z[i, 1] = if i < bandwidth
                 geomean_zeros(signal[begin:i])
@@ -297,17 +317,31 @@ function automatic_laser_times(
             else
                 geovar_zeros(signal[(i - bandwidth + 1):i])
             end
-            z[i, 3] = if i < bandwidth
-                -(z[i, 1], z[begin, 1]) / -(time[i], time[begin])
-            else
-                -(z[i, 1], z[i - bandwidth + 1, 1]) / -(time[i], time[i - bandwidth + 1])
-            end
-            z[i, 4] = i < 3 ? -Inf : -(z[i, 3], z[i - 1, 3])
-            z[i, 5] = i < 3 ? Inf : pvalue(OneSampleTTest(z[2:i, 2], mean(z[2:(i - 1), 2])))
+            z[i, 3] = i < 3 ? Inf : pvalue(OneSampleTTest(z[2:i, 2], mean(z[2:(i - 1), 2])))
         end
-        z[1, 2:3] .= -Inf
-        laser_start = time[findmin(z[:, 5])[2]]
-        aerosol_arrival = time[findmax(z[:, 4])[2]]
-        return (laser_start, aerosol_arrival, z) # remove z when algorithm finalised
+        laser_start_ind = findmin(z[:, 3])[2]
+        laser_start_time = time[laser_start_ind]
+        q = quantile(z[laser_start_ind:end, 1], [0.05, 0.95])
+        aerosol_arrival_ind = findfirst(≥(q[2]), z[:,1])
+        q = quantile(z[aerosol_arrival_ind:end, 1], [0.05, 0.95])
+        aerosol_arrival_time = time[aerosol_arrival_ind]
+        signal_start_ind = min(aerosol_arrival_ind + findfirst(<(q[2]), z[aerosol_arrival_ind:end, 1]), lastindex(time))
+        signal_end_ind = min(findlast(>(q[1]), z[:,1]), lastindex(time))
+        signal_start_time = time[signal_start_ind]
+        signal_end_time = time[signal_end_ind]
+        gas_blank_end_ind = max(laser_start_ind - 2, firstindex(time))
+        if verbose == true
+            println("gas blank: ", (time[begin], time[gas_blank_end_ind]), [1, gas_blank_end_ind])
+            println("laser start: ", (laser_start_time, laser_start_ind))
+            println("aerosol arrival: ", (aerosol_arrival_time, aerosol_arrival_ind))
+            println("signal window: ", (signal_start_time, signal_end_time), (signal_start_ind, signal_end_ind))
+        end
+        return (
+            (gas_blank_end_ind, time[gas_blank_end_ind]),
+            (laser_start_ind, laser_start_time),
+            (aerosol_arrival_ind, aerosol_arrival_time),
+            (signal_start_ind, signal_start_time),
+            (signal_end_ind, signal_end_time),
+        )
     end
 end
