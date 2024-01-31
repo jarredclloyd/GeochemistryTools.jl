@@ -54,7 +54,7 @@ end
     x_name::Symbol,
     y_name::Symbol;
     [y_weights::Union{Nothing,Symbol} = nothing,
-    weight_by::AbstractString = "abs",
+    weight_type::AbstractString = "abs",
     rm_outlier::Bool = false,
     verbose::Bool = false])
 
@@ -64,7 +64,7 @@ Input df as a DataFrame of 4 of 5 columns wide with column order (X, sX, Y, sY, 
 
 # Keywords
 - `y_weights::Union{Nothing,Symbol}`: Weights for y values (e.g. absolute uncertainties).
-- 'weight_by::AbstractString': Weight pre-scaling, values of "rel" or "abs" (default) are
+- 'weight_type::AbstractString': Weight pre-scaling, values of "rel" or "abs" (default) are
     accepted. If "rel" transforms weights to relative weights.
 - 'rm_outlier::Bool': When set to true, will remove outliers (studentised residuals ≥ 3,
     based on fit with minimum akaike information criteria value).
@@ -95,7 +95,7 @@ function fit_orthogonal(
     x_name::Symbol,
     y_name::Symbol;
     y_weights::Union{Nothing,Symbol} = nothing,
-    weight_by::AbstractString = "rel",
+    weight_type::AbstractString = "rel",
     rm_outlier::Bool = false,
     verbose::Bool = false
 )
@@ -104,7 +104,7 @@ function fit_orthogonal(
             df[!, x_name],
             df[!, y_name];
             y_weights = df[!, y_weights],
-            weight_by = weight_by,
+            weight_type = weight_type,
             rm_outlier = rm_outlier,
             verbose = verbose
         )
@@ -112,7 +112,7 @@ function fit_orthogonal(
         return _orthogonal_LSQ(
             df[!, x_name],
             df[!, y_name];
-            weight_by = weight_by,
+            weight_type = weight_type,
             rm_outlier = rm_outlier,
             verbose = verbose
         )
@@ -122,7 +122,7 @@ end
 function fit_orthogonal(
     A::AbstractArray;
     errors::Bool = false,
-    weight_by::AbstractString = "rel",
+    weight_type::AbstractString = "rel",
     rm_outlier::Bool = false,
     verbose::Bool = false
 )
@@ -130,7 +130,7 @@ function fit_orthogonal(
         return _orthogonal_LSQ(
             A[:, 1],
             A[:, 2];
-            weight_by = weight_by,
+            weight_type = weight_type,
             rm_outlier = rm_outlier,
             verbose = verbose
         )
@@ -139,7 +139,7 @@ function fit_orthogonal(
             A[:, 1],
             A[:, 2];
             y_weights = A[:, 3],
-            weight_by = weight_by,
+            weight_type = weight_type,
             rm_outlier = rm_outlier,
             verbose = verbose
         )
@@ -214,7 +214,7 @@ function _orthogonal_LSQ(
     x::AbstractVector,
     y::AbstractVector;
     y_weights::Union{Nothing,AbstractArray} = nothing,
-    weight_by::AbstractString = "rel",
+    weight_type::AbstractString = "abs",
     rm_outlier::Bool = false,
     verbose::Bool = false,
 )
@@ -237,14 +237,14 @@ function _orthogonal_LSQ(
     )
      if y_weights === nothing
         ω::Vector{Float64} = fill(1.0, length(y))
-    elseif occursin("abs", lowercase(weight_by)) === true
+    elseif occursin("rel", lowercase(weight_type)) === true
         ω = y_weights
-    elseif occursin("rel", lowercase(weight_by)) == true
-        ω = y_weights ./ y
+    elseif occursin("abs", lowercase(weight_type)) == true
+        ω = abs.(y_weights) ./ abs.(y)
     else
         throw(
             ArgumentError(
-                "Value of 'weight_by' is unrecognised. String should contain either 'rel' or 'abs'.",
+                "Value of 'weight_type' is unrecognised. String should contain either 'rel' or 'abs'.",
             ),
         )
     end
@@ -267,12 +267,11 @@ function _orthogonal_LSQ(
         while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
             n_iterations += 1
             minAIC::Integer = findmin(AIC)[2]
-            Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :)
+            Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :) * Ω
             leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
             Threads.@threads for i ∈ axes(X, 1)
                 @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
             end
-            leverage .*= ω
             studentised_residuals::Vector{Float64} =
                 y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
             mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
