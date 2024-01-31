@@ -151,7 +151,14 @@ function load_agilent(
                 df,
                 cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])),
             )
-            df.ratio = df[!, cps_column1 * "_gbsub"] ./ df[!, cps_column2 * "_gbsub"]
+            transform!(
+                df,
+                Cols(cps_column1 * "_gbsub", cps_column2 * "_gbsub", :time) =>
+                    ByRow(
+                        (cps1, cps2, time) ->
+                            time ≤ laser_time && iszero(cps2) == true ? 0.0 : cps1 / cps2,
+                    ) => :ratio,
+            )
             insertcols!(
                 df,
                 "ratio_σ" =>
@@ -172,8 +179,9 @@ function load_agilent(
                 elseif normalisation == "amean"
                     alg = mean
                 end
+                norm_val = alg(df[stable_time .≤ df.time .≤ signal_end, :ratio])
                 df.ratio_norm =
-                    df.ratio ./ alg(df[stable_time .≤ df.time .≤ signal_end, :ratio])
+                    df.ratio ./ norm_val
                 df.ratio_norm_σ = df.ratio_norm .* (df.ratio_σ ./ df.ratio)
             end
             if trim == true
