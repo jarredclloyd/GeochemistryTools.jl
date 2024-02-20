@@ -181,7 +181,7 @@ function load_agilent(
                 end
                 norm_val = alg(df[stable_time .≤ df.time .≤ signal_end, :ratio])
                 df.ratio_norm =
-                    df.ratio ./ norm_val
+                    df.ratio .- norm_val
                 df.ratio_norm_σ = df.ratio_norm .* (df.ratio_σ ./ df.ratio)
             end
             if trim == true
