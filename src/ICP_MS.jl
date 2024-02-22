@@ -126,15 +126,16 @@ function load_agilent(
             df = nothing
         else
             df = select!(df, r"Time", r"" * cps_column1, r"" * cps_column2)
-            rename!(df, ["time", cps_column1, cps_column2])
+            rename!(df, ["signal_time", cps_column1, cps_column2])
             insertcols!(df, 1, "sample" => sample_name)
             insertcols!(df, 2, "analysis_name" => analysis_name)
             insertcols!(df, 3, "analysis_time" => analysis_time)
+            insertcols!(df, 5, "beam_time" => df.signal_time .- laser_time)
             gas_blank_cps_column1 = geomean_zeros(df[begin:gas_blank_ind, cps_column1])
             gas_blank_cps_column2 = geomean_zeros(df[begin:gas_blank_ind, cps_column2])
             transform!(
                 df,
-                Cols(cps_column1, :time) =>
+                Cols(cps_column1, :signal_time) =>
                     ByRow(
                         (value, time) ->
                             time ≤ laser_time ? value : value - gas_blank_cps_column1,
@@ -146,7 +147,7 @@ function load_agilent(
             )
             transform!(
                 df,
-                Cols(cps_column2, :time) =>
+                Cols(cps_column2, :signal_time) =>
                     ByRow(
                         (value, time) ->
                             time ≤ laser_time ? value : value - gas_blank_cps_column2,
@@ -158,7 +159,7 @@ function load_agilent(
             )
             transform!(
                 df,
-                Cols(cps_column1 * "_gbsub", cps_column2 * "_gbsub", :time) =>
+                Cols(cps_column1 * "_gbsub", cps_column2 * "_gbsub", :signal_time) =>
                     ByRow(
                         (cps1, cps2, time) ->
                             time ≤ laser_time && iszero(cps2) == true ? 0.0 : cps1 / cps2,
@@ -184,19 +185,19 @@ function load_agilent(
                 elseif central_tendency == "amean"
                     alg = mean
                 end
-                norm_val = alg(df[stable_time .≤ df.time .≤ signal_end, :ratio])
+                norm_val = alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])
                 df.ratio_norm =
                     df.ratio .- norm_val
                 df.ratio_norm_σ = df.ratio_norm .* (df.ratio_σ ./ df.ratio)
             end
             if trim == true
-                filter!(:time => x -> stable_time .≤ x .≤ signal_end, df)
+                filter!(:signal_time => x -> stable_time .≤ x .≤ signal_end, df)
             end
             append!(data, df)
         end
     end
     if !isempty(data) == true
-        sort!(data, :time)
+        sort!(data, :signal_time)
         return data
     end
 end
