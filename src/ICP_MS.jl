@@ -9,7 +9,7 @@ export load_agilent, load_agilent2, automatic_laser_times
 
 Load and prepare data from CSV agilent CSV files.
 
-Load all relevant files in the `host_directory` using glob, concatenates the data into one table, calculates ratio between `cps_column1` and `cps_column2`, the median-normalised ratio, and sorts the table by time.
+Load all relevant files in the `host_directory` using glob, concatenates the data into one table, calculates ratio between `cps_column1` and `cps_column2`, the centred ratio, and sorts the table by time.
 
 # Arguments
 
@@ -21,7 +21,7 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
 
   - `host_directory` will need to be wrapped by `raw` on Windows operating systems.
   - `cps_columnX` should be specified as `element` then `isotopic mass` (e.g., `Rb85`). It matches using regular
-    expression and normalises the header names. If duplicate isotope values are present (due to mass shift checks, e.g.
+    expression and centres the header names. If duplicate isotope values are present (due to mass shift checks, e.g.
     K39 -> 39, K39 -> 58) specify the desired mass by replacing `->` with `_` (e.g. `K39 -> 39` to `K39_39`).
 
 # Keywords
@@ -29,14 +29,19 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
   - `sample::AbstractString`: The sample name as a string: only needs to be a unique portion of the sample name. E.g. NIST610 will load all `NIST610*.csv` files, whereas NIST will load any file where the name contains `NIST*.csv`).
   - `date_time_format::AbstractString`: A string formatted for the appropriate DateTime in the CSV file. See `? Dates.DateFormat` for valid strings.
   - `first_row::Integer`: An `Integer` representing the first data row. Default value is `5`.
-  - `gas_blank::Real`: The time (in seconds) where the gas blank ends. Default value is `27.5`.
+  - `automatic_times::Bool`: `[true | false]` Should laser, gas blank, and signal times be automatically determined. Default is `true`.
+  - `gas_blank::Real`: The time (in seconds) where the gas blank ends. Default value is `27.5`. Is only used if `automatic_times == false`
   - `stable_time::Real`: The time (in seconds) where signal counts are stabilised. Default value is `32` (i.e. 32 seconds).
-    This parameter is used to filter the rows when calculating the median counts per second ratio.
+    This parameter is used to filter the rows when calculating the central tendency for counts per second ratio. Is only used if `automatic_times == false`
   - `signal_end::Real`: The time (in seconds) where the data should be truncated. Default value is `Inf` (will use entire
     signal beyond `stable_time`). It is recommended to set this to a value appropriate to your data (i.e. total signal
-    time minus ~5 [e.g. 65]) to avoid some artefacts  that may occur near the end of an ablation.
-  - `trim::Bool`: Whether to trim the data to only contain values between `stable_time` and `signal_end`. Default value is
-    `false`. Setting to `true` it will retain only data for the time interval between `stable_time` and `signal_end`.
+    time minus ~5 [e.g. 65]) to avoid some artefacts  that may occur near the end of an ablation. Is only used if `automatic_times == false`
+  - `trim::Bool`: `[true | false]` Whether to trim the data to only contain values between `stable_time` and `signal_end`. Default value is
+    `false`. Setting to `true` it will retain only data for the time interval between `stable_time` and `signal_end`. `automatic_times == true` will set these values.
+  - `aggregate_files:Bool`: `[true | false]` A boolean flag for concatenating all relevant files in a directory. Default is `false`
+  - `centre::Bool`: `[true | false]` A boolean flag to centre data around the `central_tendency` (i.e. shift to mean of zero). Default is `true`.
+  - `central_tendency::AbstractString`: `["amean" | "gmean" | "median"]` The algorithm to use for the measure of central tendency (e.g. arithmetic mean, geometric mean, median)
+
 """
 function load_agilent(
     host_directory::AbstractString,
@@ -51,8 +56,8 @@ function load_agilent(
     signal_end::Real = Inf,
     trim::Bool = false,
     aggregate_files::Bool = false,
-    normalise::Bool = true,
-    normalisation::AbstractString = "gmean",
+    centre::Bool = true,
+    central_tendency::AbstractString = "gmean",
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -171,12 +176,12 @@ function load_agilent(
                         )
                     ),
             )
-            if normalise == true
-                if normalisation == "gmean"
+            if centre == true
+                if central_tendency == "gmean"
                     alg = geomean_zeros
-                elseif normalisation == "median"
+                elseif central_tendency == "median"
                     alg = median
-                elseif normalisation == "amean"
+                elseif central_tendency == "amean"
                     alg = mean
                 end
                 norm_val = alg(df[stable_time .≤ df.time .≤ signal_end, :ratio])
@@ -202,7 +207,7 @@ end
 Load and prepare data from CSV agilent CSV files to assess downhole fractionation.
 
 Load all relevant files in the `host_directory` using glob, concatenates the data into one
-table, the median-normalised ratio, and sorts the table by time.
+table, the median-centred ratio, and sorts the table by time.
 
 # Arguments
 
