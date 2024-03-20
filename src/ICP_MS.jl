@@ -58,6 +58,7 @@ function load_agilent(
     aggregate_files::Bool = false,
     centre::Bool = true,
     central_tendency::AbstractString = "gmean",
+    spot_size::Union{Missing, AbstractString, Integer} = missing,
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -87,6 +88,18 @@ function load_agilent(
             tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
         )
         sample_name = rstrip(sample_name, ' ')
+        if ismissing(spot_size) !== true
+            if typeof(spot_size) <: AbstractString
+                spot_size = tryparse(Int, file[(findlast("_", file)[1] + 1):(findnext(
+                    " ",
+                    file,
+                    findlast("_", file)[1],
+                )[1] - 1)])
+            elseif typeof(spot_size) <: Number
+            else
+                error("malformed spot_size variable")
+            end
+        end
         analysis_time = chop(
             df[3, 1];
             head = findfirst(":", df[3, 1])[1] + 1,
@@ -129,8 +142,9 @@ function load_agilent(
             rename!(df, ["signal_time", cps_column1, cps_column2])
             insertcols!(df, 1, "sample" => sample_name)
             insertcols!(df, 2, "analysis_name" => analysis_name)
-            insertcols!(df, 3, "analysis_time" => analysis_time)
-            insertcols!(df, 5, "beam_time" => df.signal_time .- laser_time)
+            insertcols!(df, 3, "spot_size" => spot_size)
+            insertcols!(df, 4, "analysis_time" => analysis_time)
+            insertcols!(df, 6, "beam_time" => df.signal_time .- laser_time)
             gas_blank_cps_column1 = geomean_zeros(df[begin:gas_blank_ind, cps_column1])
             gas_blank_cps_column2 = geomean_zeros(df[begin:gas_blank_ind, cps_column2])
             transform!(
@@ -185,10 +199,10 @@ function load_agilent(
                 elseif central_tendency == "amean"
                     alg = mean
                 end
-                norm_val = alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])
-                df.ratio_norm =
-                    df.ratio .- norm_val
-                df.ratio_norm_σ = df.ratio_norm .* (df.ratio_σ ./ df.ratio)
+                centre_value = alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])
+                df.ratio_centred =
+                    df.ratio .- centre_value
+                df.ratio_centred_σ = df.ratio_centred .* (df.ratio_σ ./ df.ratio)
             end
             if trim == true
                 filter!(:signal_time => x -> stable_time .≤ x .≤ signal_end, df)
