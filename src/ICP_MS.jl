@@ -48,7 +48,7 @@ function load_agilent(
     cps_column1::AbstractString,
     cps_column2::AbstractString;
     sample::Union{Nothing,AbstractString} = nothing,
-    date_time_format::AbstractString = "d/m/Y H:M:S",
+    date_time_format::Union{AbstractString, DateFormat} = DateFormat("d/m/Y H:M:S"),
     first_row::Integer = 5,
     automatic_times::Bool = true,
     gas_blank::Real = 27.5,
@@ -67,6 +67,9 @@ function load_agilent(
             ),
         )
     end
+    if typeof(date_time_format) <: AbstractString
+        date_time_format = Dates.DateFormat(date_time_format)
+    end
     data = DataFrame()
     if aggregate_files === true
         files = glob("*.csv", host_directory)
@@ -74,15 +77,8 @@ function load_agilent(
         files = glob(sample * "*.csv", host_directory)
     end
     for file in files
-        df = CSV.read(
-            file,
-            DataFrame;
-            header = false,
-            limit = 3,
-            silencewarnings = true,
-            delim = ',',
-        )
-        analysis_name = chop(df[1, 1]; head = findlast("b\\", df[1, 1])[2], tail = 2)
+        head_info = readlines(file)[1:3]
+        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 2)
         sample_name = chop(
             analysis_name;
             tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
@@ -101,10 +97,7 @@ function load_agilent(
             end
         end
         analysis_time = chop(
-            df[3, 1];
-            head = findfirst(":", df[3, 1])[1] + 1,
-            tail = length(df[3, 1]) -
-                   findnext(" u", df[3, 1], findfirst(":", df[3, 1])[1])[1] + 1,
+            head_info[3][findfirst(":",  head_info[3])[1] + 2 : findlast(":",  head_info[3])[1] + 2],
         )
         analysis_time = DateTime(analysis_time, date_time_format)
         if Dates.Year(analysis_time) < Dates.Year(2000)
