@@ -77,8 +77,8 @@ function load_agilent(
         files = glob(sample * "*.csv", host_directory)
     end
     for file in files
-        head_info = readlines(file)[1:3]
-        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 2)
+        head_info = split(readuntil(file, "Time "), "\n")
+        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
         sample_name = chop(
             analysis_name;
             tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
@@ -102,8 +102,6 @@ function load_agilent(
         analysis_time = DateTime(analysis_time, date_time_format)
         if Dates.Year(analysis_time) < Dates.Year(2000)
             analysis_time = analysis_time + Dates.Year(2000)
-        else
-            analysis_time = analysis_time
         end
         df = CSV.read(
             file,
@@ -268,31 +266,22 @@ function load_agilent2(
         files = glob(sample * "*.csv", host_directory)
     end
     for file in files
-        df = CSV.read(
-            file,
-            DataFrame;
-            header = false,
-            limit = 3,
-            silencewarnings = true,
-            delim = ',',
-        )
-        analysis_name = chop(df[1, 1]; head = findlast("b\\", df[1, 1])[2], tail = 2)
+        head_info = split(readuntil(file, "Time "), "\n")
+        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
         sample_name = chop(
             analysis_name;
             tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
         )
         sample_name = rstrip(sample_name, ' ')
         analysis_time = chop(
-            df[3, 1];
-            head = findfirst(":", df[3, 1])[1] + 1,
-            tail = length(df[3, 1]) -
-                   findnext(" u", df[3, 1], findfirst(":", df[3, 1])[1])[1] + 1,
+            head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
+                ":",
+                head_info[3],
+            )[1] + 2)],
         )
         analysis_time = DateTime(analysis_time, date_time_format)
         if Dates.Year(analysis_time) < Dates.Year(2000)
             analysis_time = analysis_time + Dates.Year(2000)
-        else
-            analysis_time = analysis_time
         end
         df = CSV.read(
             file,
