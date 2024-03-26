@@ -1,11 +1,11 @@
-#= 
+#=
 Functions for laser profilometry (Olympus OLS5000)
 =#
 
-export loadProfilometer
+export load_profilometer
 
 """
-    loadProfilometer(hostdir::string, sample::string; headerrow::Int=19, datarow::Int=20)
+    load_profilometer(hostdir::string, sample::string; headerrow::Int=19, datarow::Int=20)
 
 Loads Olympus OLS5000 profilometer CSV data (exported as height and area).
 
@@ -16,12 +16,12 @@ be equal to the normal surface height prior to ablation.
 
 # Example
 ```julia-repl
-julia> loadProfilometer(path/to/host/dir/, "Sample_X"; headerrow = 19, datarow = 20)
+julia> load_profilometer(path/to/host/dir/, "Sample_X"; headerrow = 19, datarow = 20)
 MxN DataFrame
 ```
 
 """
-function loadProfilometer(hostdir, sample; headerrow::Int=19, datarow::Int=20)
+function load_profilometer(hostdir, sample; headerrow::Int=19, datarow::Int=20)
     file = glob(sample * "*.csv", hostdir)
     df = CSV.read(file, DataFrame; header=false, skipto=4, limit=3, select=[1, 2])
     xresolution = df[1, 2]

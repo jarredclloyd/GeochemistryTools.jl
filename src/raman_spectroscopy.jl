@@ -2,10 +2,10 @@
 This file contains various decay system equations for calculation of ratios and ages (U-Pb).
 =#
 
-export loadRaman, correct_raman, fit_base, plot_Raman_cor, plot_Raman_cor!
+export load_raman, correct_raman, fit_base, plot_Raman_cor, plot_Raman_cor!
 
 """
-    loadRaman(hostdir, sample; [firstrow, trailing_rows, process])
+    load_raman(hostdir, sample; [firstrow, trailing_rows, process])
 
 Loads Raman spectra data from txt file in hostdir.
 
@@ -23,10 +23,10 @@ corrected intensities, and normalised intensities using the function `fit_base()
 
 # Example
 ```julia-repl
-julia> loadRaman('path/to/dir', "G17560"; firstrow = 58, trailing_rows = 0, process = true)
+julia> load_raman('path/to/dir', "G17560"; firstrow = 58, trailing_rows = 0, process = true)
 ```
 """
-function loadRaman(hostdir, sample::String;
+function load_raman(hostdir, sample::String;
     firstrow::Int=11,
     trailing_rows::Int=0,
     process::Bool=true)
