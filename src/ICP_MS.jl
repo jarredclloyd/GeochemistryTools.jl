@@ -14,41 +14,89 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
 # Arguments
 
   - `host_directory::AbstractString`: The folder path containing raw LA-ICP-MS CSV files.
-  - `cps_column1::AbstractString`: A string representing the first desired column with counts per second data.
-  - `cps_column2::AbstractString`: A string representing the second desired column with counts per second data.
+  - `cps_column1::AbstractString`: A string representing the first desired column with
+    counts per second data.
+  - `cps_column2::AbstractString`: A string representing the second desired column with
+    counts per second data.
 
 ## Argument Notes
 
   - `host_directory` will need to be wrapped by `raw` on Windows operating systems.
-  - `cps_columnX` should be specified as `element` then `isotopic mass` (e.g., `Rb85`). It matches using regular
-    expression and centres the header names. If duplicate isotope values are present (due to mass shift checks, e.g.
-    K39 -> 39, K39 -> 58) specify the desired mass by replacing `->` with `_` (e.g. `K39 -> 39` to `K39_39`).
+  - `cps_columnX` should be specified as `element` then `isotopic mass` (e.g., `Rb85`).
+    It matches using regular expression and centres the header names. If duplicate isotope
+    values are present (due to mass shift checks, e.g. K39 -> 39, K39 -> 58) specify the
+    desired mass by replacing `->` with `_` (e.g. `K39 -> 39` to `K39_39`).
 
 # Keywords
 
-  - `sample::AbstractString`: The sample name as a string: only needs to be a unique portion of the sample name. E.g. NIST610 will load all `NIST610*.csv` files, whereas NIST will load any file where the name contains `NIST*.csv`).
-  - `date_time_format::AbstractString`: A string formatted for the appropriate DateTime in the CSV file. See `? Dates.DateFormat` for valid strings.
-  - `first_row::Integer`: An `Integer` representing the first data row. Default value is `5`.
-  - `automatic_times::Bool`: `[true | false]` Should laser, gas blank, and signal times be automatically determined. Default is `true`.
-  - `gas_blank::Real`: The time (in seconds) where the gas blank ends. Default value is `27.5`. Is only used if `automatic_times == false`
-  - `stable_time::Real`: The time (in seconds) where signal counts are stabilised. Default value is `32` (i.e. 32 seconds).
-    This parameter is used to filter the rows when calculating the central tendency for counts per second ratio. Is only used if `automatic_times == false`
-  - `signal_end::Real`: The time (in seconds) where the data should be truncated. Default value is `Inf` (will use entire
-    signal beyond `stable_time`). It is recommended to set this to a value appropriate to your data (i.e. total signal
-    time minus ~5 [e.g. 65]) to avoid some artefacts  that may occur near the end of an ablation. Is only used if `automatic_times == false`
-  - `trim::Bool`: `[true | false]` Whether to trim the data to only contain values between `stable_time` and `signal_end`. Default value is
-    `false`. Setting to `true` it will retain only data for the time interval between `stable_time` and `signal_end`. `automatic_times == true` will set these values.
-  - `aggregate_files:Bool`: `[true | false]` A boolean flag for concatenating all relevant files in a directory. Default is `false`
-  - `centre::Bool`: `[true | false]` A boolean flag to centre data around the `central_tendency` (i.e. shift to mean of zero). Default is `true`.
-  - `central_tendency::AbstractString`: `["amean" | "gmean" | "median"]` The algorithm to use for the measure of central tendency (e.g. arithmetic mean, geometric mean, median)
+  - `sample::AbstractString`: The sample name as a string. E.g. `"NIST610"`
 
+      + This only needs to be a unique portion of the sample name.
+      + E.g. NIST610 will load all `NIST610*.csv` files, whereas NIST will load any file where
+        the name contains `NIST*.csv`.
+
+  - `date_time_constructor::AbstractString`: Leave at default to guess `date_time_format`
+    automatically, or set to a valid string representing the `date_time_format` for your CSV
+    files.
+
+      + Default `"automatic"`.
+      + See date `GeochemistryTools.automatic_datetime` for details on the algorithm
+      + See `? Dates.DateFormat` for guidance on valid `date_time_format` construction strings.
+  - `day_first::Bool`: Specifies the order of day-month for automatic date time
+    construction.
+
+      + Default `true` (day-month order)
+      + If your CSV dates are month-day, set to `false`.
+  - `first_row::Integer`: An `Integer` representing the first data row.
+
+      + Default value is `5`.
+  - `aggregate_files:Bool`: A boolean flag for concatenating all relevant files in a directory.
+
+      + Default is `false`.
+      + Valid values are `true` or `false`
+  - `centre::Bool`: A boolean flag to centre data around the `central_tendency` (i.e. shift
+    to mean of zero).
+
+      + Default is `true`.
+      + Valid values are `true` or `false`
+  - `central_tendency::AbstractString`: The algorithm to use for the measure of central
+    tendency (e.g. arithmetic mean, geometric mean, median)
+
+      + Valid values are: `"amean"` or `"gmean"` or `"median"`
+  - `automatic_times::Bool`: Should laser, gas blank, and signal times be automatically determined.
+
+      + Default is `true`.
+      + Valid values are `true` or `false`
+  - `trim::Bool`: A boolean flag to determine if data should be trimmed to only retain only
+    values between `stable_time` and `signal_end`.
+
+      + Default is `false`.
+      + Valid values are `true` or `false
+      + `automatic_times == true` will set these values automatically.
+
+      + `gas_blank::Real`: The time (in seconds) where the gas blank ends.
+
+      + Default value is `27.5`.
+      + Only used if `automatic_times == false`
+  - `stable_time::Real`: The time (in seconds) where signal counts are stabilised.
+
+      + Default value is `32` (i.e. 32 seconds).
+      + This parameter is used to filter the rows when calculating the central tendency for counts per second ratio.
+      + Only used if `automatic_times == false`
+  - `signal_end::Real`: The time (in seconds) where the data should be truncated.
+
+      + Default value is `Inf` (will use entire signal beyond `stable_time`)
+      + It is recommended to set this to a value appropriate to your data (i.e. total signal
+        time minus ~5 [e.g. 65]) to avoid some artefacts that may occur near the end of an ablation.
+      + Only used if `automatic_times == false`
 """
 function load_agilent(
     host_directory::AbstractString,
     cps_column1::AbstractString,
     cps_column2::AbstractString;
     sample::Union{Nothing,AbstractString} = nothing,
-    date_time_format::Union{AbstractString, DateFormat} = DateFormat("d/m/Y H:M:S"),
+    date_time_constructor::AbstractString = "automatic",
+    day_first::Bool = true,
     first_row::Integer = 5,
     automatic_times::Bool = true,
     gas_blank::Real = 27.5,
@@ -58,7 +106,7 @@ function load_agilent(
     aggregate_files::Bool = false,
     centre::Bool = true,
     central_tendency::AbstractString = "gmean",
-    spot_size::Union{Missing, AbstractString, Integer} = missing,
+    spot_size::Union{Missing,AbstractString,Integer} = missing,
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -76,6 +124,11 @@ function load_agilent(
     else
         files = glob(sample * "*.csv", host_directory)
     end
+    date_time_format::DateFormat = date_format_test(
+        files[1];
+        date_time_constructor = date_time_constructor,
+        day_first = day_first,
+    )
     for file in files
         head_info = split(readuntil(file, "Time "), "\n")
         analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
@@ -86,18 +139,26 @@ function load_agilent(
         sample_name = rstrip(sample_name, ' ')
         if ismissing(spot_size) !== true
             if typeof(spot_size) <: AbstractString
-                spot_size = tryparse(Int, file[(findlast("_", file)[1] + 1):(findnext(
-                    " ",
-                    file,
-                    findlast("_", file)[1],
-                )[1] - 1)])
+                spot_size = tryparse(
+                    Int,
+                    file[(findlast("_", file)[1] + 1):(findnext(
+                        " ",
+                        file,
+                        findlast("_", file)[1],
+                    )[1] - 1)],
+                )
             elseif typeof(spot_size) <: Number
             else
                 error("malformed spot_size variable")
             end
         end
-        analysis_time = chop(
-            head_info[3][findfirst(":",  head_info[3])[1] + 2 : findlast(":",  head_info[3])[1] + 2],
+        analysis_time = rstrip(
+            chop(
+                head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
+                    "using",
+                    head_info[3],
+                )[1] - 1)],
+            ),
         )
         analysis_time = DateTime(analysis_time, date_time_format)
         if Dates.Year(analysis_time) < Dates.Year(2000)
@@ -191,8 +252,7 @@ function load_agilent(
                     alg = mean
                 end
                 centre_value = alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])
-                df.ratio_centred =
-                    df.ratio .- centre_value
+                df.ratio_centred = df.ratio .- centre_value
                 df.ratio_centred_σ = df.ratio_centred .* (df.ratio_σ ./ df.ratio)
             end
             if trim == true
@@ -230,10 +290,12 @@ table, the median-centred ratio, and sorts the table by time.
 ## Argument Notes
 
   - `host_directory` will need to be wrapped by `raw` on Windows operating systems if not using `/` or `\\\\`.
-
-  - `date_time_format::AbstractString`: Default "d/m/Y H:M:S". A string formatted for the appropriate DateTime in the CSV file.
-
-      + See `? Dates.DateFormat` for valid strings.
+  - `date_time_constructor::AbstractString`: Default `"automatic"`. Leave at default to
+    guess date_time_format automatically, or set to a valid date_time_format for your CSV
+    files. See date `GeochemistryTools.automatic_datetime` for details on the algorithm,
+    and `? Dates.DateFormat` for guidance on valid date_time_format construction strings.
+  - `day_first::Bool`: Default `true`. Specifies the order of day-month for automatic date
+    time construction. If your CSV dates are month-day, set to `false`.
   - If `aggregate_files = true`, `sample` only needs to be a unique portion of the sample
     name. E.g. "NIST610" will load only `NIST610*.csv` files, whereas "NIST" will load any
     file where the name contains `NIST*.csv`).
@@ -244,7 +306,8 @@ function load_agilent2(
     host_directory::AbstractString,
     ;
     sample::Union{Nothing,AbstractString} = nothing,
-    date_time_format::AbstractString = "d/m/Y H:M:S",
+    date_time_constructor::AbstractString = "automatic",
+    day_first::Bool = true,
     header_row::Integer = 4,
     first_row::Integer = 5,
     footer_skip::Integer = 3,
@@ -265,6 +328,11 @@ function load_agilent2(
     elseif aggregate_files === true && sample !== nothing
         files = glob(sample * "*.csv", host_directory)
     end
+    date_time_format::DateFormat = date_format_test(
+        files[1];
+        date_time_constructor = date_time_constructor,
+        day_first = day_first,
+    )
     for file in files
         head_info = split(readuntil(file, "Time "), "\n")
         analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
@@ -273,11 +341,13 @@ function load_agilent2(
             tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
         )
         sample_name = rstrip(sample_name, ' ')
-        analysis_time = chop(
-            head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
-                ":",
-                head_info[3],
-            )[1] + 2)],
+        analysis_time = rstrip(
+            chop(
+                head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
+                    "using",
+                    head_info[3],
+                )[1] - 1)],
+            ),
         )
         analysis_time = DateTime(analysis_time, date_time_format)
         if Dates.Year(analysis_time) < Dates.Year(2000)
