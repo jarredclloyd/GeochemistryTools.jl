@@ -47,9 +47,15 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
 
       + Default `true` (day-month order)
       + If your CSV dates are month-day, set to `false`.
+  - `header_row::Integer`: An `Integer` representing the header row.
+
+      + Default value is `4`.
   - `first_row::Integer`: An `Integer` representing the first data row.
 
       + Default value is `5`.
+  - `footer_skip::Integer`: An `Integer` representing the number of trailing rows to skip.
+
+      + Default value is `3`.
   - `aggregate_files:Bool`: A boolean flag for concatenating all relevant files in a directory.
 
       + Default is `false`.
@@ -71,13 +77,13 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
     values between `stable_time` and `signal_end`.
 
       + Default is `false`.
+
       + Valid values are `true` or `false
       + `automatic_times == true` will set these values automatically.
-
       + `gas_blank::Real`: The time (in seconds) where the gas blank ends.
 
-      + Default value is `27.5`.
-      + Only used if `automatic_times == false`
+          * Default value is `27.5`.
+          * Only used if `automatic_times == false`
   - `stable_time::Real`: The time (in seconds) where signal counts are stabilised.
 
       + Default value is `32` (i.e. 32 seconds).
@@ -89,6 +95,12 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
       + It is recommended to set this to a value appropriate to your data (i.e. total signal
         time minus ~5 [e.g. 65]) to avoid some artefacts that may occur near the end of an ablation.
       + Only used if `automatic_times == false`
+
+      + `spot_size::Union{Missing, AbstractString, Integer}`: Value representing the laser
+        ablation spot size (in μm).
+
+          * Default value is `missing`
+          * Can either be a string (e.g. 67 um) or Integer (e.g. 67)
 """
 function load_agilent(
     host_directory::AbstractString,
@@ -97,7 +109,9 @@ function load_agilent(
     sample::Union{Nothing,AbstractString} = nothing,
     date_time_constructor::AbstractString = "automatic",
     day_first::Bool = true,
+    header_row::Integer = 4,
     first_row::Integer = 5,
+    footer_skip::Integer = 3,
     automatic_times::Bool = true,
     gas_blank::Real = 27.5,
     stable_time::Real = 32,
@@ -115,9 +129,6 @@ function load_agilent(
             ),
         )
     end
-    if typeof(date_time_format) <: AbstractString
-        date_time_format = Dates.DateFormat(date_time_format)
-    end
     data = DataFrame()
     if aggregate_files === true
         files = glob("*.csv", host_directory)
@@ -132,11 +143,12 @@ function load_agilent(
     for file in files
         head_info = split(readuntil(file, "Time "), "\n")
         analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
-        sample_name = chop(
-            analysis_name;
-            tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
+        sample_name = rstrip(
+            chop(
+                analysis_name;
+                tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
+            ),
         )
-        sample_name = rstrip(sample_name, ' ')
         if ismissing(spot_size) !== true
             if typeof(spot_size) <: AbstractString
                 spot_size = tryparse(
@@ -146,7 +158,7 @@ function load_agilent(
                         file,
                         findlast("_", file)[1],
                     )[1] - 1)],
-                )
+                ) # CHECK THIS
             elseif typeof(spot_size) <: Number
             else
                 error("malformed spot_size variable")
@@ -167,9 +179,9 @@ function load_agilent(
         df = CSV.read(
             file,
             DataFrame;
-            header = 4,
+            header = header_row,
             skipto = first_row,
-            footerskip = 3,
+            footerskip = footer_skip,
             ignoreemptyrows = true,
             normalizenames = true,
             delim = ',',
@@ -279,28 +291,42 @@ table, the median-centred ratio, and sorts the table by time.
 
   - `host_directory::AbstractString`: The folder path containing raw LA-ICP-MS CSV files.
 
+      + `host_directory` will need to be wrapped by `raw""` on Windows operating systems if not
+        using `/` or `\\\\`.
+
 # Keywords
 
-  - `sample::AbstractString`: The sample name as a string.
-  - `header_row::Integer`: An `Integer` representing the header row. Default value is `4`.
-  - `first_row::Integer`: An `Integer` representing the first data row. Default value is `5`.
-  - `footer_skip::Integer`: An `Integer` representing the number of trailing rows to trim. Default value is `3`.
-  - `aggregate_files::Bool`: Default `false`. Will concatenate all CSV files in host folder to one data frame.
+  - `sample::AbstractString`: The sample name as a string. E.g. `"NIST610"`
 
-## Argument Notes
+      + This only needs to be a unique portion of the sample name.
+      + E.g. NIST610 will load all `NIST610*.csv` files, whereas NIST will load any file where
+        the name contains `NIST*.csv`.
 
-  - `host_directory` will need to be wrapped by `raw` on Windows operating systems if not using `/` or `\\\\`.
-  - `date_time_constructor::AbstractString`: Default `"automatic"`. Leave at default to
-    guess date_time_format automatically, or set to a valid date_time_format for your CSV
-    files. See date `GeochemistryTools.automatic_datetime` for details on the algorithm,
-    and `? Dates.DateFormat` for guidance on valid date_time_format construction strings.
-  - `day_first::Bool`: Default `true`. Specifies the order of day-month for automatic date
-    time construction. If your CSV dates are month-day, set to `false`.
-  - If `aggregate_files = true`, `sample` only needs to be a unique portion of the sample
-    name. E.g. "NIST610" will load only `NIST610*.csv` files, whereas "NIST" will load any
-    file where the name contains `NIST*.csv`).
-  - If `aggregate_files = false`, `sample` needs to be the full sample name, e.g. "NIST610 - 1".
-  - Either `sample` or `aggregate_files=true` need to be specified for the function to run.
+  - `date_time_constructor::AbstractString`: Leave at default to guess `date_time_format`
+    automatically, or set to a valid string representing the `date_time_format` for your CSV
+    files.
+
+      + Default `"automatic"`.
+      + See date `GeochemistryTools.automatic_datetime` for details on the algorithm
+      + See `? Dates.DateFormat` for guidance on valid `date_time_format` construction strings.
+  - `day_first::Bool`: Specifies the order of day-month for automatic date time
+    construction.
+
+      + Default `true` (day-month order)
+      + If your CSV dates are month-day, set to `false`.
+  - `header_row::Integer`: An `Integer` representing the header row.
+
+      + Default value is `4`.
+  - `first_row::Integer`: An `Integer` representing the first data row.
+
+      + Default value is `5`.
+  - `footer_skip::Integer`: An `Integer` representing the number of trailing rows to skip.
+
+      + Default value is `3`.
+  - `aggregate_files:Bool`: A boolean flag for concatenating all relevant files in a directory.
+
+      + Default is `false`.
+      + Valid values are `true` or `false`
 """
 function load_agilent2(
     host_directory::AbstractString,
@@ -336,11 +362,12 @@ function load_agilent2(
     for file in files
         head_info = split(readuntil(file, "Time "), "\n")
         analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
-        sample_name = chop(
-            analysis_name;
-            tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
+        sample_name = rstrip(
+            chop(
+                analysis_name;
+                tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
+            ),
         )
-        sample_name = rstrip(sample_name, ' ')
         analysis_time = rstrip(
             chop(
                 head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
