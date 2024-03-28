@@ -81,12 +81,13 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
       + `automatic_times == true` will set these values automatically.
   - `gas_blank::Real`: The time (in seconds) where the gas blank ends.
 
-          * Default value is `27.5`.
-          * Only used if `automatic_times == false`
+      + Default value is `27.5`.
+      + Only used if `automatic_times == false`
   - `stable_time::Real`: The time (in seconds) where signal counts are stabilised.
 
       + Default value is `32` (i.e. 32 seconds).
-      + This parameter is used to filter the rows when calculating the central tendency for counts per second ratio.
+      + This parameter is used to filter the rows when calculating the central tendency for
+        counts per second ratio.
       + Only used if `automatic_times == false`
   - `signal_end::Real`: The time (in seconds) where the data should be truncated.
 
@@ -95,11 +96,19 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
       + It is recommended to set this to a value appropriate to your data (i.e. total signal
         time minus ~5 [e.g. 65]) to avoid some artefacts that may occur near the end of an ablation.
       + Only used if `automatic_times == false`
-      + `spot_size::Union{Missing, AbstractString, Integer}`: Value representing the laser
-        ablation spot size (in μm).
 
-          * Default value is `missing`
-          * Can either be a string (e.g. 67 um) or Integer (e.g. 67)
+  - `spot_size_filename::Bool`: A boolean flag to determine if the spot size should be parsed
+    from the filename.
+
+      + Default value is `false`.
+      + Valid values are `true` or `false`.
+
+
+  - `spot_size_value::Union{Missing,Integer}`: The numeric value of the spot size.
+
+      + Default value is `missing`.
+      + Is used if `spot_size_filename` = `false`.
+
 """
 function load_agilent(
     host_directory::AbstractString,
@@ -119,7 +128,8 @@ function load_agilent(
     aggregate_files::Bool = false,
     centre::Bool = true,
     central_tendency::AbstractString = "gmean",
-    spot_size::Union{Missing,AbstractString,Integer} = missing,
+    spot_size_filename::Bool = false,
+    spot_size_value::Union{Missing,Integer} = missing,
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -140,9 +150,8 @@ function load_agilent(
         day_first = day_first,
     )
     for file in files
-        if ismissing(spot_size) !== true
-            if typeof(spot_size) <: AbstractString
-                spot_size = tryparse(
+        if spot_size_filename === true
+            spot_size = tryparse(
                     Int,
                     file[(findlast("_", file)[1] + 1):(findnext(
                         " ",
@@ -150,10 +159,8 @@ function load_agilent(
                         findlast("_", file)[1],
                     )[1] - 1)],
                 )
-            elseif typeof(spot_size) <: Number
-            else
-                error("malformed spot_size variable")
-            end
+        elseif ismissing(spot_size_value) !== true && typeof(spot_size) <: Number
+            spot_size = spot_size_value
         end
         head_info = split(readuntil(file, "Time "), "\n")
         analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
@@ -175,7 +182,6 @@ function load_agilent(
         if Dates.Year(analysis_time) < Dates.Year(2000)
             analysis_time = analysis_time + Dates.Year(2000)
         end
-        println("$analysis_name:$spot_size \n $file")
         df = CSV.read(
             file,
             DataFrame;
