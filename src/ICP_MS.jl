@@ -56,10 +56,10 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
   - `footer_skip::Integer`: An `Integer` representing the number of trailing rows to skip.
 
       + Default value is `3`.
-  - `aggregate_files:Bool`: A boolean flag for concatenating all relevant files in a directory.
+  - `aggregate_files:Bool`: A boolean flag for concatenating all CSV files in a directory.
 
       + Default is `false`.
-      + Valid values are `true` or `false`
+      + Valid values are `true` or `false`.
   - `centre::Bool`: A boolean flag to centre data around the `central_tendency` (i.e. shift
     to mean of zero).
 
@@ -77,10 +77,9 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
     values between `stable_time` and `signal_end`.
 
       + Default is `false`.
-
       + Valid values are `true` or `false
       + `automatic_times == true` will set these values automatically.
-      + `gas_blank::Real`: The time (in seconds) where the gas blank ends.
+  - `gas_blank::Real`: The time (in seconds) where the gas blank ends.
 
           * Default value is `27.5`.
           * Only used if `automatic_times == false`
@@ -92,10 +91,10 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
   - `signal_end::Real`: The time (in seconds) where the data should be truncated.
 
       + Default value is `Inf` (will use entire signal beyond `stable_time`)
+
       + It is recommended to set this to a value appropriate to your data (i.e. total signal
         time minus ~5 [e.g. 65]) to avoid some artefacts that may occur near the end of an ablation.
       + Only used if `automatic_times == false`
-
       + `spot_size::Union{Missing, AbstractString, Integer}`: Value representing the laser
         ablation spot size (in μm).
 
@@ -141,14 +140,6 @@ function load_agilent(
         day_first = day_first,
     )
     for file in files
-        head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
-        sample_name = rstrip(
-            chop(
-                analysis_name;
-                tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
-            ),
-        )
         if ismissing(spot_size) !== true
             if typeof(spot_size) <: AbstractString
                 spot_size = tryparse(
@@ -158,12 +149,20 @@ function load_agilent(
                         file,
                         findlast("_", file)[1],
                     )[1] - 1)],
-                ) # CHECK THIS
+                )
             elseif typeof(spot_size) <: Number
             else
                 error("malformed spot_size variable")
             end
         end
+        head_info = split(readuntil(file, "Time "), "\n")
+        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
+        sample_name = rstrip(
+            chop(
+                analysis_name;
+                tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
+            ),
+        )
         analysis_time = rstrip(
             chop(
                 head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
@@ -176,6 +175,7 @@ function load_agilent(
         if Dates.Year(analysis_time) < Dates.Year(2000)
             analysis_time = analysis_time + Dates.Year(2000)
         end
+        println("$analysis_name:$spot_size \n $file")
         df = CSV.read(
             file,
             DataFrame;
