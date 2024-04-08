@@ -65,7 +65,7 @@ Input df as a DataFrame of 4 of 5 columns wide with column order (X, sX, Y, sY, 
 # Keywords
 - `y_weights::Union{Nothing,Symbol}`: Weights for y values (e.g. absolute uncertainties).
 - 'weight_type::AbstractString': Weight pre-scaling, values of "rel" or "abs" (default) are
-    accepted. If "rel" transforms weights to relative weights.
+    accepted. If "abs" transforms weights to relative weights.
 - 'rm_outlier::Bool': When set to true, will remove outliers (studentised residuals ≥ 3,
     based on fit with minimum akaike information criteria value).
 - 'verbose::Bool': When set to true will print the number of outliers determined during N passes.
