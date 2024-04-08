@@ -96,19 +96,15 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
       + It is recommended to set this to a value appropriate to your data (i.e. total signal
         time minus ~5 [e.g. 65]) to avoid some artefacts that may occur near the end of an ablation.
       + Only used if `automatic_times == false`
-
   - `spot_size_filename::Bool`: A boolean flag to determine if the spot size should be parsed
     from the filename.
 
       + Default value is `false`.
       + Valid values are `true` or `false`.
-
-
   - `spot_size_value::Union{Missing,Integer}`: The numeric value of the spot size.
 
       + Default value is `missing`.
       + Is used if `spot_size_filename` = `false`.
-
 """
 function load_agilent(
     host_directory::AbstractString,
@@ -152,13 +148,13 @@ function load_agilent(
     for file in files
         if spot_size_filename === true
             spot_size = tryparse(
-                    Int,
-                    file[(findlast("_", file)[1] + 1):(findnext(
-                        " ",
-                        file,
-                        findlast("_", file)[1],
-                    )[1] - 1)],
-                )
+                Int,
+                file[(findlast("_", file)[1] + 1):(findnext(
+                    " ",
+                    file,
+                    findlast("_", file)[1],
+                )[1] - 1)],
+            )
         elseif ismissing(spot_size_value) !== true && typeof(spot_size) <: Number
             spot_size = spot_size_value
         end
@@ -439,8 +435,15 @@ signal start & signal end. Likely to be updated to a `struct` in future.
   - `bandwidth::Integer`: Controls width of smoothing. Default is `cld(√(length(signal)), 2)`
     (this value generally works very well). Values too large will cause algorithm to
     fail to detect signal. Values too small may not accurately determine laser start.
-  - `verbose::Bool`: Default is `false`. If set to `true` will print estimated times and
-    indexes to REPL.
+
+  - `gas_blank_trim::Integer`: Number of seconds to trim gas blank from laser start.
+
+      + Default value is `5`.
+  - `verbose::Bool`: A boolean flag to set verbose output. If set to `true` will print
+    estimated times and indexes to REPL.
+
+      + Default is `false`.
+      + Valid values are `true` or `false`
 
 # Example
 
@@ -453,6 +456,7 @@ function automatic_laser_times(
     time::AbstractVector{<:Real},
     signal::AbstractVector{<:Real};
     bandwidth::Integer = UInt8(cld(sqrt(length(signal)), 2)),
+    gas_blank_trim::Integer = 5,
     verbose::Bool = false,
 )
     medians = Vector{Float64}(undef, Integer(cld(length(signal), bandwidth)))
@@ -494,45 +498,43 @@ function automatic_laser_times(
         end
         laser_start_ind = findmin(z[:, 3])[2]
         laser_start_time = time[laser_start_ind]
-        q = quantile(z[laser_start_ind:end, 1], [0.05, 0.95])
-        aerosol_arrival_ind = findfirst(≥(q[2]), z[:, 1])
+        q = quantile(z[laser_start_ind:end, 1], [0.05,0.25,0.5,0.75, 0.95])
+        aerosol_arrival_ind = laser_start_ind + findfirst(≥(q[2]), z[laser_start_ind:end, 1]) - 1
         aerosol_arrival_time = time[aerosol_arrival_ind]
-        q = quantile(z[aerosol_arrival_ind:end, 1], [0.05, 0.95])
+        q = quantile(z[aerosol_arrival_ind:end, 1], [0.05,0.25,0.5,0.75, 0.95])
         signal_start_ind = min(
-            aerosol_arrival_ind + findfirst(<(q[2]), z[aerosol_arrival_ind:end, 1]),
+            aerosol_arrival_ind + findfirst(>(q[4]), z[aerosol_arrival_ind:end, 1]),
             lastindex(time),
         )
-        signal_end_ind = min(findlast(>(q[1]), z[:, 1]), lastindex(time))
+        q = quantile(z[signal_start_ind:end, 2], [0.05, 0.25, 0.5, 0.75, 0.95])
+        signal_end_ind = min(findlast(<(q[5]), z[:, 2]), lastindex(time))
         signal_start_time = time[signal_start_ind]
         signal_end_time = time[signal_end_ind]
-        if signal_end_time - signal_start_time < 5
-            if verbose === true
-                println(
-                    "WARNING: <5 seconds of signal initially detected after laser start. Signal times may be inaccurate or the signal has no decay.",
-                )
-            end
-            slope = sign(
-                GeochemistryTools._GLS(
-                    @view(time[laser_start_ind:end]),
-                    @view(signal[laser_start_ind:end]),
-                    1,
-                ).beta[2],
-            )
+        slope = sign(
+            GeochemistryTools._GLS(
+                @view(time[signal_start_ind:signal_end_ind]),
+                @view(signal[signal_start_ind:signal_end_ind]),
+                1,
+            ).beta[2],
+        )
             if slope > 0
-                q = quantile(z[laser_start_ind:end, 1], [0.05, 0.95])
+                q = quantile(z[laser_start_ind:end, 1], [0.05,0.25,0.5,0.75, 0.95])
                 aerosol_arrival_ind = findfirst(≥(q[1]), z[:, 1])
                 aerosol_arrival_time = time[aerosol_arrival_ind]
-                q = quantile(z[aerosol_arrival_ind:end, 1], [0.05, 0.95])
+                q = quantile(z[aerosol_arrival_ind:end, 1], [0.05,0.25,0.5,0.75, 0.95])
                 signal_start_ind = min(
                     aerosol_arrival_ind + findfirst(<(q[1]), z[aerosol_arrival_ind:end, 1]),
                     lastindex(time),
                 )
-                signal_end_ind = min(findlast(>(q[2]), z[:, 1]), lastindex(time))
+                q = quantile(z[signal_start_ind:end, 2], [0.05, 0.25, 0.5, 0.75, 0.95])
+                signal_end_ind = min(findlast(<(q[5]), z[:, 2]), lastindex(time))
                 signal_start_time = time[signal_start_ind]
                 signal_end_time = time[signal_end_ind]
             end
-        end
-        gas_blank_end_ind = max(laser_start_ind - 2, firstindex(time))
+        gas_blank_end_ind = max(
+            laser_start_ind - (round(Int, gas_blank_trim / (time[2] - time[1]))),
+            firstindex(time),
+        )
         if verbose == true
             println(
                 "gas blank: ",
