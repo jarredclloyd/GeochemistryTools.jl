@@ -20,18 +20,19 @@ __precompile__()
 module GeochemistryTools
 
 using Reexport
-@reexport using CSV
-@reexport using DataFrames
-@reexport using Distributions
-@reexport using Polynomials
-@reexport using Statistics
-@reexport using StatsBase
-@reexport using ColorSchemes
-@reexport using Glob
-@reexport using HypothesisTests
-@reexport using Dates
-@reexport using SparseArrays
-@reexport using LinearAlgebra
+using CSV
+using DataFrames
+using Distributions
+using Polynomials
+using Statistics
+using StatsBase
+using ColorSchemes
+using Glob
+using HypothesisTests
+using Dates
+using SparseArrays
+using LinearAlgebra
+using MultiFloats
 using HypergeometricFunctions
 using SpecialFunctions
 using PyCall
@@ -64,8 +65,9 @@ include("datetime_parser.jl")
 function _check_equal_length(
     a::AbstractVector,
     b::AbstractVector,
-    c::Union{T, Nothing}=nothing,
-    d::Union{T, Nothing}=nothing) where {T<:AbstractVector}
+    c::Union{T,Nothing} = nothing,
+    d::Union{T,Nothing} = nothing,
+) where {T<:AbstractVector}
     if c !== nothing && d !== nothing
         length(a) == length(b) == length(c) == length(d)
     elseif c !== nothing && d === nothing
@@ -81,8 +83,10 @@ pyimport_conda("scipy", "scipy")
 
 function __init__()
     copy!(pybaselines, pyimport_conda("pybaselines", "pybaselines"))
+    MultiFloats.use_bigfloat_transcendentals()
+    println(
+        "👋 Thanks for using GeochemistryTools \n If you wish to use the 'plot' functions of this package you will need to add a Makie backend (e.g. GLMakie, CairoMakie)",
+    )
 end
-
-println("Hello 👋 \n If you wish to use the 'plot' functions of this package you will need to add a Makie backend (e.g. GLMakie, CairoMakie)")
 
 end
