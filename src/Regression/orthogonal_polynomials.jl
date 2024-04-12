@@ -22,20 +22,22 @@ export poly_orthogonal, poly_confidenceband, poly_predictionband, poly_standarde
 
 # stucts and base extensions
 struct OrthogonalPolynomial <: LinearRegression
-    lambda::Vector{Float64}
-    lambda_se::SparseMatrixCSC{Float64}
-    beta::Float64
-    gamma::Vector{Float64}
-    delta::Vector{Float64}
-    epsilon::Vector{Float64}
-    variance_covariance::Symmetric{Float64,Matrix{Float64}}
+    lambda::Vector{AbstractFloat}
+    lambda_se::SparseMatrixCSC
+    beta::AbstractFloat
+    gamma::Vector{AbstractFloat}
+    delta::Vector{AbstractFloat}
+    epsilon::Vector{AbstractFloat}
+    variance_covariance::Symmetric
     order::Vector{Integer}
-    r_squared::Vector{Float64}
-    rmse::Vector{Float64}
-    chi_squared::Vector{Float64}
-    reduced_chi_squared::Vector{Float64}
-    akaike_information_criteria::Vector{Float64}
-    bayesian_information_criteria::Vector{Float64}
+    r_squared::Vector{AbstractFloat}
+    rmse::Vector{AbstractFloat}
+    chi_squared::Vector{AbstractFloat}
+    reduced_chi_squared::Vector{AbstractFloat}
+    akaike_information_criteria::Vector{AbstractFloat}
+    akaike_weights::Vector{AbstractFloat}
+    bayesian_information_criteria::Vector{AbstractFloat}
+    bayesian_weights::Vector{AbstractFloat}
     n_observations::Integer
 end
 
@@ -49,7 +51,6 @@ end
 
 # call functions
 """
-
     fit_orthogonal(df::AbstractDataFrame,
     x_name::Symbol,
     y_name::Symbol;
@@ -63,12 +64,13 @@ Compute an orthogonal polynomial that represent some X and Y data.
 Input df as a DataFrame of 4 of 5 columns wide with column order (X, sX, Y, sY, [ρXY]).
 
 # Keywords
-- `y_weights::Union{Nothing,Symbol}`: Weights for y values (e.g. absolute uncertainties).
-- 'weight_type::AbstractString': Weight pre-scaling, values of "rel" or "abs" (default) are
+
+  - `y_weights::Union{Nothing,Symbol}`: Weights for y values (e.g. absolute uncertainties).
+  - 'weight_type::AbstractString': Weight pre-scaling, values of "rel" or "abs" (default) are
     accepted. If "abs" transforms weights to relative weights.
-- 'rm_outlier::Bool': When set to true, will remove outliers (studentised residuals ≥ 3,
+  - 'rm_outlier::Bool': When set to true, will remove outliers (studentised residuals ≥ 3,
     based on fit with minimum akaike information criteria value).
-- 'verbose::Bool': When set to true will print the number of outliers determined during N passes.
+  - 'verbose::Bool': When set to true will print the number of outliers determined during N passes.
 
 # References
 
@@ -88,7 +90,6 @@ https://doi.org/10.1525/collabra.343
 
 Burnham, KP & Anderson, DR (2002) 'Model selection and multimodel inference: A practical
 information-theoretic approach', 2nd ed., Springer, ISBN: 978-0-387-95364-9
-
 """
 function fit_orthogonal(
     df::AbstractDataFrame,
@@ -97,7 +98,7 @@ function fit_orthogonal(
     y_weights::Union{Nothing,Symbol} = nothing,
     weight_type::AbstractString = "rel",
     rm_outlier::Bool = false,
-    verbose::Bool = false
+    verbose::Bool = false,
 )
     if y_weights !== nothing
         return _orthogonal_LSQ(
@@ -106,7 +107,7 @@ function fit_orthogonal(
             y_weights = df[!, y_weights],
             weight_type = weight_type,
             rm_outlier = rm_outlier,
-            verbose = verbose
+            verbose = verbose,
         )
     else
         return _orthogonal_LSQ(
@@ -114,7 +115,7 @@ function fit_orthogonal(
             df[!, y_name];
             weight_type = weight_type,
             rm_outlier = rm_outlier,
-            verbose = verbose
+            verbose = verbose,
         )
     end
 end
@@ -124,7 +125,7 @@ function fit_orthogonal(
     errors::Bool = false,
     weight_type::AbstractString = "rel",
     rm_outlier::Bool = false,
-    verbose::Bool = false
+    verbose::Bool = false,
 )
     if errors === false
         return _orthogonal_LSQ(
@@ -132,7 +133,7 @@ function fit_orthogonal(
             A[:, 2];
             weight_type = weight_type,
             rm_outlier = rm_outlier,
-            verbose = verbose
+            verbose = verbose,
         )
     elseif errors === true
         return _orthogonal_LSQ(
@@ -141,7 +142,7 @@ function fit_orthogonal(
             y_weights = A[:, 3],
             weight_type = weight_type,
             rm_outlier = rm_outlier,
-            verbose = verbose
+            verbose = verbose,
         )
     end
 end
@@ -219,24 +220,18 @@ function _orthogonal_LSQ(
     verbose::Bool = false,
 )
     𝑁::Integer = length(x)
-    x_sums::Vector{Float64} = Vector{Float64}(undef, 7)
+    x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
     @simd for i ∈ eachindex(x_sums)
         x_sums[i] = sum(x .^ i)
     end
-    β::Float64 = _beta_orthogonal(𝑁, x_sums)
-    γ::Vector{Float64} = _gamma_orthogonal(𝑁, x_sums)
-    δ::Vector{Float64} = _delta_orthogonal(𝑁, x_sums)
-    ϵ::Vector{Float64} = _epsilon_orthogonal(𝑁, x_sums)
-    order::Vector{Integer} = [0, 1, 2, 3, 4]
-    X::Matrix{Float64} = hcat(
-        fill(1.0, 𝑁),
-        (x .- β),
-        (x .- γ[1]) .* (x .- γ[2]),
-        (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]),
-        (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]),
-    )
-     if y_weights === nothing
-        ω::Vector{Float64} = fill(1.0, length(y))
+    β::MultiFloat{Float64,4}         = _beta_orthogonal(𝑁, x_sums)
+    γ::Vector{MultiFloat{Float64,4}} = _gamma_orthogonal(𝑁, x_sums)
+    δ::Vector{MultiFloat{Float64,4}} = _delta_orthogonal(𝑁, x_sums)
+    ϵ::Vector{MultiFloat{Float64,4}} = _epsilon_orthogonal(𝑁, x_sums)
+    order::Vector{Integer}           = [0, 1, 2, 3, 4]
+    X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (x .- β), (x .- γ[1]) .* (x .- γ[2]), (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]), (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]))
+    if y_weights === nothing
+        ω::Vector{MultiFloat{Float64,4}} = fill(1.0, length(y))
     elseif occursin("rel", lowercase(weight_type)) === true
         ω = y_weights
     elseif occursin("abs", lowercase(weight_type)) == true
@@ -248,18 +243,18 @@ function _orthogonal_LSQ(
             ),
         )
     end
-    Ω::Diagonal{Float64,Vector{Float64}} = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
-    Xᵀ::Transpose{Float64,Matrix{Float64}} = transpose(X)
+    Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} =
+        Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
+    Xᵀ::Transpose{MultiFloat{Float64,4},Matrix{MultiFloat{Float64,4}}} = transpose(X)
     rss::Vector{Float64} = Vector{Float64}(undef, 5)
     AIC::Vector{Float64} = Vector{Float64}(undef, 5)
     VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
     Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
     @inbounds @simd for i ∈ eachindex(order)
-        residuals::Vector{Float64} = (y .- (view(X, :, 1:i) * Λ[1:i]))
-        rss[i] =
-            transpose(residuals) * Ω * (residuals)
+        residuals::Vector{MultiFloat{Float64,4}} = (y .- (view(X, :, 1:i) * Λ[1:i]))
+        rss[i] = transpose(residuals) * Ω * (residuals)
     end
-    AIC = _akaike_information_criteria.(rss, 𝑁, order .+ 2) # +2 corrects order for β₀ and δ²
+    AIC = _akaike_information_criteria.(rss, 𝑁, order)
     if rm_outlier === true
         𝑁prev::Integer = 0
         n_iterations::Integer = 0
@@ -267,14 +262,16 @@ function _orthogonal_LSQ(
         while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
             n_iterations += 1
             minAIC::Integer = findmin(AIC)[2]
-            Xvar::Matrix{Float64} = view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :) * Ω
-            leverage::Vector{Float64} = Vector{Float64}(undef, size(X, 1))
+            Xvar::Matrix{MultiFloat{Float64,4}} =
+                view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :) * Ω
+            leverage::Vector{MultiFloat{Float64,4}} =
+                Vector{MultiFloat{Float64,4}}(undef, size(X, 1))
             Threads.@threads for i ∈ axes(X, 1)
                 @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
             end
-            studentised_residuals::Vector{Float64} =
+            studentised_residuals::Vector{MultiFloat{Float64,4}} =
                 y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
-            mse::Vector{Float64} = rss ./ (𝑁 .- (order .+ 1))
+            mse::Vector{MultiFloat{Float64,4}} = rss ./ (𝑁 .- (order .+ 1))
             studentised_residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
             outlier_inds::Vector{Integer} = findall(studentised_residuals .≥ 3)
             n_outliers += length(outlier_inds)
@@ -290,7 +287,7 @@ function _orthogonal_LSQ(
                     residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
                     rss[i] = transpose(residuals) * Ω * (residuals)
                 end
-                AIC = _akaike_information_criteria.(rss, 𝑁, order .+ 2)
+                AIC = _akaike_information_criteria.(rss, 𝑁, order)
             end
             𝑁prev = 𝑁
             𝑁 = size(X, 1)
@@ -307,6 +304,9 @@ function _orthogonal_LSQ(
         Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
     end
     sparse(Λ_SE)
+    for i in eachindex(Λ)
+        Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
+    end
     tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
     rmse::Vector{Float64} = sqrt.(mse)
     R²::Vector{Float64} = 1 .- (rss ./ (tss))
@@ -318,14 +318,17 @@ function _orthogonal_LSQ(
         end
     end
     BIC::Vector{Float64} = Vector{Float64}(undef, 5)
-    BIC = _bayesian_information_criteria.(rss, 𝑁, order .+ 2)
+    BIC = _bayesian_information_criteria.(rss, 𝑁, order)
+    BICw = exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
+    AIC = _akaike_information_criteria.(rss, 𝑁, order)
+    AICw = exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
     return OrthogonalPolynomial(
         Λ,
         Λ_SE,
-        β,
-        γ,
-        δ,
-        ϵ,
+        Float64.(β),
+        Float64.(γ),
+        Float64.(δ),
+        Float64.(ϵ),
         VarΛX,
         order,
         R²,
@@ -333,7 +336,9 @@ function _orthogonal_LSQ(
         rss,
         mse,
         AIC,
+        AICw,
         BIC,
+        BICw,
         𝑁,
     )
 end
@@ -352,18 +357,26 @@ function _poly_orthogonal(
         throw(ArgumentError("Polynomial order must be positive"))
     end
     if order == 0
-        λ[1] .+ 0 .* x
+        @. (λ[1] + 0 * x)
     elseif order == 1
-        λ[1] .+ λ[2] .* (x .- β)
+        @. (λ[1] + λ[2] * (x - β))
     elseif order == 2
-        λ[1] .+ λ[2] .* (x .- β) .+ λ[3] .* ((x .- γ[1]) .* (x .- γ[2]))
+        @. (λ[1] + λ[2] * (x - β) + λ[3] * ((x - γ[1]) * (x - γ[2])))
     elseif order == 3
-        λ[1] .+ λ[2] .* (x .- β) .+ λ[3] .* ((x .- γ[1]) .* (x .- γ[2])) .+
-        λ[4] .* ((x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]))
+        @. (
+            λ[1] +
+            λ[2] * (x - β) +
+            λ[3] * ((x - γ[1]) * (x - γ[2])) +
+            λ[4] * ((x - δ[1]) * (x - δ[2]) * (x - δ[3]))
+        )
     elseif order == 4
-        λ[1] .+ λ[2] .* (x .- β) .+ λ[3] .* ((x .- γ[1]) .* (x .- γ[2])) .+
-        λ[4] .* ((x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3])) .+
-        λ[5] .* ((x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]))
+        @. (
+            λ[1] +
+            λ[2] * (x - β) +
+            λ[3] * ((x - γ[1]) * (x - γ[2])) +
+            λ[4] * ((x - δ[1]) * (x - δ[2]) * (x - δ[3])) +
+            λ[5] * ((x - ϵ[1]) * (x - ϵ[2]) * (x - ϵ[3]) * (x - ϵ[4]))
+        )
     end
 end
 
@@ -373,12 +386,13 @@ function _beta_orthogonal(N::Integer, sums::AbstractVector)
 end
 
 function _gamma_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{Float64} = [-sums[1] N; -sums[2] sums[1]] \ [-sums[2]; -sums[3]]
+    vieta::Vector{MultiFloat{Float64,4}} =
+        [-sums[1] N; -sums[2] sums[1]] \ [-sums[2]; -sums[3]]
     return real(PolynomialRoots.roots(([vieta[2], -vieta[1], 1])))
 end
 
 function _delta_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{Float64} =
+    vieta::Vector{MultiFloat{Float64,4}} =
         [
             -sums[2] sums[1] -N
             -sums[3] sums[2] -sums[1]
@@ -387,7 +401,7 @@ function _delta_orthogonal(N::Integer, sums::AbstractVector)
     return real(PolynomialRoots.roots(([-vieta[3], vieta[2], -vieta[1], 1])))
 end
 function _epsilon_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{Float64} =
+    vieta::Vector{MultiFloat{Float64,4}} =
         [
             -sums[3] sums[2] -sums[1] N
             -sums[4] sums[3] -sums[2] sums[1]
@@ -402,7 +416,7 @@ function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Int
         throw(ArgumentError("Polynomial order must be positive"))
     end
     if order == 0
-        X::Matrix{Float64} = repeat([1.0], length(x))
+        X::Matrix{Real} = repeat([1.0], length(x))
     elseif order == 1
         X = hcat(repeat([1.0], length(x)), (x .- fit.beta))
     elseif order == 2
