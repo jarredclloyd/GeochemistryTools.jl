@@ -13,7 +13,8 @@ function _bayesian_information_criteria(rss::Real, 𝑛::Integer, order::Integer
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    return 𝑛 * log(rss / 𝑛) + order * log(𝑛) + 𝑛 * log(2π) + 𝑛
+    k = order + 2
+    return 𝑛 * log(rss / 𝑛) + k * log(𝑛) + 𝑛 * log(2π) + 𝑛
 end
 
 
@@ -21,7 +22,8 @@ function _akaike_information_criteria(rss::Real, 𝑛::Integer, order::Integer)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    return 𝑛 * log(rss / 𝑛) + 2 * order + ((2 * order * (order + 1)) / (𝑛 - order - 1))
+    k = order + 2
+    return 𝑛 * log(rss / 𝑛) + 2 * k + ((2 * k * (k + 1)) / (𝑛 - k - 1))
 end
 
 function _chi_squared(
