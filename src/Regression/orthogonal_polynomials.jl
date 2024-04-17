@@ -298,15 +298,19 @@ function _orthogonal_LSQ(
             )
         end
     end
+    for i in eachindex(Λ)
+        Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
+    end
+    @inbounds @simd for i ∈ eachindex(order)
+        residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
+        rss[i] = transpose(residuals) * Ω * (residuals)
+    end
     mse = rss ./ (𝑁 .- (order .+ 1))
     Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
     @inbounds for i ∈ eachindex(order)
         Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
     end
     sparse(Λ_SE)
-    for i in eachindex(Λ)
-        Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
-    end
     tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
     rmse::Vector{Float64} = sqrt.(mse)
     R²::Vector{Float64} = 1 .- (rss ./ (tss))
