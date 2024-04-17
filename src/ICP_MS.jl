@@ -498,10 +498,10 @@ function automatic_laser_times(
         end
         laser_start_ind = findmin(z[:, 3])[2]
         laser_start_time = time[laser_start_ind]
-        q = quantile(z[laser_start_ind:end, 1], [0.05,0.25,0.5,0.75, 0.95])
+        q = quantile(z[laser_start_ind:end, 1], [0.05, 0.25, 0.5, 0.75, 0.95])
         aerosol_arrival_ind = laser_start_ind + findfirst(≥(q[2]), z[laser_start_ind:end, 1]) - 1
         aerosol_arrival_time = time[aerosol_arrival_ind]
-        q = quantile(z[aerosol_arrival_ind:end, 1], [0.05,0.25,0.5,0.75, 0.95])
+        q = quantile(z[aerosol_arrival_ind:end, 1], [0.05, 0.25, 0.5, 0.75, 0.95])
         signal_start_ind = min(
             aerosol_arrival_ind + findfirst(>(q[4]), z[aerosol_arrival_ind:end, 1]),
             lastindex(time),
@@ -518,10 +518,10 @@ function automatic_laser_times(
             ).beta[2],
         )
             if slope > 0
-                q = quantile(z[laser_start_ind:end, 1], [0.05,0.25,0.5,0.75, 0.95])
-                aerosol_arrival_ind = findfirst(≥(q[1]), z[:, 1])
+                q = quantile(z[laser_start_ind:end, 1], [0.05, 0.25, 0.5, 0.75, 0.95])
+                aerosol_arrival_ind = laser_start_ind + findfirst(≥(q[1]), z[laser_start_ind:end, 1]) - 1
                 aerosol_arrival_time = time[aerosol_arrival_ind]
-                q = quantile(z[aerosol_arrival_ind:end, 1], [0.05,0.25,0.5,0.75, 0.95])
+                q = quantile(z[aerosol_arrival_ind:end, 1], [0.05, 0.25, 0.5, 0.75, 0.95])
                 signal_start_ind = min(
                     aerosol_arrival_ind + findfirst(<(q[1]), z[aerosol_arrival_ind:end, 1]),
                     lastindex(time),
