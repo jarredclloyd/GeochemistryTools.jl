@@ -468,14 +468,12 @@ function automatic_laser_times(
             )],
         )
     end
-    pvalue_KS = pvalue(
+    if pvalue(
         ApproximateTwoSampleKSTest(
-            medians[begin:round(UInt, end / 2)],
-            medians[round(UInt, end / 2):end],
+            @view(medians[begin:round(UInt, end / 2)]),
+            @view(medians[round(UInt, end / 2):end]),
         ),
-    )
-    pvalue_JB = pvalue(JarqueBeraTest(signal; adjusted = true))
-    if pvalue_KS > 0.05 || pvalue_JB > 0.05
+    ) > 0.05 || pvalue(JarqueBeraTest(signal; adjusted = true)) > 0.05
         println("no signal detected")
     else
         z = Array{Float64}(undef, length(signal), 3)
@@ -496,18 +494,19 @@ function automatic_laser_times(
                 pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i - 1), 2]))))
             end
         end
-        laser_start_ind = findmin(z[:, 3])[2]
+        laser_start_ind = findmin(@view(z[:, 3]))[2]
         laser_start_time = time[laser_start_ind]
-        q = quantile(z[laser_start_ind:end, 1], [0.05, 0.25, 0.5, 0.75, 0.95])
-        aerosol_arrival_ind = laser_start_ind + findfirst(≥(q[2]), z[laser_start_ind:end, 1]) - 1
+        q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
+        aerosol_arrival_ind =
+            laser_start_ind + findfirst(≥(q[2]), @view(z[laser_start_ind:end, 1])) - 1
         aerosol_arrival_time = time[aerosol_arrival_ind]
-        q = quantile(z[aerosol_arrival_ind:end, 1], [0.05, 0.25, 0.5, 0.75, 0.95])
+        q = quantile(@view(z[aerosol_arrival_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
         signal_start_ind = min(
-            aerosol_arrival_ind + findfirst(>(q[4]), z[aerosol_arrival_ind:end, 1]),
+            aerosol_arrival_ind + findfirst(>(q[4]), @view(z[aerosol_arrival_ind:end, 1])),
             lastindex(time),
         )
-        q = quantile(z[signal_start_ind:end, 2], [0.05, 0.25, 0.5, 0.75, 0.95])
-        signal_end_ind = min(findlast(<(q[5]), z[:, 2]), lastindex(time))
+        q = quantile(@view(z[signal_start_ind:end, 2]), [0.05, 0.25, 0.5, 0.75, 0.95])
+        signal_end_ind = min(findlast(<(q[5]), @view(z[:, 2])), lastindex(time))
         signal_start_time = time[signal_start_ind]
         signal_end_time = time[signal_end_ind]
         slope = sign(
@@ -517,20 +516,25 @@ function automatic_laser_times(
                 1,
             ).beta[2],
         )
-            if slope > 0
-                q = quantile(z[laser_start_ind:end, 1], [0.05, 0.25, 0.5, 0.75, 0.95])
-                aerosol_arrival_ind = laser_start_ind + findfirst(≥(q[1]), z[laser_start_ind:end, 1]) - 1
-                aerosol_arrival_time = time[aerosol_arrival_ind]
-                q = quantile(z[aerosol_arrival_ind:end, 1], [0.05, 0.25, 0.5, 0.75, 0.95])
-                signal_start_ind = min(
-                    aerosol_arrival_ind + findfirst(<(q[1]), z[aerosol_arrival_ind:end, 1]),
-                    lastindex(time),
-                )
-                q = quantile(z[signal_start_ind:end, 2], [0.05, 0.25, 0.5, 0.75, 0.95])
-                signal_end_ind = min(findlast(<(q[5]), z[:, 2]), lastindex(time))
-                signal_start_time = time[signal_start_ind]
-                signal_end_time = time[signal_end_ind]
-            end
+        if slope > 0
+            q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
+            aerosol_arrival_ind =
+                laser_start_ind + findfirst(≥(q[1]), @view(z[laser_start_ind:end, 1])) - 1
+            aerosol_arrival_time = time[aerosol_arrival_ind]
+            q = quantile(
+                @view(z[aerosol_arrival_ind:end, 1]),
+                [0.05, 0.25, 0.5, 0.75, 0.95],
+            )
+            signal_start_ind = min(
+                aerosol_arrival_ind +
+                findfirst(<(q[1]), @view(z[aerosol_arrival_ind:end, 1])),
+                lastindex(time),
+            )
+            q = quantile(@view(z[signal_start_ind:end, 2]), [0.05, 0.25, 0.5, 0.75, 0.95])
+            signal_end_ind = min(findlast(<(q[5]), @view(z[:, 2])), lastindex(time))
+            signal_start_time = time[signal_start_ind]
+            signal_end_time = time[signal_end_ind]
+        end
         gas_blank_end_ind = max(
             laser_start_ind - (round(Int, gas_blank_trim / (time[2] - time[1]))),
             firstindex(time),
