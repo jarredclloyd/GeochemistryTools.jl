@@ -219,6 +219,9 @@ function _orthogonal_LSQ(
     rm_outlier::Bool = false,
     verbose::Bool = false,
 )
+    x = x[isfinite.(y) .== true]
+    y_weights = y_weights[isfinite.(y) .== true]
+    y = y[isfinite.(y) .== true]
     𝑁::Integer = length(x)
     x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
     @simd for i ∈ eachindex(x_sums)
