@@ -22,23 +22,23 @@ export poly_orthogonal, poly_confidenceband, poly_predictionband, poly_standarde
 
 # stucts and base extensions
 struct OrthogonalPolynomial <: LinearRegression
-    lambda::Vector{AbstractFloat}
-    lambda_se::SparseMatrixCSC
-    beta::AbstractFloat
-    gamma::Vector{AbstractFloat}
-    delta::Vector{AbstractFloat}
-    epsilon::Vector{AbstractFloat}
-    variance_covariance::Symmetric
-    order::Vector{Integer}
-    r_squared::Vector{AbstractFloat}
-    rmse::Vector{AbstractFloat}
-    chi_squared::Vector{AbstractFloat}
-    reduced_chi_squared::Vector{AbstractFloat}
-    akaike_information_criteria::Vector{AbstractFloat}
-    akaike_weights::Vector{AbstractFloat}
-    bayesian_information_criteria::Vector{AbstractFloat}
-    bayesian_weights::Vector{AbstractFloat}
-    n_observations::Integer
+    lambda::Union{Vector{AbstractFloat}, Nothing}
+    lambda_se::Union{SparseMatrixCSC, Nothing}
+    beta::Union{AbstractFloat, Nothing}
+    gamma::Union{Vector{AbstractFloat}, Nothing}
+    delta::Union{Vector{AbstractFloat}, Nothing}
+    epsilon::Union{Vector{AbstractFloat}, Nothing}
+    variance_covariance::Union{Symmetric, Nothing}
+    order::Union{Vector{Integer}, Nothing}
+    r_squared::Union{Vector{AbstractFloat}, Nothing}
+    rmse::Union{Vector{AbstractFloat}, Nothing}
+    chi_squared::Union{Vector{AbstractFloat}, Nothing}
+    reduced_chi_squared::Union{Vector{AbstractFloat}, Nothing}
+    akaike_information_criteria::Union{Vector{AbstractFloat}, Nothing}
+    akaike_weights::Union{Vector{AbstractFloat}, Nothing}
+    bayesian_information_criteria::Union{Vector{AbstractFloat}, Nothing}
+    bayesian_weights::Union{Vector{AbstractFloat}, Nothing}
+    n_observations::Union{Integer, Nothing}
 end
 
 function Base.show(io::IOContext, fit::OrthogonalPolynomial)
@@ -223,131 +223,154 @@ function _orthogonal_LSQ(
     y_weights = y_weights[isfinite.(y) .== true]
     y = y[isfinite.(y) .== true]
     𝑁::Integer = length(x)
-    x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
-    @simd for i ∈ eachindex(x_sums)
-        x_sums[i] = sum(x .^ i)
-    end
-    β::MultiFloat{Float64,4}         = _beta_orthogonal(𝑁, x_sums)
-    γ::Vector{MultiFloat{Float64,4}} = _gamma_orthogonal(𝑁, x_sums)
-    δ::Vector{MultiFloat{Float64,4}} = _delta_orthogonal(𝑁, x_sums)
-    ϵ::Vector{MultiFloat{Float64,4}} = _epsilon_orthogonal(𝑁, x_sums)
-    order::Vector{Integer}           = [0, 1, 2, 3, 4]
-    X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (x .- β), (x .- γ[1]) .* (x .- γ[2]), (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]), (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]))
-    if y_weights === nothing
-        ω::Vector{MultiFloat{Float64,4}} = fill(1.0, length(y))
-    elseif occursin("rel", lowercase(weight_type)) === true
-        ω = y_weights
-    elseif occursin("abs", lowercase(weight_type)) == true
-        ω = abs.(y_weights) ./ abs.(y)
-    else
-        throw(
-            ArgumentError(
-                "Value of 'weight_type' is unrecognised. String should contain either 'rel' or 'abs'.",
-            ),
-        )
-    end
-    Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} =
-        Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
-    Xᵀ::Transpose{MultiFloat{Float64,4},Matrix{MultiFloat{Float64,4}}} = transpose(X)
-    rss::Vector{Float64} = Vector{Float64}(undef, 5)
-    AIC::Vector{Float64} = Vector{Float64}(undef, 5)
-    VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
-    Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
-    @inbounds @simd for i ∈ eachindex(order)
-        residuals::Vector{MultiFloat{Float64,4}} = (y .- (view(X, :, 1:i) * Λ[1:i]))
-        rss[i] = transpose(residuals) * Ω * (residuals)
-    end
-    AIC = _akaike_information_criteria.(rss, 𝑁, order)
-    if rm_outlier === true
-        𝑁prev::Integer = 0
-        n_iterations::Integer = 0
-        n_outliers::Integer = 0
-        while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
-            n_iterations += 1
-            minAIC::Integer = findmin(AIC)[2]
-            Xvar::Matrix{MultiFloat{Float64,4}} =
-                view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :) * Ω
-            leverage::Vector{MultiFloat{Float64,4}} =
-                Vector{MultiFloat{Float64,4}}(undef, size(X, 1))
-            Threads.@threads for i ∈ axes(X, 1)
-                @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
-            end
-            studentised_residuals::Vector{MultiFloat{Float64,4}} =
-                y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
-            mse::Vector{MultiFloat{Float64,4}} = rss ./ (𝑁 .- (order .+ 1))
-            studentised_residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
-            outlier_inds::Vector{Integer} = findall(studentised_residuals .≥ 3)
-            n_outliers += length(outlier_inds)
-            if n_outliers > 0
-                X = view(X, Not(outlier_inds), :) # high allocs
-                y = y[Not(outlier_inds)] # high allocs
-                ω = ω[Not(outlier_inds)] # high allocs
-                Xᵀ = transpose(X)
-                Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
-                VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
-                Λ = VarΛX * Xᵀ * Ω * y
-                @inbounds @simd for i ∈ eachindex(order)
-                    residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
-                    rss[i] = transpose(residuals) * Ω * (residuals)
-                end
-                AIC = _akaike_information_criteria.(rss, 𝑁, order)
-            end
-            𝑁prev = 𝑁
-            𝑁 = size(X, 1)
+    if 𝑁 == length(y) && 𝑁 > 2
+        x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
+        @simd for i ∈ eachindex(x_sums)
+            x_sums[i] = sum(x .^ i)
         end
-        if verbose == true
-            println(
-                "Determined $n_outliers $(n_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
+        β::MultiFloat{Float64,4}         = _beta_orthogonal(𝑁, x_sums)
+        γ::Vector{MultiFloat{Float64,4}} = _gamma_orthogonal(𝑁, x_sums)
+        δ::Vector{MultiFloat{Float64,4}} = _delta_orthogonal(𝑁, x_sums)
+        ϵ::Vector{MultiFloat{Float64,4}} = _epsilon_orthogonal(𝑁, x_sums)
+        order::Vector{Integer}           = [0, 1, 2, 3, 4]
+        X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (x .- β), (x .- γ[1]) .* (x .- γ[2]), (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]), (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]))
+        if y_weights === nothing
+            ω::Vector{MultiFloat{Float64,4}} = fill(1.0, length(y))
+        elseif occursin("rel", lowercase(weight_type)) === true
+            ω = y_weights
+        elseif occursin("abs", lowercase(weight_type)) == true
+            ω = abs.(y_weights) ./ abs.(y)
+        else
+            throw(
+                ArgumentError(
+                    "Value of 'weight_type' is unrecognised. String should contain either 'rel' or 'abs'.",
+                ),
             )
         end
-    end
-    for i in eachindex(Λ)
-        Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
-    end
-    @inbounds @simd for i ∈ eachindex(order)
-        residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
-        rss[i] = transpose(residuals) * Ω * (residuals)
-    end
-    mse = rss ./ (𝑁 .- (order .+ 1))
-    Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
-    @inbounds for i ∈ eachindex(order)
-        Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
-    end
-    sparse(Λ_SE)
-    tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
-    rmse::Vector{Float64} = sqrt.(mse)
-    R²::Vector{Float64} = 1 .- (rss ./ (tss))
-    @inbounds for i ∈ eachindex(R²)
-        if R²[i] < 0
-            R²[i] = 0
-        else
-            R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
+        Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} =
+            Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
+        Xᵀ::Transpose{MultiFloat{Float64,4},Matrix{MultiFloat{Float64,4}}} = transpose(X)
+        rss::Vector{Float64} = Vector{Float64}(undef, 5)
+        AIC::Vector{Float64} = Vector{Float64}(undef, 5)
+        VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
+        Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
+        @inbounds @simd for i ∈ eachindex(order)
+            residuals::Vector{MultiFloat{Float64,4}} = (y .- (view(X, :, 1:i) * Λ[1:i]))
+            rss[i] = transpose(residuals) * Ω * (residuals)
         end
+        AIC = _akaike_information_criteria.(rss, 𝑁, order)
+        if rm_outlier === true
+            𝑁prev::Integer = 0
+            n_iterations::Integer = 0
+            n_outliers::Integer = 0
+            while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
+                n_iterations += 1
+                minAIC::Integer = findmin(AIC)[2]
+                Xvar::Matrix{MultiFloat{Float64,4}} =
+                    view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :) * Ω
+                leverage::Vector{MultiFloat{Float64,4}} =
+                    Vector{MultiFloat{Float64,4}}(undef, size(X, 1))
+                Threads.@threads for i ∈ axes(X, 1)
+                    @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
+                end
+                studentised_residuals::Vector{MultiFloat{Float64,4}} =
+                    y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
+                mse::Vector{MultiFloat{Float64,4}} = rss ./ (𝑁 .- (order .+ 1))
+                studentised_residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
+                outlier_inds::Vector{Integer} = findall(>=(3), studentised_residuals)
+                n_outliers += length(outlier_inds)
+                if n_outliers > 0
+                    X = view(X, Not(outlier_inds), :) # high allocs
+                    y = y[Not(outlier_inds)] # high allocs
+                    ω = ω[Not(outlier_inds)] # high allocs
+                    Xᵀ = transpose(X)
+                    Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
+                    VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
+                    Λ = VarΛX * Xᵀ * Ω * y
+                    @inbounds @simd for i ∈ eachindex(order)
+                        residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
+                        rss[i] = transpose(residuals) * Ω * (residuals)
+                    end
+                    AIC = _akaike_information_criteria.(rss, 𝑁, order)
+                end
+                𝑁prev = 𝑁
+                𝑁 = size(X, 1)
+            end
+            if verbose == true
+                println(
+                    "Determined $n_outliers $(n_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
+                )
+            end
+        end
+        for i in eachindex(Λ)
+            Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
+        end
+        @inbounds @simd for i ∈ eachindex(order)
+            residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
+            rss[i] = transpose(residuals) * Ω * (residuals)
+        end
+        mse = rss ./ (𝑁 .- (order .+ 1))
+        Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
+        @inbounds for i ∈ eachindex(order)
+            Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
+        end
+        sparse(Λ_SE)
+        tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
+        rmse::Vector{Float64} = sqrt.(mse)
+        R²::Vector{Float64} = 1 .- (rss ./ (tss))
+        @inbounds for i ∈ eachindex(R²)
+            if R²[i] < 0
+                R²[i] = 0
+            else
+                R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
+            end
+        end
+        BIC::Vector{Float64} = Vector{Float64}(undef, 5)
+        BIC = _bayesian_information_criteria.(rss, 𝑁, order)
+        BICw = exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
+        AIC = _akaike_information_criteria.(rss, 𝑁, order)
+        AICw = exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
+        return OrthogonalPolynomial(
+            Λ,
+            Λ_SE,
+            Float64.(β),
+            Float64.(γ),
+            Float64.(δ),
+            Float64.(ϵ),
+            VarΛX,
+            order,
+            R²,
+            rmse,
+            rss,
+            mse,
+            AIC,
+            AICw,
+            BIC,
+            BICw,
+            𝑁,
+        )
+    else
+        println("Unable to fit data as there are less than three values")
+        return OrthogonalPolynomial(
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
+        )
     end
-    BIC::Vector{Float64} = Vector{Float64}(undef, 5)
-    BIC = _bayesian_information_criteria.(rss, 𝑁, order)
-    BICw = exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
-    AIC = _akaike_information_criteria.(rss, 𝑁, order)
-    AICw = exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
-    return OrthogonalPolynomial(
-        Λ,
-        Λ_SE,
-        Float64.(β),
-        Float64.(γ),
-        Float64.(δ),
-        Float64.(ϵ),
-        VarΛX,
-        order,
-        R²,
-        rmse,
-        rss,
-        mse,
-        AIC,
-        AICw,
-        BIC,
-        BICw,
-        𝑁,
-    )
 end
 
 # polynomial functions
