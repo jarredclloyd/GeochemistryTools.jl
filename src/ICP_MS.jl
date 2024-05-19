@@ -155,7 +155,7 @@ function load_agilent(
                     findlast("_", file)[1],
                 )[1] - 1)],
             )
-        elseif ismissing(spot_size_value) !== true && typeof(spot_size) <: Number
+        elseif ismissing(spot_size_value) !== true && typeof(spot_size_value) <: Number
             spot_size = spot_size_value
         end
         head_info = split(readuntil(file, "Time "), "\n")
