@@ -319,7 +319,7 @@ function _orthogonal_LSQ(
         rmse::Vector{Float64} = sqrt.(mse)
         R²::Vector{Float64} = 1 .- (rss ./ (tss))
         @inbounds for i ∈ eachindex(R²)
-            if R²[i] < 0
+            if R²[i] < Base.rtoldefault(Float64)
                 R²[i] = 0
             else
                 R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
@@ -351,25 +351,7 @@ function _orthogonal_LSQ(
         )
     else
         println("Unable to fit data as there are less than three values")
-        return OrthogonalPolynomial(
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-        )
+        return OrthogonalPolynomial(fill(nothing,length(fieldnames(OrthogonalPolynomial)))...)
     end
 end
 
