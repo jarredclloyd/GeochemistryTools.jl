@@ -1,6 +1,6 @@
 function _olkin_pratt(R²::AbstractFloat, 𝑛::Integer, predictors::Integer)
     z = 1 - R²
-    _₂F₁ = HypergeometricFunctions._₂F₁positive(1, 1, (𝑛 - predictors + 1) / 2, z)
+    _₂F₁ = HypergeometricFunctions._₂F₁(1, 1, (𝑛 - predictors + 1) / 2, z)
     return 1 - ((𝑛 - 3) / (𝑛 - predictors + 1) * z) * _₂F₁
 end
 
@@ -55,8 +55,8 @@ function _chi_squared(
     return χ²
 end
 
-function _reduced_chi_squared_ci(dof::Integer, confidence_level::AbstractFloat=0.95)
+function _reduced_chi_squared_ci(dof::Integer, confidence_level::AbstractFloat = 0.95)
     lower_χ²ᵣ = cquantile(Chisq(dof), 1 - (1 - confidence_level) / 2) / dof
-    upper_χ²ᵣ = cquantile(Chisq(dof), (1 - confidence_level)/2) / dof
-    return(lower_χ²ᵣ, upper_χ²ᵣ)
+    upper_χ²ᵣ = cquantile(Chisq(dof), (1 - confidence_level) / 2) / dof
+    return (lower_χ²ᵣ, upper_χ²ᵣ)
 end
