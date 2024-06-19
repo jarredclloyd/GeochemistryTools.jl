@@ -77,6 +77,19 @@ function _check_equal_length(
     end
 end
 
+function timeout(f, arg, seconds, fail)
+    tsk = @task f(arg)
+    schedule(tsk)
+    Timer(seconds) do timer
+        return istaskdone(tsk) || Base.throwto(tsk, InterruptException())
+    end
+    try
+        fetch(tsk)
+    catch _
+        fail
+    end
+end
+
 const pybaselines = PyNULL()
 
 pyimport_conda("scipy", "scipy")
