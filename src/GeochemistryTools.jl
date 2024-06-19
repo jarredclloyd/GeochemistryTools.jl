@@ -77,8 +77,8 @@ function _check_equal_length(
     end
 end
 
-function timeout(f, arg, seconds, fail)
-    tsk = @task f(arg)
+function timeout(f, args, seconds, fail)
+    tsk = @task f(args...)
     schedule(tsk)
     Timer(seconds) do timer
         return istaskdone(tsk) || Base.throwto(tsk, InterruptException())
