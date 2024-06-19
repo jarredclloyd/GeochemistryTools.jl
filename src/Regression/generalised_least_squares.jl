@@ -26,6 +26,7 @@ function _GLS(
     order::Integer;
     y_weights::Union{Nothing,AbstractVector} = nothing,
     weight_by::AbstractString = "abs",
+    adjust_r::Bool = false
 )
     order = abs(order)
     if length(x) != length(y)
@@ -57,10 +58,12 @@ function _GLS(
     tss = transpose((y .- mean(y))) * Ω * (y .- mean(y))
     mse = ess / (length(x) - order)
     R² = 1 - (ess / tss)
-    if R² < 0
+    if R² ≤ Base.rtoldefault(Float64)
         R² = 0
     end
-    R² = _olkin_pratt(R², length(x), order)
+    if adjust_r == true
+        R² = _olkin_pratt(R², length(x), order)
+    end
     rmse = sqrt(mse)
     return GeneralisedLeastSquares(β, β_SE, C, R², rmse, length(x))
 end
