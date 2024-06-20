@@ -1,7 +1,8 @@
 function _olkin_pratt(R²::AbstractFloat, 𝑛::Integer, predictors::Integer)
     z = 1 - R²
-    _₂F₁ = HypergeometricFunctions._₂F₁(1, 1, (𝑛 - predictors + 1) / 2, z)
-    return 1 - ((𝑛 - 3) / (𝑛 - predictors + 1) * z) * _₂F₁
+    c = 𝑛 - predictors - 1
+    _₂F₁value = HypergeometricFunctions._₂F₁positive(1, 1, c / 2, z)
+    return 1 - ((𝑛 - 3) / c) * z * _₂F₁value
 end
 
 function _chi_squared_reduced(χ²::Real, 𝑛::Integer, predictors::Integer)
