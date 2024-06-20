@@ -322,7 +322,8 @@ function _orthogonal_LSQ(
             if R²[i] < Base.rtoldefault(Float64)
                 R²[i] = 0
             else
-                R²[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
+                R²ₒₚ = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
+                R²[i] = R²ₒₚ < Base.rtoldefault(Float64) ? 0 : R²ₒₚ
             end
         end
         BIC::Vector{Float64} = Vector{Float64}(undef, 5)
