@@ -20,7 +20,7 @@ https://doi.org/10.1007/s11004-021-09959-5
 export fit_orthogonal
 export poly_orthogonal, poly_confidenceband, poly_predictionband, poly_standarderror
 
-# stucts and base extensions
+# structs and base extensions
 struct OrthogonalPolynomial <: LinearRegression
     lambda::Union{Vector{AbstractFloat}, Nothing}
     lambda_se::Union{SparseMatrixCSC, Nothing}
