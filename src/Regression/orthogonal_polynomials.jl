@@ -31,6 +31,7 @@ struct OrthogonalPolynomial <: LinearRegression
     variance_covariance::Union{Symmetric, Nothing}
     order::Union{Vector{Integer}, Nothing}
     r_squared::Union{Vector{AbstractFloat}, Nothing}
+    OP_r_squared::Union{Vector{AbstractFloat},Nothing}
     rmse::Union{Vector{AbstractFloat}, Nothing}
     chi_squared::Union{Vector{AbstractFloat}, Nothing}
     reduced_chi_squared::Union{Vector{AbstractFloat}, Nothing}
@@ -318,12 +319,13 @@ function _orthogonal_LSQ(
         tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
         rmse::Vector{Float64} = sqrt.(mse)
         R²::Vector{Float64} = 1 .- (rss ./ (tss))
-        @inbounds for i ∈ eachindex(R²)
+        R²ₒₚ::Vector{Float64} = deepcopy(R²)
+        @inbounds for i ∈ eachindex(R²ₒₚ)
             if R²[i] < Base.rtoldefault(Float64)
-                R²[i] = 0
+                R²ₒₚ[i] = 0
             else
-                R²ₒₚ = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
-                R²[i] = R²ₒₚ < Base.rtoldefault(Float64) ? 0 : R²ₒₚ
+                R²ₒₚ[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
+                R²ₒₚ[i] = R²ₒₚ[i] < Base.rtoldefault(Float64) ? 0 : R²ₒₚ[i]
             end
         end
         BIC::Vector{Float64} = Vector{Float64}(undef, 5)
@@ -341,6 +343,7 @@ function _orthogonal_LSQ(
             VarΛX,
             order,
             R²,
+            R²ₒₚ,
             rmse,
             rss,
             mse,
