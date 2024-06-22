@@ -22,24 +22,24 @@ export poly_orthogonal, poly_confidenceband, poly_predictionband, poly_standarde
 
 # structs and base extensions
 struct OrthogonalPolynomial <: LinearRegression
-    lambda::Union{Vector{AbstractFloat}, Nothing}
-    lambda_se::Union{SparseMatrixCSC, Nothing}
-    beta::Union{AbstractFloat, Nothing}
-    gamma::Union{Vector{AbstractFloat}, Nothing}
-    delta::Union{Vector{AbstractFloat}, Nothing}
-    epsilon::Union{Vector{AbstractFloat}, Nothing}
-    variance_covariance::Union{Symmetric, Nothing}
-    order::Union{Vector{Integer}, Nothing}
-    r_squared::Union{Vector{AbstractFloat}, Nothing}
+    lambda::Union{Vector{AbstractFloat},Nothing}
+    lambda_se::Union{SparseMatrixCSC,Nothing}
+    beta::Union{AbstractFloat,Nothing}
+    gamma::Union{Vector{AbstractFloat},Nothing}
+    delta::Union{Vector{AbstractFloat},Nothing}
+    epsilon::Union{Vector{AbstractFloat},Nothing}
+    variance_covariance::Union{Symmetric,Nothing}
+    order::Union{Vector{Integer},Nothing}
+    r_squared::Union{Vector{AbstractFloat},Nothing}
     OP_r_squared::Union{Vector{AbstractFloat},Nothing}
-    rmse::Union{Vector{AbstractFloat}, Nothing}
-    chi_squared::Union{Vector{AbstractFloat}, Nothing}
-    reduced_chi_squared::Union{Vector{AbstractFloat}, Nothing}
-    akaike_information_criteria::Union{Vector{AbstractFloat}, Nothing}
-    akaike_weights::Union{Vector{AbstractFloat}, Nothing}
-    bayesian_information_criteria::Union{Vector{AbstractFloat}, Nothing}
-    bayesian_weights::Union{Vector{AbstractFloat}, Nothing}
-    n_observations::Union{Integer, Nothing}
+    rmse::Union{Vector{AbstractFloat},Nothing}
+    chi_squared::Union{Vector{AbstractFloat},Nothing}
+    reduced_chi_squared::Union{Vector{AbstractFloat},Nothing}
+    akaike_information_criteria::Union{Vector{AbstractFloat},Nothing}
+    akaike_weights::Union{Vector{AbstractFloat},Nothing}
+    bayesian_information_criteria::Union{Vector{AbstractFloat},Nothing}
+    bayesian_weights::Union{Vector{AbstractFloat},Nothing}
+    n_observations::Union{Integer,Nothing}
 end
 
 function Base.show(io::IOContext, fit::OrthogonalPolynomial)
@@ -306,10 +306,6 @@ function _orthogonal_LSQ(
         for i in eachindex(Λ)
             Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
         end
-        @inbounds @simd for i ∈ eachindex(order)
-            residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
-            rss[i] = transpose(residuals) * Ω * (residuals)
-        end
         mse = rss ./ (𝑁 .- (order .+ 1))
         Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
         @inbounds for i ∈ eachindex(order)
@@ -321,18 +317,19 @@ function _orthogonal_LSQ(
         R²::Vector{Float64} = 1 .- (rss ./ (tss))
         R²ₒₚ::Vector{Float64} = deepcopy(R²)
         @inbounds for i ∈ eachindex(R²ₒₚ)
-            if R²[i] < Base.rtoldefault(Float64)
+            if R²ₒₚ[i] < Base.rtoldefault(Float64)
                 R²ₒₚ[i] = 0
             else
                 R²ₒₚ[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
-                R²ₒₚ[i] = R²ₒₚ[i] < Base.rtoldefault(Float64) ? 0 : R²ₒₚ[i]
             end
         end
         BIC::Vector{Float64} = Vector{Float64}(undef, 5)
         BIC = _bayesian_information_criteria.(rss, 𝑁, order)
-        BICw = exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
+        BICw =
+            exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
         AIC = _akaike_information_criteria.(rss, 𝑁, order)
-        AICw = exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
+        AICw =
+            exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
         return OrthogonalPolynomial(
             Λ,
             Λ_SE,
@@ -355,7 +352,9 @@ function _orthogonal_LSQ(
         )
     else
         println("Unable to fit data as there are less than three values")
-        return OrthogonalPolynomial(fill(nothing,length(fieldnames(OrthogonalPolynomial)))...)
+        return OrthogonalPolynomial(
+            fill(nothing, length(fieldnames(OrthogonalPolynomial)))...,
+        )
     end
 end
 
