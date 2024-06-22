@@ -1,7 +1,17 @@
 function _olkin_pratt(R²::AbstractFloat, 𝑛::Integer, predictors::Integer)
     z = 1 - R²
     c = (𝑛 - predictors + 1) / 2
-    _₂F₁value = HypergeometricFunctions._₂F₁positive(1, 1, c, z)
+    if z ≤ 0
+        _₂F₁value = 0
+    elseif z == 1
+        _₂F₁value = (c - 1) / (c - 2)
+    else
+        _₂F₁value = HypergeometricFunctions._₂F₁(1, 1, c, z)
+        if isfinite(_₂F₁value)
+        else
+            _₂F₁value = HypergeometricFunctions._₂F₁positive(1, 1, c, z)
+        end
+    end
     return 1 - ((𝑛 - 3) / (𝑛 - predictors - 1)) * z * _₂F₁value
 end
 
