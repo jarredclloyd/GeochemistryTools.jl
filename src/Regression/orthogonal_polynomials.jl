@@ -315,14 +315,7 @@ function _orthogonal_LSQ(
         tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
         rmse::Vector{Float64} = sqrt.(mse)
         R²::Vector{Float64} = 1 .- (rss ./ (tss))
-        R²ₒₚ::Vector{Float64} = deepcopy(R²)
-        @inbounds for i ∈ eachindex(R²ₒₚ)
-            if R²ₒₚ[i] < Base.rtoldefault(Float64)
-                R²ₒₚ[i] = 0
-            else
-                R²ₒₚ[i] = _olkin_pratt(R²[i], 𝑁, order[i] + 1)
-            end
-        end
+        R²ₒₚ::Vector{Float64} = _olkin_pratt.(R², 𝑁, order .+ 1)
         BIC::Vector{Float64} = Vector{Float64}(undef, 5)
         BIC = _bayesian_information_criteria.(rss, 𝑁, order)
         BICw =
