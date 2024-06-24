@@ -33,7 +33,6 @@ using Dates
 using SparseArrays
 using LinearAlgebra
 using MultiFloats
-using HypergeometricFunctions
 using SpecialFunctions
 using PyCall
 using Conda
