@@ -204,8 +204,8 @@ function load_agilent(
         if automatic_times == true && isnothing(auto_times) == true
             df = nothing
         else
-            df = select!(df, r"Time", r"" * cps_column1, r"" * cps_column2)
-            rename!(df, ["signal_time", cps_column1, cps_column2])
+            df = select!(df, r"Time", "total_signal", r"" * cps_column1, r"" * cps_column2)
+            rename!(df, ["signal_time", "total_cps", cps_column1, cps_column2])
             insertcols!(df, 1, "sample" => sample_name)
             insertcols!(df, 2, "analysis_name" => analysis_name)
             insertcols!(df, 3, "spot_size" => spot_size)
@@ -516,7 +516,7 @@ function automatic_laser_times(
                 1,
             ).beta[2],
         )
-        if slope > 0
+        if slope > 0 || signal_end_time - signal_start_time < 10
             q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
             aerosol_arrival_ind =
                 laser_start_ind + findfirst(≥(q[1]), @view(z[laser_start_ind:end, 1])) - 1
