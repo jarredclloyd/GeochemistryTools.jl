@@ -1,18 +1,21 @@
-function _olkin_pratt(R²::AbstractFloat, 𝑛::Integer, predictors::Integer)
-    z = 1 - R²
-    c = (𝑛 - predictors + 1) / 2
-    if z ≤ 0
-        _₂F₁value = 0
-    elseif z == 1
-        _₂F₁value = (c - 1) / (c - 2)
-    else
-        _₂F₁value = HypergeometricFunctions._₂F₁(1, 1, c, z)
-        if isfinite(_₂F₁value)
+function _olkin_pratt(R²::Real, 𝑛::Integer, predictors::Integer)
+    if R² ≥ Base.rtoldefault(typeof(R²))
+        z = 1 - R²
+        c = (𝑛 - predictors + 1) / 2
+        if z == 0
+            _₂F₁value = 0
+        elseif z == 1
+            _₂F₁value = (c - 1) / (c - 2)
         else
-            _₂F₁value = HypergeometricFunctions._₂F₁positive(1, 1, c, z)
+            _₂F₁value = _hypergeometric2F1_taylor(1, 1, c, z)
         end
+        OP_R² = 1 - ((𝑛 - 3) / (𝑛 - predictors - 1)) * z * _₂F₁value
     end
-    return 1 - ((𝑛 - 3) / (𝑛 - predictors - 1)) * z * _₂F₁value
+    if R² ≤ Base.rtoldefault(typeof(R²)) || OP_R² ≤ Base.rtoldefault(typeof(R²))
+        return zero(typeof(R²))
+    else
+        return OP_R²
+    end
 end
 
 function _chi_squared_reduced(χ²::Real, 𝑛::Integer, predictors::Integer)
@@ -70,4 +73,15 @@ function _reduced_chi_squared_ci(dof::Integer, confidence_level::AbstractFloat =
     lower_χ²ᵣ = cquantile(Chisq(dof), 1 - (1 - confidence_level) / 2) / dof
     upper_χ²ᵣ = cquantile(Chisq(dof), (1 - confidence_level) / 2) / dof
     return (lower_χ²ᵣ, upper_χ²ᵣ)
+end
+
+function _hypergeometric2F1_taylor(a::Real, b::Real, c::Real, z::Real, tol = eps(Float64))
+    Cⱼ, Sⱼ = 1, 1
+    j = 0
+    while abs(Cⱼ) / abs(Sⱼ) > tol && j ≤ 10e4
+        Cⱼ *= (a + j) * (b + j) / (c + j) * z / (j + 1)
+        Sⱼ += Cⱼ
+        j += 1
+    end
+    return Sⱼ
 end
