@@ -26,10 +26,12 @@ corrected intensities, and normalised intensities using the function `fit_base()
 julia> load_raman('path/to/dir', "G17560"; firstrow = 58, trailing_rows = 0, process = true)
 ```
 """
-function load_raman(hostdir, sample::String;
+function load_raman(hostdir, sample::AbstractString;
     firstrow::Int=11,
     trailing_rows::Int=0,
-    process::Bool=true)
+    process::Bool=true,
+    normalise::Bool=true,
+    normalisation::AbstractString="area")
     file = glob(sample * "*.txt", hostdir)
     data = CSV.read(file, DataFrame; header=[:wavenumber, :intensity], skipto=firstrow,
      types=Float64, footerskip=trailing_rows, ignoreemptyrows=true)
@@ -70,12 +72,10 @@ function fit_base(data::DataFrame; intensity_col=:intensity, λ=Nothing)
         output = pybaselines.whittaker.iarpls(data[!, intensity_col])
         data.baseline = output[1]
         data.corr_intensity = data[!, intensity_col] .- data[!, :baseline]
-        data.norm_intensity = data[!, :corr_intensity] ./ maximum(data[!, :corr_intensity])
     elseif λ > 0
         output = pybaselines.whittaker.iarpls(data[!, intensity_col], λ)
         data.baseline = output[1]
         data.corr_intensity = data[!, intensity_col] .- data[!, :baseline]
-        data.norm_intensity = data[!, :corr_intensity] ./ maximum(data[!, :corr_intensity])
     end
     return data
 end
@@ -355,4 +355,16 @@ function _hehlen_correction(
     density::AbstractFloat
 )
     ω * I * (1 / (ν^3 * density)) * temp_cor_boltz
+end
+
+function _integral_trapezoidal(x::AbstractVector, y::AbstractVector)
+    if length(x) ≠ length(y)
+        error("Vector lengths are not equal")
+    else
+        area = 0.0
+        for i ∈ firstindex(x):lastindex(x)-1
+            area += (x[i+1] - x[i]) * (y[i] + y[i+1]) / 2
+        end
+    end
+    return area
 end
