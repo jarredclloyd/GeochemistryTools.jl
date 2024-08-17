@@ -2,7 +2,7 @@
 This jl file contains dictionaries and other reference information for that are used in "GeochemistryTools.jl"
 =#
 
-export Avogadro,
+export avogadro,
     element_symbol_to_mass,
     molecular_weight_oxide,
     dict_sr87_sr86i, cn_eight_IR,
@@ -223,7 +223,7 @@ ci_chondrite_PO2016::AbstractDict = Dict([
 # Initial Sr87/86 ratios
 """
     dict_sr87_sr86i["key"]
-Return the inital ⁸⁷Sr/⁸⁶Sr for a given reference material and its standard error
+Return the initial ⁸⁷Sr/⁸⁶Sr for a given reference material and its standard error
 
 type 'keys(dict_sr87_sr86i)' for a list of available materials
 """
