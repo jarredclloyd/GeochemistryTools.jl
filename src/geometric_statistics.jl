@@ -2,7 +2,7 @@
 
 Author: Jarred C Lloyd: https://github.com/jarredclloyd
 Created: 2023-10-05
-Edited: 2023-10-05
+Edited: 2024-08-17
 
 This source file contains functions to compute geometric means and variances based on
 Habib (2012).
@@ -16,15 +16,15 @@ www.arpapress.com/Volumes/Vol11Issue3/IJRRAS_11_3_08.pdf
 export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros
 
 """
-    geomean_zeros(a::AbstractVector)
+    geomean_zeros(x::AbstractVector)
 
     Computes the geometric mean for x ≥ 0.
 """
-function geomean_zeros(a::AbstractVector)
-    N = length(a)
-    N2 = count(a .> 0)
+function geomean_zeros(x::AbstractVector)
+    N = length(x)
+    N2 = count(x .> 0)
     if N2 > 0
-        G₊ = geomean(a[a[:] .> 0, :])
+        G₊ = geomean(x[x[:] .> 0, :])
         G = (N2 / N) * G₊
     else
         G = 0
@@ -34,15 +34,15 @@ function geomean_zeros(a::AbstractVector)
 end
 
 """
-    geovar_zeros(a::AbstractVector)
+    geovar_zeros(x::AbstractVector)
 
     Computes the variance of the geometric mean for x ≥ 0
 """
-function geovar_zeros(a::AbstractVector)
-    N = length(a)
-    N2 = count(a .> 0)
+function geovar_zeros(x::AbstractVector)
+    N = length(x)
+    N2 = count(x .> 0)
     if N2 > 0
-        var₊ = exp(var(log.(a[a[:] .> 0, :])))
+        var₊ = exp(var(log.(x[x[:] .> 0, :])))
         varG = (N2 / N) * var₊
     else
         varG = 0
@@ -50,15 +50,15 @@ function geovar_zeros(a::AbstractVector)
     return varG
 end
 
-function geostd_zeros(a::AbstractVector)
-    return sqrt(geovar_zeros(a))
+function geostd_zeros(x::AbstractVector)
+    return sqrt(geovar_zeros(x))
 end
 
-function geosem_zeros(a::AbstractVector)
-    N = length(a)
-    N2 = count(a .> 0)
+function geosem_zeros(x::AbstractVector)
+    N = length(x)
+    N2 = count(x .> 0)
     if N2 > 0
-        sem₊ = exp(sem(log.(a[a[:] .> 0, :])))
+        sem₊ = exp(sem(log.(x[x[:] .> 0, :])))
         semG = (N2 / N) * sem₊
     else
         semG = 0
@@ -67,15 +67,15 @@ function geosem_zeros(a::AbstractVector)
 end
 
 """
-    tri_geomean(a::AbstractVector)
+    tri_geomean(x::AbstractVector)
 
     Computes the geometric mean for x ∈ R. Only defined for odd values of 𝑁ₜ(negative)
     and 𝑁ₜ(total)
 """
-function tri_geomean(a::AbstractVector)
-    𝑁ₜ = length(a)
-    𝑁₁ = count(a .< 0)
-    𝑁₂ = count(a .> 0)
+function tri_geomean(x::AbstractVector)
+    𝑁ₜ = length(x)
+    𝑁₁ = count(x .< 0)
+    𝑁₂ = count(x .> 0)
     # if 𝑁₁ > 0 && isodd(𝑁₁) !== true && isodd(𝑁ₜ) !== true
     #     throw(
     #         DomainError(
@@ -83,15 +83,15 @@ function tri_geomean(a::AbstractVector)
     #         ),
     #     )
     # end
-    𝑁₁ > 0 ? G₋ = -(geomean(abs.(a[a[:] .< 0, :]))) : G₋ = 0
-    𝑁₂ > 0 ? G₊ = geomean(a[a[:] .> 0, :]) : G₊ = 0
+    𝑁₁ > 0 ? G₋ = -(geomean(abs.(x[x[:] .< 0, :]))) : G₋ = 0
+    𝑁₂ > 0 ? G₊ = geomean(x[x[:] .> 0, :]) : G₊ = 0
     return (𝑁₁ * G₋ + 𝑁₂ * G₊) / 𝑁ₜ
 end
 
-function tri_geovar(a::AbstractVector)
-    𝑁ₜ = length(a)
-    𝑁₁ = count(a .< 0)
-    𝑁₂ = count(a .> 0)
+function tri_geovar(x::AbstractVector)
+    𝑁ₜ = length(x)
+    𝑁₁ = count(x .< 0)
+    𝑁₂ = count(x .> 0)
     if 𝑁₁ > 0 && isodd(𝑁₁) !== true && isodd(𝑁ₜ) !== true
         throw(
             DomainError(
@@ -101,8 +101,8 @@ function tri_geovar(a::AbstractVector)
     end
     if 𝑁₁ > 0
         𝑁₁𝑁 = 𝑁₁ / 𝑁ₜ
-        G₋ = geomean(abs.(a[a[:] .< 0, :]))
-        varlogG₋ = -(var(log.(abs.(a[a[:] .< 0, :]))))
+        G₋ = geomean(abs.(x[x[:] .< 0, :]))
+        varlogG₋ = -(var(log.(abs.(x[x[:] .< 0, :]))))
         𝐸G₋ = _expectation_g_negative(G₋, varlogG₋, 𝑁₁, 𝑁ₜ)
         varG₋ = (𝑁₁𝑁)^2 * (varlogG₋ / 𝑁₁) * (G₋)^2
     else
@@ -114,8 +114,8 @@ function tri_geovar(a::AbstractVector)
     end
     if 𝑁₂ > 0
         𝑁₂𝑁 = 𝑁₂ / 𝑁ₜ
-        G₊ = geomean(a[a[:] .> 0, :])
-        varlogG₊ = var(log.(abs.(a[a[:] .> 0, :])))
+        G₊ = geomean(x[x[:] .> 0, :])
+        varlogG₊ = var(log.(abs.(x[x[:] .> 0, :])))
         𝐸G₊ = _expectation_g_positive(G₊, varlogG₊, 𝑁₂, 𝑁ₜ)
         varG₊ = (𝑁₂𝑁)^2 * (varlogG₊ / 𝑁₂) * (G₊)^2
     else
@@ -167,18 +167,18 @@ function _expectation_g_weighted(
     return G + (G / 2) * ((𝑁₁𝑁)^2 * (varlogG₋ / 𝑁₁) + (𝑁₂𝑁)^2 * (varlogG₊ / 𝑁₂))
 end
 
-function _geomean_zeros_cruz(a::AbstractVector, ϵ::AbstractFloat = 1e-5)
-    G₊ = geomean(a[a[:] .> 0, :])
+function _geomean_zeros_cruz(x::AbstractVector, ϵ::AbstractFloat = 1e-5)
+    G₊ = geomean(x[x[:] .> 0, :])
     δmin = 0
-    δmax = G₊ - minimum(a[a[:] .> 0, :])
+    δmax = G₊ - minimum(x[x[:] .> 0, :])
     δ = (δmin + δmax) / 2
     ϵ = ϵ * G₊
-    auxExp = geomean(a[a[:] .> 0, :] .+ δ) - δ
+    auxExp = geomean(x[x[:] .> 0, :] .+ δ) - δ
     while (auxExp - G₊) > ϵ
         auxExp < G₊ ? δmin = δ : δmax = δ
         δ = (δmin + δmax) / 2
-        auxExp = geomean(a[a[:] .> 0, :] .+ δ) - δ
+        auxExp = geomean(x[x[:] .> 0, :] .+ δ) - δ
     end
-    G = geomean(a .+ δ) - δ
+    G = geomean(x .+ δ) - δ
     return (G, δ)
 end
