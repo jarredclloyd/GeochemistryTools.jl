@@ -7,7 +7,7 @@ export load_raman, correct_raman, fit_base, plot_Raman_cor, plot_Raman_cor!
 """
     load_raman(hostdir, sample; [firstrow, trailing_rows, process])
 
-Loads Raman spectra data from txt file in hostdir.
+Loads Raman spectra data from text (*.txt) file in hostdir.
 
 # Description
 Sample is a string representing a unique substring of the desired filename (e.g., "G17560-53
