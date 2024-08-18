@@ -36,6 +36,3 @@ function cartesian2ternary(x, y)
     a = 1 - b - c
     return a, b, c
 end
-
-
-
