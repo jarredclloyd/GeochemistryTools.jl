@@ -1,10 +1,21 @@
+cd(@__DIR__)
+
 using Documenter
+using DocumenterCitations
 using GeochemistryTools
 
+pages = [
+    "Introduction" => "index.md"
+]
+
+bib = CitationBibliography(joinpath(@__DIR__, "src", "GeochemistryTools.jl.bib");
+style = :authoryear)
 makedocs(
     sitename = "GeochemistryTools.jl",
     format = Documenter.HTML(),
-    modules = [GeochemistryTools]
+    plugins = [bib],
+    modules = [GeochemistryTools],
+    checkdocs = :exports
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.

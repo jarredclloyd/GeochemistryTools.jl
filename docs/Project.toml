@@ -1,2 +1,4 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterCitations = "daee34ce-89f3-4625-b898-19384cb65244"
+GeochemistryTools = "353b66c2-bbc9-4dac-8f82-6fcd8c646e7a"
