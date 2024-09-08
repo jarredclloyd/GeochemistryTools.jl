@@ -303,7 +303,7 @@ function _orthogonal_LSQ(
         AIC::Vector{Float64} = Vector{Float64}(undef, 5)
         VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
         Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
-        @inbounds @simd for i ∈ eachindex(order)
+        @simd for i ∈ eachindex(order)
             residuals::Vector{MultiFloat{Float64,4}} = (y .- (view(X, :, 1:i) * Λ[1:i]))
             rss[i] = transpose(residuals) * Ω * (residuals)
         end
@@ -320,7 +320,7 @@ function _orthogonal_LSQ(
                 leverage::Vector{MultiFloat{Float64,4}} =
                     Vector{MultiFloat{Float64,4}}(undef, size(X, 1))
                 Threads.@threads for i ∈ axes(X, 1)
-                    @inbounds leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
+                    leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
                 end
                 studentised_residuals::Vector{MultiFloat{Float64,4}} =
                     y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
@@ -336,7 +336,7 @@ function _orthogonal_LSQ(
                     Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
                     VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
                     Λ = VarΛX * Xᵀ * Ω * y
-                    @inbounds @simd for i ∈ eachindex(order)
+                    @simd for i ∈ eachindex(order)
                         residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
                         rss[i] = transpose(residuals) * Ω * (residuals)
                     end
@@ -356,7 +356,7 @@ function _orthogonal_LSQ(
         end
         mse = rss ./ (𝑁 .- (order .+ 1))
         Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
-        @inbounds for i ∈ eachindex(order)
+        for i ∈ eachindex(order)
             Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
         end
         sparse(Λ_SE)

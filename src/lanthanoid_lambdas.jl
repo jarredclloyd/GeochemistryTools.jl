@@ -80,13 +80,13 @@ function LambdaREE(
             Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
         end
         rss::Vector{Float64} = Vector{Float64}(undef, 5)
-        @inbounds @simd for i ∈ eachindex(order)
+        @simd for i ∈ eachindex(order)
             residuals::Vector{MultiFloat{Float64,4}} = (y .- (view(X, :, 1:i) * Λ[1:i]))
             rss[i] = transpose(residuals) * Ω * (residuals)
         end
         mse = rss ./ (𝑁 .- (order .+ 1))
         Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
-        @inbounds for i ∈ eachindex(order)
+        for i ∈ eachindex(order)
             Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
         end
         sparse(Λ_SE)
