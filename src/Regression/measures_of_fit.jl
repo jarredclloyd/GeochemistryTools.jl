@@ -78,7 +78,7 @@ end
 function _hypergeometric2F1_taylor(a::Real, b::Real, c::Real, z::Real, tol = eps(Float64))
     Cⱼ, Sⱼ = 1, 1
     j = 0
-    while abs(Cⱼ) / abs(Sⱼ) > tol && j ≤ 10e4
+    while abs(Cⱼ) / abs(Sⱼ) > tol && j ≤ 1000
         Cⱼ *= (a + j) * (b + j) / (c + j) * z / (j + 1)
         Sⱼ += Cⱼ
         j += 1
