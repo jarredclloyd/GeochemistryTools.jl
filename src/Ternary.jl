@@ -7,7 +7,7 @@ export ternary2cartesian, cartesian2ternary
 """
     ternary2cartesian(x, y)
 
-Computes the cartesian coordinates (x, y) for a given set of ternary coordinates (a, b, c).
+Converts ternary coordinates (a, b, c) to cartesian coordinates (x, y).
 
 ```
 julia> cartesian2ternary(-1.1547005383792517, -0.15470053837925168, 2.3094010767585034)
@@ -23,7 +23,7 @@ end
 """
     cartesian2ternary(x, y)
 
-Computes the ternary coordinates (a, b, c) for a given set of cartesian coordinates (x, y).
+Converts cartesian coordinates (x, y) to ternary coordinates (a, b, c).
 
 ```
 julia> cartesian2ternary(1,2)
