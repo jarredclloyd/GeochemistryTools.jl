@@ -1,17 +1,16 @@
-#= Preamble
+# SPDX-FileCopyrightText: 2024 Jarred Lloyd (https://github.com/jarredclloyd)
+# SPDX-License-Identifier: MIT
 
-Author: Jarred C Lloyd: https://github.com/jarredclloyd
-Created: 2023-10-05
-Edited: 2024-08-17
+#= Preamble
+Last updated: 2024-10-17
 
 This source file contains functions to compute geometric means and variances based on
 Habib (2012).
 
 Habib, EAE (2012) 'Geometric Mean for Negative and Zero Values',
-International Journal of Research and Reviews in Applied Sciences, 11(3),
-www.arpapress.com/Volumes/Vol11Issue3/IJRRAS_11_3_08.pdf
-
+International Journal of Research and Reviews in Applied Sciences, 11(3)
 =#
+
 # function exports
 export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros
 
