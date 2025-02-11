@@ -19,12 +19,25 @@ Converts a value representing an amount of a given element into its correspondin
     + For example, for Al2O3, set this to `2`
     + default is `1`.
 - `oxide::AbstractString`: The formula of the oxide to which the element should be converted.
+- `units::AbstractString`: The units of the output value ("wt%" or "ppm").
+    + Default is "wt%".
+
+
 
 ```julia-repl
 julia> element_to_oxide(1; element="Si",element_multiplicity=1,oxide="SiO2")
 2.1393352441651383
 ```
 """
-function element_to_oxide(value::Real; element::Union{AbstractString, AbstractChar}, element_multiplicity::Integer=1, oxide::AbstractString)
-    return value / (atomic_mass[element] * element_multiplicity) * molecular_mass(oxide; verbose=false)
+function element_to_oxide(value::Real; element::Union{AbstractString, AbstractChar}, element_multiplicity::Integer=1, oxide::AbstractString, units::AbstractString="wt%")
+    if length(element) == 1
+        element = only(element)
+    end
+    if units == "wt%"
+        return value / (atomic_mass[element] * element_multiplicity) * molecular_mass(oxide; verbose=false)
+    elseif units == "ppm"
+        return (value * 1e-4) / (atomic_mass[element] * element_multiplicity) * molecular_mass(oxide; verbose=false)
+    else
+        throw(ArgumentError("""Invalid units. Please choose `"wt%"`  or `"ppm"`."""))
+    end
 end
