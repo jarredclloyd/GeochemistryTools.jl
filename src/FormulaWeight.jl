@@ -28,22 +28,23 @@ Molecular weight of input formula {Al2O3} is:
 101.9612772 gmol⁻¹.
 ```
 """
-function molecular_mass(formula::Union{String, Vector{T} where T <: AbstractString};
+function molecular_mass(formula::Union{String, Vector{String}};
     verbose::Bool=true)
-    if isa(formula, Array)
+    println(typeof(formula))
+    if isa(formula, Vector{String})
         weight = zeros(size(formula))
         nformulas = length(formula)
-        @simd for i in 1:nformulas
+        for i in 1:nformulas
             weight[i] = computemass(formula[i])
-            if print == true
+            if verbose == true
                 printstyled("Molecular weight of input formula {" * string(formula[i]) * "} is:\n" * string(weight[i]) *
                         " gmol⁻¹.\n", bold=true)
             end
-            return weight
         end
+        return weight
     else
         weight = computemass(formula)
-        if print == true
+        if verbose == true
         printstyled("Molecular weight of input formula {" * string(formula) * "} is:\n" * string(weight) *
                     " gmol⁻¹.", bold=true)
         end
@@ -79,8 +80,8 @@ function computeionmass(formula, left_index)
             if right_index - left_index == 1
                 mass = atomic_mass[formula[left_index]]
                 left_index = left_index + 2
-            elseif right_index - left_index == 2    #e.g., (OH) (Mg) (B2)
-                right_index = right_index - 1
+            elseif right_index - left_index == 2   #e.g., (OH) (Mg) (B2)
+                right_index -= - 1
                 if formula[right_index] == uppercase(formula[right_index]) && isdigit(formula[right_index]) == false
                     ion_mass = atomic_mass[formula[left_index]]
                     ion_mass = ion_mass + atomic_mass[formula[right_index]]
