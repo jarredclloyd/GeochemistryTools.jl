@@ -3,7 +3,7 @@ This jl file contains dictionaries and other reference information for that are 
 =#
 
 export avogadro,
-    element_symbol_to_mass,
+    atomic_mass,
     molecular_weight_oxide,
     dict_sr87_sr86i, cn_eight_IR,
     ci_chondrite_PO2016,
@@ -51,7 +51,7 @@ const U238U235::AbstractFloat, SE238U235::AbstractFloat = 137.818, 0.0225
 element_symbol_to_name = Dict()
 
 """
-    element_symbol_to_mass(x)
+    atomic_mass(x)
 Return the IUPAC aggregate atomic mass (gmol⁻¹) for a given element.
 
 Single character elements must be entered as a character using ' '.
@@ -59,13 +59,13 @@ Double character elements must be entered as a string " ".
 
 #Examples
 ```julia-repl
-julia > element_symbol_to_mass('H')
+julia > atomic_mass('H')
 1.00794
-julia> element_symbol_to_mass("He")
+julia> atomic_mass("He")
 4.002602
 ```
 """
-const element_symbol_to_mass::AbstractDict = Dict{Any, AbstractFloat}(
+const atomic_mass::AbstractDict = Dict{Any, AbstractFloat}(
     [('H', 1.00794), ("He", 4.002602), ("Li", 6.941), ("Be", 9.012182), ('B', 10.811),
     ('C', 12.0107), ('N', 14.0067), ('O', 15.9994), ('F', 18.9984032), ("Ne", 20.1797),
     ("Na", 22.98976928), ("Mg", 24.305), ("Al", 26.9815386), ("Si", 28.0855),
