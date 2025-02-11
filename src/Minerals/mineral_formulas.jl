@@ -19,7 +19,6 @@ Units is the units the data is in, a string of value "ppm" OR "wt%"
 julia> formula_mica(df, "ppm")
 ```
 """
-
 function formula_mica(data::AbstractDataFrame, units::AbstractString; normalising_O::Int=11)
     I_site = [:Na, :K, :Ca, :Rb, :Cs, :Ba]
     M_site = [:Li, :Mg, :Ti, :V, :Cr, :Mn, :Zn, :Fe]
@@ -42,13 +41,29 @@ function formula_mica(data::AbstractDataFrame, units::AbstractString; normalisin
     end
 
     molecular_weights = [
-        molecular_weight_oxide["Na2O"], molecular_weight_oxide["K2O"], molecular_weight_oxide["CaO"],
-        molecular_weight_oxide["Rb2O"], molecular_weight_oxide["Cs2O"], molecular_weight_oxide["BaO"],
-        molecular_weight_oxide["Li2O"], molecular_weight_oxide["MgO"], molecular_weight_oxide["TiO2"],
-        molecular_weight_oxide["VO2"], molecular_weight_oxide["Cr2O3"], molecular_weight_oxide["MnO"],
-        molecular_weight_oxide["ZnO"], molecular_weight_oxide["FeO"], molecular_weight_oxide["Al2O3"],
-        molecular_weight_oxide["BeO"], molecular_weight_oxide["B2O3"], molecular_weight_oxide["SiO2"],
-        element_symbol_to_mass['F'], element_symbol_to_mass["Cl"], molecular_weight_oxide["H2O"]
+        molecular_mass["Na2O"],
+        molecular_mass["K2O"],
+        molecular_mass["CaO"],
+        molecular_mass["Rb2O"],
+        molecular_mass["Cs2O"],
+        molecular_mass["BaO"],
+        molecular_mass["Li2O"],
+        molecular_mass["MgO"],
+        molecular_mass["TiO2"],
+        molecular_mass["VO2"],
+        molecular_mass["Cr2O3"],
+        molecular_mass["MnO"],
+        molecular_mass["ZnO"],
+        molecular_mass["FeO"],
+        molecular_mass["Fe2O3"],
+        molecular_mass["AlO"],
+        molecular_mass["Al2O3"],
+        molecular_mass["BeO"],
+        molecular_mass["B2O3"],
+        molecular_mass["SiO2"],
+        atomic_mass['F'],
+        atomic_mass["Cl"],
+        molecular_mass["H2O"]
     ]
 
     moles_compound = weight_percent ./ molecular_weights
@@ -63,6 +78,7 @@ function formula_mica(data::AbstractDataFrame, units::AbstractString; normalisin
     # iterate OH
     iterations = 0
     H_initial = 2 - (normalised_oxygen_moles[19] + normalised_oxygen_moles[20])
+    println("Initial H: ", H_initial)
     O_OH = (0.5 * H_initial) / normalising_factor
     moles_oxygen[21] = O_OH
     oxygen_sum = sum(moles_oxygen) - 0.5 * (moles_oxygen[19] + moles_oxygen[20])
@@ -72,168 +88,177 @@ function formula_mica(data::AbstractDataFrame, units::AbstractString; normalisin
     ϵ = 1
     while ϵ > 1e-4 && iterations <= 1000
         H_iteration = 2 - (normalised_oxygen_moles[19] + normalised_oxygen_moles[20])
+        println("H iteration: ", H_iteration)
         O_OH = (0.5 * H_iteration) / normalising_factor
         moles_oxygen[21] = O_OH
         oxygen_sum = sum(moles_oxygen) - 0.5 * (moles_oxygen[19]+moles_oxygen[20])
         normalising_factor = normalising_O / oxygen_sum
         normalised_oxygen_moles = moles_oxygen .* normalising_factor
         ϵ = abs(H_iteration - H_initial)
+        println("Oxygen Sum: ", oxygen_sum, ", Normalising Factor: ", normalising_factor)  # Debugging statement
         iterations = iterations + 1
         H_initial = H_iteration
     end
 
-    element_oxy_ratio = [2, 2, 1, 2, 2, 1, 2, 1, 0.5, 0.5, 0.667, 1, 1, 1, 0.667, 1, 0.667, 0.5, 1, 1, 2]
+    element_oxy_ratio = [2, 2, 1, 2, 2, 1, 2, 1, 0.5, 0.5, 0.667, 1, 1, 1, 0.667, 1, 0.667, 0.5, 1, 1, 2]D
     atoms_per_formula_unit = normalised_oxygen_moles .* element_oxy_ratio
-    return atoms_per_formula_unit
+    return round.(atoms_per_formula_unit,digits=3)
 end
 
-# use lowercase.(names(data)) to make code shorter.
 function _find_columns_mica(data)
     workingdata = DataFrame()
-    if in("sample", lowercase.(names(data))) == true
-        workingdata.Sample = data[:, :Sample]
+    if "sample" in lowercase.(names(data))
+        workingdata.Sample = data[:, findfirst(lowercase.(names(data)) .== "sample")]
     else
         workingdata.Sample .= "sample"
     end
-    if in("Na", names(data)) == true
+    if "Na" in names(data)
         workingdata.Na = data[:, :Na]
-    elseif in("Na2O", names(data)) == true
+    elseif "Na2O" in names(data)
         workingdata.Na = data[:, :Na2O]
     else
         workingdata.Na .= 0
     end
-    if in("K", names(data)) == true
+    if "K" in names(data)
         workingdata.K = data[:, :K]
-    elseif in("K2O", names(data)) == true
+    elseif "K2O" in names(data)
         workingdata.K = data[:, :K2O]
     else
         workingdata.K .= 0
     end
-    if in("Ca", names(data)) == true
+    if "Ca" in names(data)
         workingdata.Ca = data[:, :Ca]
-    elseif in("CaO", names(data)) == true
+    elseif "CaO" in names(data)
         workingdata.Ca = data[:, :CaO]
     else
         workingdata.Ca .= 0
     end
-    if in("Rb", names(data)) == true
+    if "Rb" in names(data)
         workingdata.Rb = data[:, :Rb]
-    elseif in("Rb2O", names(data)) == true
+    elseif "Rb2O" in names(data)
         workingdata.Rb = data[:, :Rb2O]
     else
         workingdata.Rb .= 0
     end
-    if in("Cs", names(data)) == true
+    if "Cs" in names(data)
         workingdata.Cs = data[:, :Cs]
-    elseif in("Cs2O", names(data)) == true
+    elseif "Cs2O" in names(data)
         workingdata.Cs = data[:, :Cs2O]
     else
         workingdata.Cs .= 0
     end
-    if in("Ba", names(data)) == true
+    if "Ba" in names(data)
         workingdata.Ba = data[:, :Ba]
-    elseif in("BaO", names(data)) == true
+    elseif "BaO" in names(data)
         workingdata.Ba = data[:, :BaO]
     else
         workingdata.Ba .= 0
     end
-    if in("Li", names(data)) == true
+    if "Li" in names(data)
         workingdata.Li = data[:, :Li]
-    elseif in("Li2O", names(data)) == true
+    elseif "Li2O" in names(data)
         workingdata.Li = data[:, :Li2O]
     else
         workingdata.Li .= 0
     end
-    if in("Mg", names(data)) == true
+    if "Mg" in names(data)
         workingdata.Mg = data[:, :Mg]
-    elseif in("MgO", names(data)) == true
+    elseif "MgO" in names(data)
         workingdata.Mg = data[:, :MgO]
     else
         workingdata.Mg .= 0
     end
-    if in("Ti", names(data)) == true
+    if "Ti" in names(data)
         workingdata.Ti = data[:, :Ti]
-    elseif in("TiO2", names(data)) == true
+    elseif "TiO2" in names(data)
         workingdata.Ti = data[:, :TiO2]
     else
         workingdata.Ti .= 0
     end
-    if in("V", names(data)) == true
+    if "V" in names(data)
         workingdata.V = data[:, :V]
-    elseif in("VO2", names(data)) == true
+    elseif "VO2" in names(data)
         workingdata.V = data[:, :VO2]
     else
         workingdata.V .= 0
     end
-    if in("Cr", names(data)) == true
+    if "Cr" in names(data)
         workingdata.Cr = data[:, :Cr]
-    elseif in("Cr2O3", names(data)) == true
+    elseif "Cr2O3" in names(data)
         workingdata.Cr = data[:, :Cr2O3]
     else
         workingdata.Cr .= 0
     end
-    if in("Mn", names(data)) == true
+    if "Mn" in names(data)
         workingdata.Mn = data[:, :Mn]
-    elseif in("MnO", names(data)) == true
+    elseif "MnO" in names(data)
         workingdata.Mn = data[:, :MnO]
     else
         workingdata.Mn .= 0
     end
-    if in("Zn", names(data)) == true
+    if "Zn" in names(data)
         workingdata.Zn = data[:, :Zn]
-    elseif in("ZnO", names(data)) == true
+    elseif "ZnO" in names(data)
         workingdata.Zn = data[:, :ZnO]
     else
         workingdata.Zn .= 0
     end
-    if in("Fe", names(data)) == true
-        workingdata.Fe = data[:, :Fe]
-    elseif in("FeO", names(data)) == true
-        workingdata.Fe = data[:, :FeO]
+    if "FeO" in names(data)
+            workingdata.FeO = data[:, :FeO]
+    else
+        workingdata.FeO = 0
+    end
+    if "Fe2O3" in names(data)
+        workingdata.Fe2O3 = data[:, :Fe2O3]
+    end
+    if "Fe" in names(data)
+            workingdata.FeO = 0
+            workingdata.Fe2O3 = 0
+            workingdata.Fe = data[:, :Fe]
     else
         workingdata.Fe .= 0
     end
-    if in("Al", names(data)) == true
+    if "Al" in names(data)
         workingdata.Al = data[:, :Al]
-    elseif in("Al2O3", names(data)) == true
+    elseif "Al2O3" in names(data)
         workingdata.Al = data[:, :Al2O3]
     else
         workingdata.Al .= 0
     end
-    if in("Be", names(data)) == true
+    if "Be" in names(data)
         workingdata.Be = data[:, :Be]
-    elseif in("BeO", names(data)) == true
+    elseif "BeO" in names(data)
         workingdata.Be = data[:, :BeO]
     else
         workingdata.Be .= 0
     end
-    if in("B", names(data)) == true
+    if "B" in names(data)
         workingdata.B = data[:, :B]
-    elseif in("B2O3", names(data)) == true
+    elseif "B2O3" in names(data)
         workingdata.B = data[:, :B2O3]
     else
         workingdata.B .= 0
     end
-    if in("Si", names(data)) == true
+    if "Si" in names(data)
         workingdata.Si = data[:, :Si]
-    elseif in("SiO2", names(data)) == true
+    elseif "SiO2" in names(data)
         workingdata.Si = data[:, :SiO2]
     else
         workingdata.Si .= 0
     end
-    if in("F", names(data)) == true
+    if "F" in names(data)
         workingdata.F = data[:, :F]
     else
         workingdata.F .= 0
     end
-    if in("Cl", names(data)) == true
+    if "Cl" in names(data)
         workingdata.Cl = data[:, :Cl]
     else
         workingdata.Cl .= 0
     end
-    if in("OH", names(data)) == true
+    if "OH" in names(data)
         workingdata.OH = data[:, :OH]
-    elseif in("H2O", names(data)) == true
+    elseif "H2O" in names(data)
         workingdata.OH = data[:, :H2O]
     else
         workingdata.OH .= 0
