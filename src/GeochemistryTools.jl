@@ -9,16 +9,16 @@ __precompile__()
 module GeochemistryTools
 
 using Reexport
-using CSV
-using DataFrames
+@reexport using CSV
+@reexport using DataFrames
 using Distributions
 using Polynomials
 using Statistics
 using StatsBase
-using ColorSchemes
+@reexport using ColorSchemes
 using Glob
 using HypothesisTests
-using Dates
+@reexport using Dates
 using SparseArrays
 using LinearAlgebra
 using MultiFloats
@@ -26,11 +26,13 @@ using SpecialFunctions
 using PyCall
 using Conda
 using PolynomialRoots
+@reexport using PeriodicTable
+@reexport using IsotopeTable
+@reexport using Unitful
 
 import Base: getindex, setindex!
 import Base.Threads: @spawn, @threads, @simd
 
-include("FormulaWeight.jl")
 include("GCTDictionaries.jl")
 include("Regression/ErrorInVariablesRegression/ErrorsInVariablesRegression.jl")
 include("Geochronology/beta_minus_decay_systems.jl")
@@ -50,6 +52,7 @@ include("Regression/OrthogonalPolynomials.jl")
 include("GeometricStatistics.jl")
 include("ErrorEllipse.jl")
 include("DateTimeParser.jl")
+include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__),"ChemistryTools/"); join=true)))
 
 function _check_equal_length(
     a::AbstractVector,
