@@ -12,8 +12,10 @@ Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
 HypothesisTests = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
+IsotopeTable = "301f09c9-9f3f-4b04-816f-ee47ab44b8cb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MultiFloats = "bdf0d083-296b-4888-a5b6-7498122e68a5"
+PeriodicTable = "7b2266bf-644c-5ea3-82d8-af4bbd25a884"
 PolynomialRoots = "3a141323-8675-5d76-9d11-e1df1406c778"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
@@ -22,11 +24,15 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [weakdeps]
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [compat]
+IsotopeTable = "0.1.0"
+PeriodicTable = "1.2.1"
+Unitful = "1.22.0"
 julia = "1.6.7"
 
 [extras]
