@@ -97,12 +97,16 @@ function computeionmass(formula, left_index, formula_length)
     in(Symbol(formula[left_index]), keys(PeriodicTable.elements.bysymbol))
        ionicmass = get_atomicmass(formula[left_index]).val
     end
-    if checkbounds(Bool, formula, nextind(formula, right_index))
+    if checkbounds(Bool, formula, nextind(formula, right_index)) # something wrong here
         left_index = nextind(formula, right_index)
         if left_index < lastindex(formula)
             if isnumeric(formula[left_index])
+                if left == lastindex(formula) in
+                    ionicmass *= tryparse(Int64, formula[left_index])
+                elseif
                 right_index = findnext(r"[A-Z()\[\]]",formula, left_index)[1]
                 n_mole_end_ind = right_index - 1
+                end
                 if n_mole_end_ind == left_index
                     ionicmass *= tryparse(Int64, formula[left_index])
                 else
@@ -124,49 +128,4 @@ function computeionmass(formula, left_index, formula_length)
     end
     position_index = right_index+1
     return ionicmass, position_index
-end
-
-#Find number of moles for ion
-function findnmoles(formula, mole_index)
-    formula_length = length(formula)
-    #if findnext('.', formula, mole_index) != nothing
-    #    decimal_index = findnext('.', formula, mole_index)
-    if mole_index + 2 ≤ formula_length && formula[mole_index+2] == '.' #find decimals >10.00
-        if mole_index + 4 ≤ formula_length && isdigit(formula[mole_index+4]) == true
-            n_moles = parse(Float64, formula[mole_index:mole_index+4])
-            position_index = mole_index + 5
-        elseif mole_index + 3 ≤ formula_length && isdigit(formula[mole_index+3]) == true
-            n_moles = parse(Float64, formula[mole_index:mole_index+2])
-            position_index = mole_index + 4
-        end
-    elseif mole_index + 1 ≤ formula_length && formula[mole_index+1] != '.' #find Int
-        if isdigit(formula[mole_index+1]) == true && isdigit(formula[mole_index]) == true  #e.g., Si10
-            n_moles = parse(Int, formula[mole_index:mole_index+1])
-            position_index = mole_index + 2
-        elseif isdigit(formula[mole_index]) == true  #e.g., B2
-            n_moles = parse(Int, formula[mole_index])
-            position_index = mole_index + 1
-        else
-            n_moles = 1
-            position_index = mole_index
-        end
-    elseif mole_index + 1 ≤ formula_length && formula[mole_index+1] == '.' #find decimals <10.00
-        if mole_index + 3 ≤ formula_length && isdigit(formula[mole_index+3]) == true
-            n_moles = parse(Float64, formula[mole_index:mole_index+3])
-            position_index = mole_index + 4
-        elseif mole_index + 2 ≤ formula_length && isdigit(formula[mole_index+2]) == true
-            n_moles = parse(Float64, formula[mole_index:mole_index+2])
-            position_index = mole_index + 3
-        end
-    elseif mole_index ≤ formula_length && isdigit(formula[mole_index]) == true
-        n_moles = parse(Int, string(formula[mole_index]))
-        position_index = mole_index + 1
-    else
-        n_moles = 1
-        position_index = mole_index
-    end
-    if position_index ≤ formula_length && formula[position_index] == ')'
-        position_index = position_index + 1
-    end
-    return n_moles, position_index
 end
