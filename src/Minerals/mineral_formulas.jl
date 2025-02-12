@@ -29,7 +29,7 @@ function formula_mica(data::AbstractDataFrame, units::AbstractString; normalisin
     workingdata = _find_columns_mica(data)
     workingvector = collect(values(workingdata[1, Not(:Sample)]))
 
-    if uppercase(units) == "PPM"
+    if lowercase(units) == "ppm"
         oxide_conversion = [
             1.347955633, 1.204601258, 1.399196567, 1.093596434, 1.060187345, 1.1165004, 2.152665706, 1.658259617,
             1.668477239, 1.628126104, 1.461545119, 1.291219193, 1.244707862, 1.28648939, 1.889426284, 2.775260203,
@@ -41,29 +41,29 @@ function formula_mica(data::AbstractDataFrame, units::AbstractString; normalisin
     end
 
     molecular_weights = [
-        molecular_mass["Na2O"],
-        molecular_mass["K2O"],
-        molecular_mass["CaO"],
-        molecular_mass["Rb2O"],
-        molecular_mass["Cs2O"],
-        molecular_mass["BaO"],
-        molecular_mass["Li2O"],
-        molecular_mass["MgO"],
-        molecular_mass["TiO2"],
-        molecular_mass["VO2"],
-        molecular_mass["Cr2O3"],
-        molecular_mass["MnO"],
-        molecular_mass["ZnO"],
-        molecular_mass["FeO"],
-        molecular_mass["Fe2O3"],
-        molecular_mass["AlO"],
-        molecular_mass["Al2O3"],
-        molecular_mass["BeO"],
-        molecular_mass["B2O3"],
-        molecular_mass["SiO2"],
-        atomic_mass['F'],
-        atomic_mass["Cl"],
-        molecular_mass["H2O"]
+        molecular_mass("Na2O"),
+        molecular_mass("K2O"),
+        molecular_mass("CaO"),
+        molecular_mass("Rb2O"),
+        molecular_mass("Cs2O"),
+        molecular_mass("BaO"),
+        molecular_mass("Li2O"),
+        molecular_mass("MgO"),
+        molecular_mass("TiO2"),
+        molecular_mass("VO2"),
+        molecular_mass("Cr2O3"),
+        molecular_mass("MnO"),
+        molecular_mass("ZnO"),
+        molecular_mass("FeO"),
+        molecular_mass("Fe2O3"),
+        molecular_mass("AlO"),
+        molecular_mass("Al2O3"),
+        molecular_mass("BeO"),
+        molecular_mass("B2O3"),
+        molecular_mass("SiO2"),
+        atomic_mass('F'),
+        atomic_mass("Cl"),
+        molecular_mass("H2O")
     ]
 
     moles_compound = weight_percent ./ molecular_weights
