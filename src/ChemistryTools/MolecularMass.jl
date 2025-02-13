@@ -30,7 +30,6 @@ Molecular weight of input formula {Al2O3} is:
 """
 function molecular_mass(formula::Union{String, Vector{String}};
     verbose::Bool=true)
-    println(typeof(formula))
     if isa(formula, Vector{String})
         mass = zeros(size(formula))
         nformulas = length(formula)
@@ -53,79 +52,124 @@ function molecular_mass(formula::Union{String, Vector{String}};
 end
 
 #Compute total formula mass
-function computemoleculemass(formula)
+function computemoleculemass(formula::AbstractString)
     moleculemass = 0
     position_index = firstindex(formula)
-    formula_length = length(formula)
+    formula_lastind = lastindex(formula)
     if length(findall('(', formula)) != length(findall(')', formula))
         error("Error: Mismatched parentheses `(` & `)` in formula")
     end
     if length(findall('[', formula)) != length(findall(']', formula))
         error("Error: Mismatched square brackets `[` & `]` in formula")
     end
-    while position_index ≤ formula_length
-        ionmass, position_index = computeionmass(formula, position_index, formula_length)
+    while position_index ≤ formula_lastind
+        ionmass, position_index = computeionmass(formula, position_index, formula_lastind)
         moleculemass = moleculemass + ionmass
     end
     return moleculemass
 end
 
 #Find ions and compute their masses
-function computeionmass(formula, left_index, formula_length)
+function computeionmass(formula::AbstractString, left_index::Integer, formula_lastind::Integer)
+    parenmass = nothing
+    sqrbracmass = nothing
     if left_index < lastindex(formula)
         right_index = nextind(formula, left_index)
     else
         right_index = lastindex(formula)
     end
+    # find parentheses and brackets
     if formula[left_index] == '['
-        sqrbrac_open = formula[left_index]
-        sqrbrac_close = formula[findnext('[', formula, left_index)]
-        left_index = nextind(formula, sqrbrac_open)
-        right_index = nextind(formula, sqrbrac_open)
+        sqrbrac_close = findnext('[', formula, left_index)[1]
+        sqrbracmass, left_index = _sqrbracsum(formula, left_index+1, sqrbrac_close,formula_lastind)
+        left_index = nextind(formula, left_index)
     end
     if formula[left_index] == '('
-        paren_open = formula[left_index]
-        paren_close = formula[findnext(')', formula, left_index)]
-        left_index = nextind(formula, paren_open)
-        right_index = nextind(formula, paren_open)
+        paren_close = findnext(')', formula, left_index)[1]
+        parenmass, left_index =_parensum(formula, left_index+1, paren_close,formula_lastind)
+        left_index = nextind(formula, left_index)
     end
-    if right_index <= formula_length &&
-    occursin(r"[A-Z][a-z]", formula[left_index:right_index]) &&
-    in(Symbol(formula[left_index:right_index]), keys(PeriodicTable.elements.bysymbol))
-        ionicmass = get_atomicmass(formula[left_index:right_index]).val
-    elseif occursin(r"[A-Z]", string(formula[left_index])) &&
-    in(Symbol(formula[left_index]), keys(PeriodicTable.elements.bysymbol))
-       ionicmass = get_atomicmass(formula[left_index]).val
+    if isnothing(sqrbracmass) && isnothing(parenmass)
+        element = _get_element!(formula, left_index, formula_lastind)
+        ionicmass = get_atomicmass(element).val
+        left_index = left_index + length(element)
+    elseif !isnothing(parenmass)
+        ionicmass = parenmass
+    elseif !isnothing(sqrbracmass)
+        ionicmass = sqrbracmass
     end
-    if checkbounds(Bool, formula, nextind(formula, right_index)) # something wrong here
-        left_index = nextind(formula, right_index)
-        if left_index < lastindex(formula)
-            if isnumeric(formula[left_index])
-                if left == lastindex(formula) in
-                    ionicmass *= tryparse(Int64, formula[left_index])
-                elseif
-                right_index = findnext(r"[A-Z()\[\]]",formula, left_index)[1]
-                n_mole_end_ind = right_index - 1
-                end
-                if n_mole_end_ind == left_index
-                    ionicmass *= tryparse(Int64, formula[left_index])
-                else
-                    ionicmass *= tryparse(Float64, formula[left_index:n_mole_end_ind])
-                end
-                left_index = right_index
-                right_index = nextind(formula, left_index)
-            end
-            if left_index < paren_close
-                cummulativemass = ionicmass
-                while left_index < paren_close
-                    ionicmass = computeionmass(formula[left_index:right_index], left_index, length(formula[left_index:paren_close]))
-                    cummulativemass += ionicmass
-                    left_index = right_index
-                    right_index = nextind(formula, left_index)
-                end
-            end
+    if left_index ≤ formula_lastind
+        if isnumeric(formula[left_index])
+            nmoles, left_index = _get_nmoles(formula, left_index, formula_lastind)
+            ionicmass *= nmoles
         end
     end
-    position_index = right_index+1
+    position_index = left_index
     return ionicmass, position_index
+end
+
+
+function _get_element!(formula::AbstractString, elem_start_ind::Integer, formula_lastind::Integer)
+    element = nothing
+    if occursin(r"[()\[\]]", string(formula[elem_start_ind]))
+    else
+        if elem_start_ind < formula_lastind
+            elem_end_ind = nextind(formula, elem_start_ind)
+        else
+            elem_end_ind = elem_start_ind
+        end
+        if occursin(r"[0-9.()\[\]]", string(formula[elem_end_ind]))
+            elem_end_ind = elem_start_ind
+        end
+        if elem_start_ind < formula_lastind && occursin(r"[A-Z][a-z]", formula[elem_start_ind:elem_end_ind]) &&
+            in(Symbol(formula[elem_start_ind:elem_end_ind]), keys(PeriodicTable.elements.bysymbol))
+            return element = formula[elem_start_ind:elem_end_ind]
+        elseif elem_start_ind ≤ formula_lastind &&
+            occursin(r"[A-Z]", string(formula[elem_start_ind])) &&
+            in(Symbol(formula[elem_start_ind]), keys(PeriodicTable.elements.bysymbol))
+            return element = formula[elem_start_ind]
+        end
+        if isnothing(element)
+                error("Invalid element symbol ($(formula[elem_start_ind:elem_end_ind])) found in formula at position $elem_start_ind")
+        else
+        return element
+        end
+    end
+end
+
+function _get_nmoles(formula::AbstractString, nmole_start_ind::Integer, formula_lastind::Integer)
+    if nmole_start_ind == formula_lastind
+        nmoles = tryparse(Int, string(formula[nmole_start_ind]))
+        nmole_end_ind = nextind(formula, nmole_start_ind)+1
+    else
+        nmole_end_ind = findnext(r"[A-Za-z()\[\]]",formula, nmole_start_ind)
+        if isnothing(nmole_end_ind)
+            nmole_end_ind = formula_lastind
+            nmoles = tryparse(Float64, string(formula[nmole_start_ind:nmole_end_ind]))
+            nmole_end_ind += 1
+        else
+            nmole_end_ind = nmole_end_ind[1]
+            nmoles = tryparse(Float64, string(formula[nmole_start_ind:nmole_end_ind-1]))
+        end
+    end
+    return nmoles, nmole_end_ind
+end
+
+
+function _parensum(formula::AbstractString, left_index::Integer, paren_close::Integer, formula_lastind::Integer)
+    cumulativemass = 0.0
+    while left_index < paren_close
+        ionmass, left_index = computeionmass(formula, left_index, formula_lastind::Integer)
+        cumulativemass += ionmass
+    end
+    return cumulativemass, left_index
+end
+
+function _sqrbracsum(formula::AbstractString, left_index::Integer, sqrbrac_close::Integer, formula_lastind::Integer)
+    cumulativemass = 0.0
+    while left_index < sqrbrac_close
+        ionmass, left_index = computeionmass(formula, left_index, formula_lastind::Integer)
+        cumulativemass += ionmass
+    end
+    return cumulativemass, left_index
 end
