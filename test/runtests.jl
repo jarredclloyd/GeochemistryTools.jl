@@ -1,5 +1,4 @@
 using GeochemistryTools
 using Test
 
-include("minerals.jl")
-include("DateTimeParser.jl")
+include.(filter(contains(r".jl$"), readdir(@__DIR__; join=true)))
