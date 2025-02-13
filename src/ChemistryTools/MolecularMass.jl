@@ -7,25 +7,32 @@ export molecular_mass
 """
     molecular_mass(formula; verbose::Bool=true)
 
-Calculates molar weight of input formula.
+Calculates molar mass (gmol⁻¹) of input formula.
 
 Multiple formulas can be passed as vector of strings.
 Use only standard characters and do not superscript mole numbers. Additional ions after a • should be added in
 parentheses if there are multiple moles of it, e.g., •2(H20) should be entered as (H20)2.
 
+You can use both square brackets `[]` and parentheses `()` in the formulas.
+- E.g. [AsO2(OH)2]4
+
 # Keywords
-    `-verbose::Bool=true` set to false to suppress detailed output to REPL.
+    `-verbose::Bool=true` set to false to suppress detailed output to REPL (i.e. just return the values).
 
 ```julia-repl
 julia> molecular_mass("Na0.84Ca0.64K0.44Ba0.02Sr0.01Ca0.64Mn0.05Zn0.01Nb2.7Ti1.28Fe0.07Si7.97Al0.06O24.09OH1.23O2.75(H2O)6.92")
-Molecular weight of input formula {Na0.84Ca0.64K0.44Ba0.02Sr0.01Ca0.64Mn0.05Zn0.01Nb2.7Ti1.28Fe0.07Si7.97Al0.06O24.09OH1.23O2.75(H2O)6.92} is:
-1207.6534935612 gmol⁻¹.
+Molecular mass of input formula {Na0.84Ca0.64K0.44Ba0.02Sr0.01Ca0.64Mn0.05Zn0.01Nb2.7Ti1.28Fe0.07Si7.97Al0.06O24.09OH1.23O2.75(H2O)6.92} is:
+1207.6361916492 gmol⁻¹.
 
 julia> molecular_mass(["Al2O3", "K2O"])
-Molecular weight of input formula {K2O} is:
-94.196 gmol⁻¹.
-Molecular weight of input formula {Al2O3} is:
-101.9612772 gmol⁻¹.
+Molecular mass of input formula {Al2O3} is:
+101.9600768 gmol⁻¹.
+Molecular mass of input formula {K2O} is:
+94.1956 gmol⁻¹.
+
+julia> molecular_mass("K0.6Cu18[AsO2(OH)2]4[AsO3OH]10(AsO4)(OH)9.6(H2O)18.6")
+Molecular mass of input formula {K0.6Cu18[AsO2(OH)2]4[AsO3OH]10(AsO4)(OH)9.6(H2O)18.6} is:
+3767.5411050000007 gmol⁻¹.
 ```
 """
 function molecular_mass(formula::Union{String, Vector{String}};
@@ -57,10 +64,10 @@ function computemoleculemass(formula::AbstractString)
     position_index = firstindex(formula)
     formula_lastind = lastindex(formula)
     if length(findall('(', formula)) != length(findall(')', formula))
-        error("Error: Mismatched parentheses `(` & `)` in formula")
+        error("Error: Mismatched parentheses `(` & `)` in formula $formula")
     end
     if length(findall('[', formula)) != length(findall(']', formula))
-        error("Error: Mismatched square brackets `[` & `]` in formula")
+        error("Error: Mismatched square brackets `[` & `]` in formula $formula")
     end
     while position_index ≤ formula_lastind
         ionmass, position_index = computeionmass(formula, position_index, formula_lastind)
@@ -71,8 +78,8 @@ end
 
 #Find ions and compute their masses
 function computeionmass(formula::AbstractString, left_index::Integer, formula_lastind::Integer)
-    parenmass = nothing
     sqrbracmass = nothing
+    parenmass = nothing
     if left_index < lastindex(formula)
         right_index = nextind(formula, left_index)
     else
@@ -80,14 +87,16 @@ function computeionmass(formula::AbstractString, left_index::Integer, formula_la
     end
     # find parentheses and brackets
     if formula[left_index] == '['
-        sqrbrac_close = findnext('[', formula, left_index)[1]
+        sqrbrac_close = findnext(']', formula, left_index)[1]
         sqrbracmass, left_index = _sqrbracsum(formula, left_index+1, sqrbrac_close,formula_lastind)
         left_index = nextind(formula, left_index)
     end
-    if formula[left_index] == '('
-        paren_close = findnext(')', formula, left_index)[1]
-        parenmass, left_index =_parensum(formula, left_index+1, paren_close,formula_lastind)
-        left_index = nextind(formula, left_index)
+        if isnothing(sqrbracmass)
+        if formula[left_index] == '('
+            paren_close = findnext(')', formula, left_index)[1]
+            parenmass, left_index =_parensum(formula, left_index+1, paren_close,formula_lastind)
+            left_index = nextind(formula, left_index)
+        end
     end
     if isnothing(sqrbracmass) && isnothing(parenmass)
         element = _get_element!(formula, left_index, formula_lastind)
