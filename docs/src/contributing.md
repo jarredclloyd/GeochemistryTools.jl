@@ -22,13 +22,11 @@ but makes some deviations.
 
 Module and type names use `PascalCase`: `module GeometricStatistics`, `struct OrthogonalPolynomial`
 
-Function names should be `lowercase` and, when readable, with multiple words squashed together.
-If readability is compromised by squashing words together or the function has a modifier
-then function names should use `snake_case`. Modifiers should come after the main concept
-of a function.
+Function names should be `snake_case`.
+Modifiers should come after the main concept of a function.
 
-- `geomean` instead of `gmean` or `geometric_mean`
-- `geomean_zeros` instead of `geometric_mean_with_zeros`
+- `geometric_mean` instead of`geomean` or `gmean`
+- `geometric_mean_with_zeros`
 
 Names should be descriptive, and avoid abbreviations or shorthand unless they are widely
 understood or would be excessively verbose. For example:
