@@ -52,6 +52,7 @@ include("Regression/OrthogonalPolynomials.jl")
 include("GeometricStatistics.jl")
 include("ErrorEllipse.jl")
 include("DateTimeParser.jl")
+include("BarycentricConversions.jl")
 include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__),"ChemistryTools/"); join=true)))
 
 function _check_equal_length(
