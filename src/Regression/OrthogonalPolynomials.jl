@@ -33,6 +33,7 @@ struct OrthogonalPolynomial <: LinearRegression
     r_squared::Union{Vector{AbstractFloat},Nothing}
     OP_r_squared::Union{Vector{AbstractFloat},Nothing}
     rmse::Union{Vector{AbstractFloat},Nothing}
+    nrmse::Union{Vector{AbstractFloat},Nothing}
     chi_squared::Union{Vector{AbstractFloat},Nothing}
     reduced_chi_squared::Union{Vector{AbstractFloat},Nothing}
     akaike_information_criteria::Union{Vector{AbstractFloat},Nothing}
@@ -362,6 +363,7 @@ function _orthogonal_LSQ(
         sparse(Λ_SE)
         tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
         rmse::Vector{Float64} = sqrt.(mse)
+        nrmse::Vector{Float64} = rmse ./ (maximum(y) - minimum(y))
         R²::Vector{Float64} = 1 .- (rss ./ (tss))
         R²ₒₚ::Vector{Float64} = _olkin_pratt.(R², 𝑁, order .+ 1)
         BIC::Vector{Float64} = Vector{Float64}(undef, 5)
@@ -383,6 +385,7 @@ function _orthogonal_LSQ(
             R²,
             R²ₒₚ,
             rmse,
+            nrmse,
             rss,
             mse,
             AIC,
