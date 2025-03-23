@@ -1,8 +1,8 @@
 #=
-Functions for plotting ternary plots
+Functions for barycentric coordinate conversions
 =#
 
-export ternary2cartesian, cartesian2ternary
+export ternary2cartesian, cartesian2ternary, tetradhedral2ternary
 
 """
     ternary2cartesian(x, y)
@@ -35,4 +35,12 @@ function cartesian2ternary(x, y)
     b = x - c / 2
     a = 1 - b - c
     return a, b, c
+end
+
+
+function tetradhedral2ternary(a, b, c, d)
+    x = (c + 1 - b)/2
+    y = √3 / 2 * a + √3 / 6 * d
+    z = √6 / 3 * d
+    return (x, y, z)
 end
