@@ -269,9 +269,9 @@ function _orthogonal_LSQ(
     rm_outlier::Bool = false,
     verbose::Bool = false,
 )
-    x = x[isfinite.(y) .== true]
-    y_weights = y_weights[isfinite.(y) .== true]
-    y = y[isfinite.(y) .== true]
+    finite_indices = intersect(findall(isfinite, x), findall(isfinite, y))
+    x = x[finite_indices]
+    y = y[finite_indices]
     𝑁::Integer = length(x)
     if 𝑁 == length(y) && 𝑁 > 2
         x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
@@ -287,9 +287,9 @@ function _orthogonal_LSQ(
         if y_weights === nothing
             ω::Vector{MultiFloat{Float64,4}} = fill(1.0, length(y))
         elseif occursin("rel", lowercase(weight_type)) === true
-            ω = y_weights
+            ω = y_weights[finite_indices]
         elseif occursin("abs", lowercase(weight_type)) == true
-            ω = abs.(y_weights) ./ abs.(y)
+            ω = abs.(y_weights[finite_indices]) ./ abs.(y)
         else
             throw(
                 ArgumentError(
@@ -441,33 +441,33 @@ end
 
 # functions for parameter calculations
 function _beta_orthogonal(N::Integer, sums::AbstractVector)
-    return 1 / N * sums[1]
+    return Float64x4(1) / Float64x4(N) * sums[1]
 end
 
 function _gamma_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{MultiFloat{Float64,4}} =
+    vieta::Vector{BigFloat} =
         [-sums[1] N; -sums[2] sums[1]] \ [-sums[2]; -sums[3]]
-    return real(PolynomialRoots.roots(([vieta[2], -vieta[1], 1])))
+    return real(PolynomialRoots.roots([vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 
 function _delta_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{MultiFloat{Float64,4}} =
+    vieta::Vector{BigFloat} =
         [
             -sums[2] sums[1] -N
             -sums[3] sums[2] -sums[1]
             -sums[4] sums[3] -sums[2]
         ] \ [-sums[3]; -sums[4]; -sums[5]]
-    return real(PolynomialRoots.roots(([-vieta[3], vieta[2], -vieta[1], 1])))
+    return real(PolynomialRoots.roots([-vieta[3], vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 function _epsilon_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{MultiFloat{Float64,4}} =
+    vieta::Vector{BigFloat} =
         [
             -sums[3] sums[2] -sums[1] N
             -sums[4] sums[3] -sums[2] sums[1]
             -sums[5] sums[4] -sums[3] sums[2]
             -sums[6] sums[5] -sums[4] sums[3]
         ] \ [-sums[4]; -sums[5]; -sums[6]; -sums[7]]
-    return real(PolynomialRoots.roots(([vieta[4], -vieta[3], vieta[2], -vieta[1], 1])))
+    return real(PolynomialRoots.roots([vieta[4], -vieta[3], vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 
 function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Integer)
