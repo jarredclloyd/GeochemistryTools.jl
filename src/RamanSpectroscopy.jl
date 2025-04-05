@@ -369,7 +369,17 @@ function _integration_trapezoidal(x::AbstractVector, y::AbstractVector)
     return area
 end
 
-function raman_despike(x::AbstractVector, y::AbstractVector; threshold = 6.0, bandwidth = 5)
+"""
+    despike(x::AbstractVector, y::AbstractVector; threshold=6.0, bandwidth=5)
+
+Despike time-series data.
+
+# Description
+Remove spikes in time-series data. Implements a simple algorithm outlined in
+Whitaker & Hayes (2018) that uses modified z-scores to detect outlier points.
+
+"""
+function despike(x::AbstractVector, y::AbstractVector; threshold::Real = 6.0, bandwidth::Integer = 5)
     if length(x) ≠ length(y)
         error("Vector lengths are not equal")
     else
