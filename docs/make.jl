@@ -14,7 +14,6 @@ makedocs(
     sitename = "GeochemistryTools.jl",
     authors = "Jarred Lloyd",
     format = Documenter.HTML(),
-<<<<<<< Updated upstream
     plugins = [bib],
     checkdocs= :export,
     pages = [
@@ -24,11 +23,6 @@ makedocs(
         ],
         "Contributing" => "contributing.md"
     ]
-=======
-    # plugins = [bib],
-    modules = [geometric_statistics],
-    # checkdocs = :exports
->>>>>>> Stashed changes
 )
 
 # Documenter can also automatically deploy documentation to gh-pages.
