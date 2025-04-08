@@ -48,11 +48,11 @@ function _GLS(
             ),
         )
     end
-    ω = 1 ./ (ω ./ mean(ω)) .^2
+    ω = (ω ./ mean(ω)) .^2
     Ω = Diagonal(ω)
     X = _design_matrix(x, order)
-    C = inv(transpose(X) * Ω * X)
-    β = inv(transpose(X) * Ω * X) * transpose(X) * Ω * y
+    C = inv(transpose(X) * inv(Ω) * X)
+    β = inv(transpose(X) * inv(Ω) * X) * transpose(X) * inv(Ω) * y
     ess = transpose(y .- X * β) * Ω * (y .- X * β)
     β_SE = sqrt.(diag(abs.((C) * (ess / (length(x) - order)))))
     tss = transpose((y .- mean(y))) * Ω * (y .- mean(y))
@@ -83,9 +83,9 @@ function _design_matrix(x, order)
 end
 
 function _polyGLS(x::AbstractVector, fit::GeneralisedLeastSquares)
-    order = length(fit.β) - 1
+    order = length(fit.beta) - 1
     X = _design_matrix(x, order)
-    return X * fit.β[1:(order + 1)]
+    return X * fit.beta[1:(order + 1)]
 end
 
 function _polyCI(
@@ -93,10 +93,10 @@ function _polyCI(
     fit::GeneralisedLeastSquares;
     ci_level::AbstractFloat = 0.95,
 )
-    order = length(fit.β) - 1
-    tvalue = cquantile(TDist(fit.𝑁 - order), (1 - ci_level) / 2)
+    order = length(fit.beta) - 1
+    tvalue = cquantile(TDist(fit.n_observations - order), (1 - ci_level) / 2)
     X = _design_matrix(x, order)
-    return vec(sqrt.((fit.rmse^2) .* sum(X .* (X * fit.VarβX); dims = 2))) .* tvalue
+    return vec(sqrt.((fit.rmse^2) .* sum(X .* (X * fit.variance_covariance); dims = 2))) .* tvalue
 end
 
 function _polyPI(
@@ -104,10 +104,10 @@ function _polyPI(
     fit::GeneralisedLeastSquares;
     ci_level::AbstractFloat = 0.95,
 )
-    order = length(fit.β) - 1
-    tvalue = cquantile(TDist(fit.𝑁 - order), (1 - ci_level) / 2)
+    order = length(fit.beta) - 1
+    tvalue = cquantile(TDist(fit.n_observations - order), (1 - ci_level) / 2)
     X = _design_matrix(x, order)
     return vec(
-        sqrt.((fit.rmse^2) .* sum(1 .+ X .* (X * fit.VarβX) .* (fit.rmse^2); dims = 2)),
+        sqrt.((fit.rmse^2) .* sum(1 .+ X .* (X * fit.variance_covariance) .* (fit.rmse^2); dims = 2)),
     ) .* tvalue
 end

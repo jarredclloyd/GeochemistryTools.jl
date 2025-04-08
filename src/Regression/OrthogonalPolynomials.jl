@@ -298,15 +298,15 @@ function _orthogonal_LSQ(
             )
         end
         Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} =
-            Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
+            Diagonal((ω ./ mean(ω)) .^ 2)
         Xᵀ::Transpose{MultiFloat{Float64,4},Matrix{MultiFloat{Float64,4}}} = transpose(X)
         rss::Vector{Float64} = Vector{Float64}(undef, 5)
         AIC::Vector{Float64} = Vector{Float64}(undef, 5)
-        VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
-        Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
+        VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * inv(Ω) * X))
+        Λ::Vector{Float64} = VarΛX * Xᵀ * inv(Ω) * y
         @simd for i ∈ eachindex(order)
             residuals::Vector{MultiFloat{Float64,4}} = (y .- (view(X, :, 1:i) * Λ[1:i]))
-            rss[i] = transpose(residuals) * Ω * (residuals)
+            rss[i] = transpose(residuals) * inv(Ω) * (residuals)
         end
         AIC = _akaike_information_criteria.(rss, 𝑁, order)
         if rm_outlier === true
@@ -317,7 +317,7 @@ function _orthogonal_LSQ(
                 n_iterations += 1
                 minAIC::Integer = findmin(AIC)[2]
                 Xvar::Matrix{MultiFloat{Float64,4}} =
-                    view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :) * Ω
+                    view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :) * inv(Ω)
                 leverage::Vector{MultiFloat{Float64,4}} =
                     Vector{MultiFloat{Float64,4}}(undef, size(X, 1))
                 Threads.@threads for i ∈ axes(X, 1)
@@ -334,12 +334,12 @@ function _orthogonal_LSQ(
                     y = y[Not(outlier_inds)] # high allocs
                     ω = ω[Not(outlier_inds)] # high allocs
                     Xᵀ = transpose(X)
-                    Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
-                    VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
-                    Λ = VarΛX * Xᵀ * Ω * y
+                    Ω = Diagonal((ω ./ mean(ω)) .^ 2)
+                    VarΛX = Symmetric(inv(Xᵀ * inv(Ω) * X))
+                    Λ = VarΛX * Xᵀ * inv(Ω) * y
                     @simd for i ∈ eachindex(order)
                         residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
-                        rss[i] = transpose(residuals) * Ω * (residuals)
+                        rss[i] = transpose(residuals) * inv(Ω) * (residuals)
                     end
                     AIC = _akaike_information_criteria.(rss, 𝑁, order)
                 end
@@ -361,7 +361,7 @@ function _orthogonal_LSQ(
             Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
         end
         sparse(Λ_SE)
-        tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
+        tss::Float64 = transpose((y .- mean(y))) * inv(Ω) * (y .- mean(y))
         rmse::Vector{Float64} = sqrt.(mse)
         nrmse::Vector{Float64} = rmse ./ (maximum(y) - minimum(y))
         R²::Vector{Float64} = 1 .- (rss ./ (tss))
