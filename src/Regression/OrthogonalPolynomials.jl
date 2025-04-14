@@ -287,9 +287,9 @@ function _orthogonal_LSQ(
         if y_weights === nothing
             ω::Vector{MultiFloat{Float64,4}} = fill(1.0, length(y))
         elseif occursin("rel", lowercase(weight_type)) === true
-            ω = y_weights[finite_indices]
+            ω = y_weights[finite_indices] .* y[finite_indices]
         elseif occursin("abs", lowercase(weight_type)) == true
-            ω = abs.(y_weights[finite_indices]) ./ abs.(y)
+            ω = y_weights[finite_indices]
         else
             throw(
                 ArgumentError(
@@ -298,7 +298,7 @@ function _orthogonal_LSQ(
             )
         end
         Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} =
-            Diagonal((ω ./ mean(ω)) .^ 2)
+            Diagonal(ω .^ 2)
         Xᵀ::Transpose{MultiFloat{Float64,4},Matrix{MultiFloat{Float64,4}}} = transpose(X)
         rss::Vector{Float64} = Vector{Float64}(undef, 5)
         AIC::Vector{Float64} = Vector{Float64}(undef, 5)
@@ -334,7 +334,7 @@ function _orthogonal_LSQ(
                     y = y[Not(outlier_inds)] # high allocs
                     ω = ω[Not(outlier_inds)] # high allocs
                     Xᵀ = transpose(X)
-                    Ω = Diagonal((ω ./ mean(ω)) .^ 2)
+                    Ω = Diagonal(ω .^ 2)
                     VarΛX = Symmetric(inv(Xᵀ * inv(Ω) * X))
                     Λ = VarΛX * Xᵀ * inv(Ω) * y
                     @simd for i ∈ eachindex(order)
