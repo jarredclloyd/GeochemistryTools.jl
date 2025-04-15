@@ -106,7 +106,7 @@ function fit_orthogonal(
     x_name::Symbol,
     y_name::Symbol;
     y_weights::Union{Nothing,Symbol} = nothing,
-    weight_type::AbstractString = "rel",
+    weight_type::AbstractString = "abs",
     rm_outlier::Bool = false,
     verbose::Bool = false,
 )
@@ -307,8 +307,8 @@ function _orthogonal_LSQ(
             VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
         else
             F = svd(X̃)
-            Λ = F.V * inv(Diagonal(F.S)) .* transpose(F.U) * ỹ
-            VarΛX = F.V * inv(Diagonal(F.S .^2)) .* F.Vt
+            Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
+            VarΛX = F.V * inv(Diagonal(F.S .^2)) * F.Vt
         end
         rss::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
         @simd for i ∈ eachindex(order)
@@ -376,7 +376,6 @@ function _orthogonal_LSQ(
         for i ∈ eachindex(order)
             Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
         end
-        Λ_SE = UpperTriangular(Λ_SE)
         tss::Float64x4 = transpose((y .- mean(y))) * inv(Ω) * (y .- mean(y))
         rmse::Vector{Float64x4} = sqrt.(mse)
         nrmse::Vector{Float64x4} = rmse ./ (maximum(y) - minimum(y))
@@ -390,13 +389,13 @@ function _orthogonal_LSQ(
         AICw =
             exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
         return OrthogonalPolynomial(
-            Λ,
-            Λ_SE,
+            Float64.(Λ),
+            UpperTriangular(Λ_SE),
             big.(β),
             big.(γ),
             big.(δ),
             big.(ϵ),
-            VarΛX,
+            Float64.(VarΛX),
             order,
             R²,
             R²ₒₚ,
@@ -491,7 +490,7 @@ function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Int
         throw(ArgumentError("Polynomial order must be positive"))
     end
     if order == 0
-        X::Matrix{Real} = repeat([1.0], length(x))
+        X::Matrix{Float64x4} = repeat([1.0], length(x))
     elseif order == 1
         X = hcat(repeat([1.0], length(x)), (x .- fit.beta))
     elseif order == 2
