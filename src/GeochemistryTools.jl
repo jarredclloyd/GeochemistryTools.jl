@@ -23,9 +23,6 @@ using SparseArrays
 using LinearAlgebra
 using GenericLinearAlgebra
 using MultiFloats
-# MultiFloats.use_bigfloat_transcendentals()
-@inline Base.precision(::Type{MultiFloat{T,N}}) where {T,N} =
-           N * precision(T) + (N - 1) # implicit bits of precision between limbs
 using SpecialFunctions
 using PyCall
 using Conda
@@ -58,6 +55,12 @@ include("ErrorEllipse.jl")
 include("DateTimeParser.jl")
 include("BarycentricConversions.jl")
 include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__),"ChemistryTools/"); join=true)))
+
+# To enable use of MultiFloats in Julia 1.11 until MultiFloats v3.0 is released
+@inline Base.precision(::Type{MultiFloat{T,N}}) where {T,N} =
+           N * precision(T) + (N - 1) # implicit bits of precision between limbs
+@inline    Base.round(x::MultiFloat{T,N} where {T,N}, r::RoundingMode) = Base.round(big.(x), r)
+@inline    Base.trunc(x::MultiFloat{T,N} where {T,N}, r::RoundingMode{:ToZero}) = Base.trunc(big.(x), r)
 
 function _check_equal_length(
     a::AbstractVector,
