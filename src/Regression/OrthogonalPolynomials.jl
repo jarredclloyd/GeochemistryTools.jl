@@ -297,8 +297,20 @@ function _orthogonal_LSQ(
                 ),
             )
         end
-        Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} =
-            Diagonal(ω .^ 2)
+        Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} = Diagonal(ω .^ 2)
+        #= Replace computation of Λ and VarΛX with QR and SVD forms.
+
+        ỹ =  exp(-0.5log(Ω)) * y, X̃ = exp(-0.5log(Ω) * X until native transcendentals implemented in MultiFloats then ^ should work
+
+        QR form
+        Λ = QR \ ỹ, , QR = qr(X̃),
+        U = inv(R)*transpose(inv(R))
+
+        SVD form
+        Λ = V * inv(diagm(S)) * transpose(U) * ȳ,
+        U = V * inv(diagm(S .^2)) * V'
+
+        =#
         Xᵀ::Transpose{MultiFloat{Float64,4},Matrix{MultiFloat{Float64,4}}} = transpose(X)
         rss::Vector{Float64} = Vector{Float64}(undef, 5)
         AIC::Vector{Float64} = Vector{Float64}(undef, 5)
