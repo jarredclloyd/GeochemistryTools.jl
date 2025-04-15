@@ -21,7 +21,11 @@ using HypothesisTests
 @reexport using Dates
 using SparseArrays
 using LinearAlgebra
+using GenericLinearAlgebra
 using MultiFloats
+# MultiFloats.use_bigfloat_transcendentals()
+@inline Base.precision(::Type{MultiFloat{T,N}}) where {T,N} =
+           N * precision(T) + (N - 1) # implicit bits of precision between limbs
 using SpecialFunctions
 using PyCall
 using Conda
