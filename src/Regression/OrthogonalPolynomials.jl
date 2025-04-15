@@ -221,7 +221,7 @@ function poly_standarderror(
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    X::Matrix{Float64} = _design_matrix(x, fit, order)
+    X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
         sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level,
@@ -238,7 +238,7 @@ function poly_confidenceband(
         throw(ArgumentError("Polynomial order must be positive"))
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
-    X::Matrix{Float64} = _design_matrix(x, fit, order)
+    X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue)
 end
@@ -253,7 +253,7 @@ function poly_predictionband(
         throw(ArgumentError("Polynomial order must be positive"))
     end
     tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
-    X::Matrix{Float64} = _design_matrix(x, fit, order)
+    X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
         sqrt.((fit.rmse[order + 1]^2) .* sum(1 .+ X .* (X * VarΛX); dims = 2)) .* tvalue,
@@ -490,7 +490,7 @@ function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Int
         throw(ArgumentError("Polynomial order must be positive"))
     end
     if order == 0
-        X::Matrix{Float64x4} = repeat([1.0], length(x))
+        X = repeat([1.0], length(x))
     elseif order == 1
         X = hcat(repeat([1.0], length(x)), (x .- fit.beta))
     elseif order == 2
