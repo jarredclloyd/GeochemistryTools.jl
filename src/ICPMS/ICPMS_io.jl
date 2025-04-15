@@ -267,7 +267,7 @@ function load_agilent(
                 end
                 centre_value = alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])
                 df.ratio_centred = df.ratio .- centre_value
-                df.ratio_centred_σ = df.ratio_centred .* (df.ratio_σ ./ df.ratio)
+                df.ratio_centred_σ = abs.(df.ratio_centred .* (df.ratio_σ ./ df.ratio))
             end
             if trim == true
                 filter!(:signal_time => x -> stable_time .≤ x .≤ signal_end, df)
