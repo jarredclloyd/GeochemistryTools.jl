@@ -392,10 +392,10 @@ function _orthogonal_LSQ(
         return OrthogonalPolynomial(
             Λ,
             Λ_SE,
-            Float64.(β),
-            Float64.(γ),
-            Float64.(δ),
-            Float64.(ϵ),
+            big.(β),
+            big.(γ),
+            big.(δ),
+            big.(ϵ),
             VarΛX,
             order,
             R²,
@@ -462,27 +462,27 @@ end
 
 function _gamma_orthogonal(N::Integer, sums::AbstractVector)
     vieta::Vector{BigFloat} =
-        [-sums[1] N; -sums[2] sums[1]] \ [-sums[2]; -sums[3]]
+        qr([-sums[1] N; -sums[2] sums[1]]) \ [-sums[2]; -sums[3]]
     return real(PolynomialRoots.roots([vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 
 function _delta_orthogonal(N::Integer, sums::AbstractVector)
     vieta::Vector{BigFloat} =
-        [
+        qr([
             -sums[2] sums[1] -N
             -sums[3] sums[2] -sums[1]
             -sums[4] sums[3] -sums[2]
-        ] \ [-sums[3]; -sums[4]; -sums[5]]
+        ]) \ [-sums[3]; -sums[4]; -sums[5]]
     return real(PolynomialRoots.roots([-vieta[3], vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 function _epsilon_orthogonal(N::Integer, sums::AbstractVector)
     vieta::Vector{BigFloat} =
-        [
+        qr([
             -sums[3] sums[2] -sums[1] N
             -sums[4] sums[3] -sums[2] sums[1]
             -sums[5] sums[4] -sums[3] sums[2]
             -sums[6] sums[5] -sums[4] sums[3]
-        ] \ [-sums[4]; -sums[5]; -sums[6]; -sums[7]]
+        ]) \ [-sums[4]; -sums[5]; -sums[6]; -sums[7]]
     return real(PolynomialRoots.roots([vieta[4], -vieta[3], vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 
