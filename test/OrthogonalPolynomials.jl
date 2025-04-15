@@ -1,5 +1,5 @@
-using Random, GeochemistryTools, Distributions, LinearAlgebra, MultiFloats, StatsBase
-test_x = collect(0:0.5:60)
+using Random, GeochemistryTools, Distributions, LinearAlgebra, MultiFloats, StatsBase, GenericLinearAlgebra
+test_x = collect(0:0.05:10)
 𝑁::Integer = length(test_x)
 
 x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
@@ -16,7 +16,6 @@ X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (test_x .- β), (test_x
 
 Λ = [1, -1, 1, -1, 1]
 test_y = GeochemistryTools._poly_orthogonal(test_x, Λ, β, γ, δ, ϵ, 4)
-test_y_noisy = GeochemistryTools._poly_orthogonal(test_x .+ noise_x, Λ, β, γ, δ, ϵ, 4)
 test_array = hcat(test_x, test_y)
 test_errors = abs.(rand(Xoshiro(), Normal(0.02,0.01), 𝑁))
 test_fit = fit_orthogonal(test_array)
@@ -39,6 +38,5 @@ for i ∈ 2:10000
     test_array_noisy = hcat(test_x_noisy, test_y_noisy);
     test_fit_noisy = fit_orthogonal(test_array_noisy);
     coeffs = vcat(coeffs, test_fit_noisy.lambda')
-    GLScoeffs = vcat(GLScoeffs, GLS_fit_noisy.beta')
 end
 coeff_mean_var = hcat(reshape(mean(coeffs; dims=1),5,1), reshape(var(coeffs; dims=1),5,1))
