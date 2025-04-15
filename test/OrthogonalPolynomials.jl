@@ -10,15 +10,16 @@ x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
 γ::Vector{MultiFloat{Float64,4}} = GeochemistryTools._gamma_orthogonal(𝑁, x_sums)
 δ::Vector{MultiFloat{Float64,4}} = GeochemistryTools._delta_orthogonal(𝑁, x_sums)
 ϵ::Vector{MultiFloat{Float64,4}} = GeochemistryTools._epsilon_orthogonal(𝑁, x_sums)
-order::Vector{Integer} = [0, 1, 2, 3, 4]
+order= [0, 1, 2, 3, 4]
 
 X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (test_x .- β), (test_x .- γ[1]) .* (test_x .- γ[2]), (test_x .- δ[1]) .* (test_x .- δ[2]) .* (test_x .- δ[3]), (test_x .- ϵ[1]) .* (test_x .- ϵ[2]) .* (test_x .- ϵ[3]) .* (test_x .- ϵ[4]))
 
 Λ = [1, -1, 1, -1, 1]
 test_y = GeochemistryTools._poly_orthogonal(test_x, Λ, β, γ, δ, ϵ, 4)
 test_array = hcat(test_x, test_y)
-test_errors = abs.(rand(Xoshiro(), Normal(0.02,0.01), 𝑁))
+test_errors = abs.(rand(Xoshiro(), Normal(0.02,0.01), 𝑁)) .* test_y
 test_fit = fit_orthogonal(test_array)
+test_fit_wt = fit_orthogonal(hcat(test_array, test_errors); errors=true)
 
 @test test_fit.lambda .≈ Λ
 
