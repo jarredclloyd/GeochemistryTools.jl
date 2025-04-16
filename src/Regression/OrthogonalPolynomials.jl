@@ -301,7 +301,7 @@ function _orthogonal_LSQ(
         X̃::Matrix{Float64x4} = exp(-0.5log(Ω)) * X
         ỹ::Vector{Float64x4} = exp(-0.5log(Ω)) * y
 
-        if cond(X) ≤ 1e7
+        if cond(X̃) ≤ 1e7
             F = qr(X̃)
             Λ::Vector{Float64x4} = F \ ỹ
             VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
