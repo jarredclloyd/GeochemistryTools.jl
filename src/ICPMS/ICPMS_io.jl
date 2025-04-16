@@ -494,6 +494,7 @@ function automatic_laser_times(
                 pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i - 1), 2]))))
             end
         end
+        z[:,3] = replace!(x -> isnan(x) ? Inf : x, z[:,3])
         laser_start_ind = findmin(@view(z[:, 3]))[2]
         laser_start_time = time[laser_start_ind]
         q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
