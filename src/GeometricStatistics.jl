@@ -40,7 +40,7 @@ end
 function geovar_zeros(x::AbstractVector)
     N = length(x)
     N2 = count(x .> 0)
-    if N2 > 0
+    if N2 > 1
         var₊ = exp(var(log.(x[x[:] .> 0, :])))
         varG = (N2 / N) * var₊
     else
@@ -56,7 +56,7 @@ end
 function geosem_zeros(x::AbstractVector)
     N = length(x)
     N2 = count(x .> 0)
-    if N2 > 0
+    if N2 > 1
         sem₊ = exp(sem(log.(x[x[:] .> 0, :])))
         semG = (N2 / N) * sem₊
     else
