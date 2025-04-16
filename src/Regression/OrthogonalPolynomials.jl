@@ -224,7 +224,7 @@ function poly_standarderror(
     X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
-        sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level,
+        sqrt.(fit.reduced_chi_squared[order + 1] .* sum(X .* (X * VarΛX); dims = 2)) .* se_level,
     )
 end
 
@@ -237,10 +237,12 @@ function poly_confidenceband(
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
+    tvalue = cquantile(TDist(length(x) - order + 1), (1 - ci_level) / 2)
     X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
-    return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue)
+    return vec(
+        sqrt.(fit.reduced_chi_squared[order + 1] .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue
+        )
 end
 
 function poly_predictionband(
@@ -252,11 +254,11 @@ function poly_predictionband(
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
+    tvalue = cquantile(TDist(length(x) - order + 1), (1 - ci_level) / 2)
     X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
-        sqrt.((fit.rmse[order + 1]^2) .* sum(1 .+ X .* (X * VarΛX); dims = 2)) .* tvalue,
+        sqrt.(fit.reduced_chi_squared[order + 1] .* (1 .+ sum(X .* (X * VarΛX); dims = 2))) .* tvalue,
     )
 end
 
