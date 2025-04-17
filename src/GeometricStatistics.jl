@@ -50,7 +50,7 @@ function geovar_zeros(x::AbstractVector)
 end
 
 function geostd_zeros(x::AbstractVector)
-    return sqrt(geovar_zeros(x))
+    return std(log.(x[x[:] .> 0, :]))
 end
 
 function geosem_zeros(x::AbstractVector)
