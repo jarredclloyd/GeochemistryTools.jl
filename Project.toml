@@ -31,10 +31,12 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [compat]
-GenericLinearAlgebra = "0.3.15"
-IsotopeTable = "0.1.0"
-PeriodicTable = "1.2.1"
-Unitful = "1.22.0"
+Conda = "1.10"
+GenericLinearAlgebra = "0.3"
+IsotopeTable = "0.1"
+PeriodicTable = "1.2"
+PyCall = "1.96"
+Unitful = "1.22"
 julia = "1.10"
 
 [extras]
