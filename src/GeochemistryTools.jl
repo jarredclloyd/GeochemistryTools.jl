@@ -90,9 +90,15 @@ function timeout(f, args, seconds, fail)
     end
 end
 
-const pybaselines = PyNULL()
 
-pyimport_conda("scipy", "scipy")
+# switch to PythonCall and CondaPkg when open_ssl is updated, or write baselines into native julia
+#=
+const pybaselines = Ref{Py}()
+function __init__
+    pybaselines = pyimport("pybaselines)
+end
+=#
+const pybaselines = PyNULL()
 
 function __init__()
     copy!(pybaselines, pyimport_conda("pybaselines", "pybaselines"))
