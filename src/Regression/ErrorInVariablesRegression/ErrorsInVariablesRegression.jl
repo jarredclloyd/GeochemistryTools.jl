@@ -1,4 +1,4 @@
-export fit_eivlr, affine_prediction, affine_standarderror, affine_confidenceband, affine_predictionband
+export fit_eivlr, linear_prediction, linear_standarderror, linear_confidenceband, linear_predictionband
 export LinearRegression, ErrorsInVariablesRegression
 abstract type LinearRegression <: Any end
 abstract type ErrorsInVariablesRegression <: LinearRegression end
@@ -176,8 +176,8 @@ function fit_eivlr(
     se_type::AbstractString = "abs",
     initial::Any = nothing,
 )
-    dfCols::Integer = ncol(df)
-    dfRows::Integer = nrow(df)
+    dfCols::Int = ncol(df)
+    dfRows::Int = nrow(df)
     if initial !== nothing
         if isa(initial, AbstractString) == true && haskey(dict_sr87_sr86i, initial) == true
             if algorithm .== "mahon"
@@ -189,8 +189,8 @@ function fit_eivlr(
                 ]
             else
                 initial = [
-                    1e-16,
-                    1e-16,
+                    1e-12,
+                    1e-12,
                     deepcopy(dict_sr87_sr86i[initial])[1],
                     deepcopy(dict_sr87_sr86i[initial])[2] * se_level_in,
                 ]
@@ -199,7 +199,7 @@ function fit_eivlr(
             if algorithm .== "mahon"
                 initial = [0, 0, initial, initial * 0.1]
             else
-                initial = [1e-16, 1e-16, initial, initial * 0.1]
+                initial = [1e-12, 1e-12, initial, initial * 0.1]
             end
         elseif length(initial) == 2 &&
                isa(initial[1], AbstractFloat) &&
@@ -207,7 +207,7 @@ function fit_eivlr(
             if algorithm .== "mahon"
                 initial = [0, 0, initial[1], initial[2]]
             else
-                initial = [1e-16, 1e-16, initial[1], initial[2]]
+                initial = [1e-12, 1e-12, initial[1], initial[2]]
             end
         elseif length(initial) >= 3
             throw(
@@ -244,10 +244,10 @@ Dictionaries currently available are `dict_sr87_sr86i`
         alg = _eivlr_mahon
     elseif lowercase.(algorithm) == "york"
         alg = _eivlr_york
+    else
+        throw(ArgumentError("Algorithm must be either 'mahon' or 'york'. Received: $algorithm"))
     end
-    if occursin('a', lowercase.(se_type)) == true ||
-       occursin("abs", lowercase.(se_type)) == true ||
-       occursin("absolute", lowercase.(se_type)) == true
+    if occursin('a', lowercase.(se_type)) == true
         if dfCols == 5
             eivlr = alg(
                 df[!, 1],
@@ -263,9 +263,7 @@ Dictionaries currently available are `dict_sr87_sr86i`
                 ArgumentError("Column width is not equal to 4 or 5. Some data is missing."),
             )
         end
-    elseif occursin('r', lowercase.(se_type)) == true ||
-           occursin("rel", lowercase.(se_type)) == true ||
-           occursin("relative", lowercase.(se_type)) == true
+    elseif occursin('r', lowercase.(se_type)) == true
         if dfCols == 5
             eivlr = alg(
                 df[!, 1],
@@ -293,32 +291,22 @@ Dictionaries currently available are `dict_sr87_sr86i`
     return eivlr
 end
 
-function affine_prediction(x::AbstractVector, fit::ErrorsInVariablesRegression)
+function linear_prediction(x::AbstractVector, fit::ErrorsInVariablesRegression)
     return fit.beta0 .+ x .* fit.beta1
 end
 
-function affine_standarderror(
+function linear_standarderror(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
     se_level::Integer = 1,
 )
     X = hcat(repeat([1.0], length(x)), x)
     VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit. covariance_beta fit.beta1_se^2]
-    return vec(sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* se_level)
+    return vec(
+        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* se_level
+    )
 end
-function affine_confidenceband(
-    x::AbstractVector,
-    fit::ErrorsInVariablesRegression;
-    confidence_level::AbstractFloat = 0.95,
-)
-    ν = fit.n_observations - 2
-    tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
-    X = hcat(repeat([1.0], length(x)), x)
-    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
-    return vec(sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* tvalue)
-end
-
-function affine_predictionband(
+function linear_confidenceband(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
     confidence_level::AbstractFloat = 0.95,
@@ -328,6 +316,20 @@ function affine_predictionband(
     X = hcat(repeat([1.0], length(x)), x)
     VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
     return vec(
-        sqrt.(fit.reduced_chi_squared .* sum(1 .+ X .* (X * VarCovar); dims = 2)) .* tvalue,
+        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* tvalue
+    )
+end
+
+function linear_predictionband(
+    x::AbstractVector,
+    fit::ErrorsInVariablesRegression;
+    confidence_level::AbstractFloat = 0.95,
+)
+    ν = fit.n_observations - 2
+    tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
+    X = hcat(repeat([1.0], length(x)), x)
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
+    return vec(
+        sqrt.(fit.reduced_chi_squared[order + 1] .* (1 .+ sum(X .* (X * VarCovar); dims = 2))) .* tvalue,
     )
 end

@@ -9,16 +9,16 @@ errors-in-variables regression algorithm of Mahon (1996) corrected by Stephan an
 
 =#
 # function exports
-export _eivlr_mahon
+export fit_mahon
 
 # caller functions
 """
-    _eivlr_mahon(df::AbstractDataFrame; [se_level_in::Int=2, se_level_out::Int=2, se_type::AbstractString="abs",
+    fit_mahon(df::AbstractDataFrame; [se_level_in::Int=2, se_level_out::Int=2, se_type::AbstractString="abs",
         initial::Any=nothing])
 
 Compute line of best fit using the "Mahon" errors-in-variables linear regression algorithm.
 
-Input df as a DataFrame of 4 of 5 columns wide with column order (X, sX, Y, sY, [ρXY]).
+Input df as a DataFrame of 4 of 5 columns wide with column order (x, σx, y, σy, [ρxy]).
 
 # Keywords
 
@@ -43,7 +43,7 @@ Stephan, T & Trappitsch, R (2023) 'Reliable uncertainties: Error correlation, ro
 regressions ∈ three-isotope plots and beyond', *International Journal of Mass Spectrometry*, 491:117053.
 https://doi.org/10.1016/j.ijms.2023]].117053
 """
-function _eivlr_mahon(
+function fit_mahon(
     df::AbstractDataFrame;
     se_level_in::Int = 2,
     se_level_out::Int = 2,
@@ -52,98 +52,107 @@ function _eivlr_mahon(
 ) end
 
 """
-    _eivlr_mahon(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
+    _eivlr_mahon(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, σy::Vector{<:Real}, ρxy::Union{Nothing, Vector{<:Real}} = nothing)
 
 Compute line of best fit using the "Mahon" errors-in-variables regression algorithm.
 """
 function _eivlr_mahon(
-    X::AbstractArray,
-    sX::AbstractArray,
-    Y::AbstractArray,
-    sY::AbstractArray,
-    ρXY = nothing,
+    x::Vector{<:Real},
+    σx::Vector{<:Real},
+    y::Vector{<:Real},
+    σy::Vector{<:Real},
+    ρxy::Union{Nothing, Vector{<:Real}} = nothing,
 )
-    nX::Int = length(X)
-    if ρXY === nothing
-        ρXY::AbstractArray = zeros(nX)
-    elseif length(ρXY) !== nX
-        ρXY = push!(zeros(nX - length(ρXY)))
+    if _check_equal_length(x, σx, y, σy) != true
+        throw(ArgumentError("The length of x, σx, y and σy must be the same."))
     end
-    β₀::AbstractFloat, β₁::AbstractFloat = coeffs(Polynomials.fit(X, Y, 1))
-    βₑ::AbstractFloat = β₁
-    σxy::AbstractVector = ρXY .* sX .* sY
-    Ω::AbstractVector = @. (1 / (sY^2 + β₁^2 * sX^2 - 2 * β₁ * σxy))
-    X̄::AbstractFloat = sum(Ω .* X) / sum(Ω)
-    Ȳ::AbstractFloat = sum(Ω .* Y) / sum(Ω)
-    U::AbstractVector = X .- X̄
-    V::AbstractVector = Y .- Ȳ
+    𝑁::Int = length(x)
+    if ρxy === nothing
+        ρxy::Vector{Float64} = zeros(𝑁)
+    elseif length(ρxy) !== 𝑁
+        throw(ArgumentError("The length of ρxy must be the same as x, σx, y and σy."))
+    end
+
+    # initial slope and intercept from (OLS)
+    β₀::Float64, β₁::Float64 = hcat(ones(𝑁), x) \ y
+    βₑ::Float64 = β₁
+
+    # initial fit via Mahon method
+    σxy::Vector{Float64} = ρxy .* σx .* σy
+    Ω::Vector{Float64} = @. (1 / (σy^2 + β₁^2 * σx^2 - 2 * β₁ * σxy))
+    x̄::Float64 = sum(Ω .* x) / sum(Ω)
+    ȳ::Float64 = sum(Ω .* y) / sum(Ω)
+    u::Vector{Float64} = x .- x̄
+    v::Vector{Float64} = y .- ȳ
     β₁ =
-        sum(@.(Ω^2 * V * (U * sY^2 + β₁ * V * sX^2 - V * σxy))) /
-        sum(@.(Ω^2 * U * (U * sY^2 + β₁ * V * sX^2 - β₁ * U * σxy)))
+        sum(@.(Ω^2 * v * (u * σy^2 + β₁ * v * σx^2 - v * σxy))) /
+        sum(@.(Ω^2 * u * (u * σy^2 + β₁ * v * σx^2 - β₁ * u * σxy)))
+
     n_iterations::Integer = 1
+    # iterative solve via Mahon method
     while abs(βₑ - β₁) > 1e-15 && n_iterations < 1e6
         βₑ = β₁
-        Ω = @.(1 / (sY^2 + βₑ^2 * sX^2 - 2 * βₑ * σxy))
-        X̄ = sum(Ω .* X) / sum(Ω)
-        Ȳ = sum(Ω .* Y) / sum(Ω)
-        U = X .- X̄
-        V = Y .- Ȳ
+        Ω = @.(1 / (σy^2 + βₑ^2 * σx^2 - 2 * βₑ * σxy))
+        x̄ = sum(Ω .* x) / sum(Ω)
+        ȳ = sum(Ω .* y) / sum(Ω)
+        u = x .- x̄
+        v = y .- ȳ
         β₁ =
-            sum(@. (Ω^2 * V * (U * sY^2 + β₁ * V * sX^2 - V * σxy))) /
-            sum(@. (Ω^2 * U * (U * sY^2 + β₁ * V * sX^2 - β₁ * U * σxy)))
+            sum(@. (Ω^2 * v * (u * σy^2 + β₁ * v * σx^2 - v * σxy))) /
+            sum(@. (Ω^2 * u * (u * σy^2 + β₁ * v * σx^2 - β₁ * u * σxy)))
         n_iterations += 1
     end
-    β₀ = Ȳ - β₁ * X̄
-    χ²::AbstractFloat = sum(@. (Ω * (Y - β₁ * X - β₀)^2))
-    ν::Int = nX > 2 ? nX - 2 : 1
-    χ²ᵣ::AbstractFloat = χ² / ν
-    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
+    β₀ = ȳ - β₁ * x̄
+    χ²::Float64 = sum(@. (Ω * (y - β₁ * x - β₀)^2))
+    ν::Int = 𝑁 > 2 ? 𝑁 - 2 : 1
+    χ²ᵣ::Float64 = χ² / ν
+    pval::Float64 = ccdf(Chisq(ν), χ²)
     # derivative calculations
-    δθδβ₁ = _δθδβ₁(β₁, Ω, U, V, sX, sY, σxy)
-    δθδX = zeros(AbstractFloat, nX)
-    Threads.@threads for i ∈ eachindex(X)
-        δθδX[i] = _δθδXᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
+    δθδβ₁ = _δθδβ₁(β₁, Ω, u, v, σx, σy, σxy)
+    δθδX = zeros(Float64, 𝑁)
+    Threads.@threads for i ∈ eachindex(x)
+        δθδX[i] = _δθδXᵢ(i, β₁, Ω, u, v, σx, σy, σxy)
     end
-    δθδY = zeros(AbstractFloat, nX)
-    Threads.@threads for i ∈ eachindex(X)
-        δθδY[i] = _δθδYᵢ(i, β₁, Ω, U, V, sX, sY, σxy)
+    δθδY = zeros(Float64, 𝑁)
+    Threads.@threads for i ∈ eachindex(x)
+        δθδY[i] = _δθδYᵢ(i, β₁, Ω, u, v, σx, σy, σxy)
     end
-    δβ₀δX = zeros(AbstractFloat, nX)
-    Threads.@threads for i ∈ eachindex(X)
-        δβ₀δX[i] = _δβ₀δXᵢ(i, X̄, β₁, Ω, δθδX, δθδβ₁)
+    δβ₀δX = zeros(Float64, 𝑁)
+    Threads.@threads for i ∈ eachindex(x)
+        δβ₀δX[i] = _δβ₀δXᵢ(i, x̄, β₁, Ω, δθδX, δθδβ₁)
     end
-    δβ₀δY = zeros(AbstractFloat, nX)
-    Threads.@threads for i ∈ eachindex(X)
-        δβ₀δY[i] = _δβ₀δYᵢ(i, X̄, Ω, δθδY, δθδβ₁)
+    δβ₀δY = zeros(Float64, 𝑁)
+    Threads.@threads for i ∈ eachindex(x)
+        δβ₀δY[i] = _δβ₀δYᵢ(i, x̄, Ω, δθδY, δθδβ₁)
     end
     # variance calculations
-    σβ₁² = sum(@.(δθδX^2 * sX^2 + δθδY^2 * sY^2 + 2 * σxy * δθδX * δθδY)) / δθδβ₁^2
-    σβ₀² = sum(@.(δβ₀δX^2 * sX^2 + δβ₀δY^2 * sY^2 + 2 * σxy * δβ₀δX * δβ₀δY))
+    σβ₁² = sum(@.(δθδX^2 * σx^2 + δθδY^2 * σy^2 + 2 * σxy * δθδX * δθδY)) / δθδβ₁^2
+    σβ₀² = sum(@.(δβ₀δX^2 * σx^2 + δβ₀δY^2 * σy^2 + 2 * σxy * δβ₀δX * δβ₀δY))
     X_intercept = -β₀ / β₁
-    #= X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; sX ⇄ sY; X̄ ⇄ Ȳ}
-    Ω = @.(1 / (sX^2 + (1 / β₁)^2 * sY^2 - 2 * (1 / β₁) * σxy))
-    δθδβ₁ = _δθδβ₁((1 / β₁), Ω, U, V, sY, sX, σxy)
-    δθδX = zeros(AbstractFloat, nX)
-    Threads.@threads for i ∈ eachindex(X)
-        δθδX[i] = _δθδXᵢ(i, (1 / β₁), Ω, U, V, sY, sX, σxy)
+    #= X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; σx ⇄ σy; x̄ ⇄ ȳ}
+    Ω = @.(1 / (σx^2 + (1 / β₁)^2 * σy^2 - 2 * (1 / β₁) * σxy))
+    δθδβ₁ = _δθδβ₁((1 / β₁), Ω, u, v, σy, σx, σxy)
+    δθδX = zeros(Float64, 𝑁)
+    Threads.@threads for i ∈ eachindex(x)
+        δθδX[i] = _δθδXᵢ(i, (1 / β₁), Ω, u, v, σy, σx, σxy)
     end
-    δθδY = zeros(AbstractFloat, nX)
-    Threads.@threads for i ∈ eachindex(X)
-        δθδY[i] = _δθδYᵢ(i, (1 / β₁), Ω, U, V, sY, sX, σxy)
+    δθδY = zeros(Float64, 𝑁)
+    Threads.@threads for i ∈ eachindex(x)
+        δθδY[i] = _δθδYᵢ(i, (1 / β₁), Ω, u, v, σy, σx, σxy)
     end
-    δβ₀δX = zeros(AbstractFloat, nX)
-    Threads.@threads for i ∈ eachindex(X)
-        δβ₀δX[i] = _δβ₀δXᵢ(i, Ȳ, (1 / β₁), Ω, δθδX, δθδβ₁)
+    δβ₀δX = zeros(Float64, 𝑁)
+    Threads.@threads for i ∈ eachindex(x)
+        δβ₀δX[i] = _δβ₀δXᵢ(i, ȳ, (1 / β₁), Ω, δθδX, δθδβ₁)
     end
-    δβ₀δY = zeros(AbstractFloat, nX)
-    Threads.@threads for i ∈ eachindex(X)
-        δβ₀δY[i] = _δβ₀δYᵢ(i, Ȳ, Ω, δθδY, δθδβ₁)
+    δβ₀δY = zeros(Float64, 𝑁)
+    Threads.@threads for i ∈ eachindex(x)
+        δβ₀δY[i] = _δβ₀δYᵢ(i, ȳ, Ω, δθδY, δθδβ₁)
     end
-    σX_intercept² = sum(@.(δβ₀δX^2 * sY^2 + δβ₀δY^2 * sX^2 + 2 * σxy * δβ₀δX * δβ₀δY))
+    σX_intercept² = sum(@.(δβ₀δX^2 * σy^2 + δβ₀δY^2 * σx^2 + 2 * σxy * δβ₀δX * δβ₀δY))
     =#
     β₀SE = √(σβ₀²)
     β₁SE = √(σβ₁²)
-    σᵦ₁ᵦ₀::AbstractFloat = -X̄ * σβ₁²
+    σᵦ₁ᵦ₀::Float64 = -x̄ * σβ₁²
     X_interceptSE = sqrt((β₀SE / β₀)^2 + (β₁SE / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁)) #=√(σX_intercept²)=#
     return MahonNonFixed(
         β₀,
@@ -155,78 +164,81 @@ function _eivlr_mahon(
         χ²ᵣ,
         pval,
         σᵦ₁ᵦ₀,
-        nX
+        𝑁
     )
 end
 
 function _eivlr_mahon_fixedpoint(
-    X::AbstractArray,
-    sX::AbstractArray,
-    Y::AbstractArray,
-    sY::AbstractArray,
-    ρXY = nothing;
-    X₀Y₀::Tuple{Real,Real,Real,Real} = (0, 0, 0, 0),
+    x::AbstractArray,
+    σx::AbstractArray,
+    y::AbstractArray,
+    σy::AbstractArray,
+    ρxy = nothing;
+    x₀y₀::Tuple{Real,Real,Real,Real} = (0, 0, 0, 0),
 )
-    nX::Int = length(X)
-    if ρXY === nothing
-        ρXY::AbstractArray = zeros(nX)
-    elseif length(ρXY) !== nX
-        ρXY = push!(zeros(nX - length(ρXY)))
+    if _check_equal_length(x, σx, y, σy) != true
+        throw(ArgumentError("The length of x, σx, y and σy must be the same."))
     end
-    β₀::AbstractFloat, β₁::AbstractFloat = coeffs(Polynomials.fit(X, Y, 1))
-    βₑ::AbstractFloat = β₁
-    σxy::AbstractVector = ρXY .* sX .* sY
-    Ω::AbstractVector = @. (1 / (sY^2 + β₁^2 * sX^2 - 2 * β₁ * σxy))
-    X̄::AbstractFloat = sum(Ω .* X) / sum(Ω)
-    Ȳ::AbstractFloat = sum(Ω .* Y) / sum(Ω)
-    U::AbstractVector = X .- X̄
-    V::AbstractVector = Y .- Ȳ
+    𝑁::Int = length(x)
+    if ρxy === nothing
+        ρxy::Vector{Float64} = zeros(𝑁)
+    elseif length(ρxy) !== 𝑁
+        throw(ArgumentError("The length of ρxy must be the same as x, σx, y and σy."))
+    end
+    β₀::Float64, β₁::Float64 = hcat(ones(𝑁), x) \ y
+    βₑ::Float64 = β₁
+    σxy::Vector{Float64} = ρxy .* σx .* σy
+    Ω::Vector{Float64} = @. (1 / (σy^2 + β₁^2 * σx^2 - 2 * β₁ * σxy))
+    x̄::Float64 = sum(Ω .* x) / sum(Ω)
+    ȳ::Float64 = sum(Ω .* y) / sum(Ω)
+    u::Vector{Float64} = x .- x̄
+    v::Vector{Float64} = y .- ȳ
     β₁ =
-        sum(@.(Ω^2 * V * (U * sY^2 + β₁ * V * sX^2 - V * σxy))) /
-        sum(@.(Ω^2 * U * (U * sY^2 + β₁ * V * sX^2 - β₁ * U * σxy)))
+        sum(@.(Ω^2 * v * (u * σy^2 + β₁ * v * σx^2 - v * σxy))) /
+        sum(@.(Ω^2 * u * (u * σy^2 + β₁ * v * σx^2 - β₁ * u * σxy)))
     n_iterations::Integer = 1
     while abs(βₑ - β₁) > 1e-15 && n_iterations < 1e6
         βₑ = β₁
-        Ω = @.(1 / (sY^2 + βₑ^2 * sX^2 - 2 * βₑ * σxy))
-        X̄ = sum(Ω .* X) / sum(Ω)
-        Ȳ = sum(Ω .* Y) / sum(Ω)
-        U = X .- X̄
-        V = Y .- Ȳ
+        Ω = @.(1 / (σy^2 + βₑ^2 * σx^2 - 2 * βₑ * σxy))
+        x̄ = sum(Ω .* x) / sum(Ω)
+        ȳ = sum(Ω .* y) / sum(Ω)
+        u = x .- x̄
+        v = y .- ȳ
         β₁ =
-            sum(@. (Ω^2 * V * (U * sY^2 + β₁ * V * sX^2 - V * σxy))) /
-            sum(@. (Ω^2 * U * (U * sY^2 + β₁ * V * sX^2 - β₁ * U * σxy)))
+            sum(@. (Ω^2 * v * (u * σy^2 + β₁ * v * σx^2 - v * σxy))) /
+            sum(@. (Ω^2 * u * (u * σy^2 + β₁ * v * σx^2 - β₁ * u * σxy)))
         n_iterations += 1
     end
-    β₀ = Ȳ - β₁ * X̄
-    χ²::AbstractFloat = sum(@.(Ω * (Y - β₁ * X - β₀)^2))
-    ν::Int = nX > 2 ? nX - 2 : 1
-    χ²ᵣ::AbstractFloat = χ² / ν
-    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
+    β₀ = ȳ - β₁ * x̄
+    χ²::Float64 = sum(@.(Ω * (y - β₁ * x - β₀)^2))
+    ν::Int = 𝑁 > 2 ? 𝑁 - 2 : 1
+    χ²ᵣ::Float64 = χ² / ν
+    pval::Float64 = ccdf(Chisq(ν), χ²)
     # derivative calculations
-    δθδβ₁ = _δθδβ₁_fp(β₁, Ω, U, V, sX, sY, σxy)
-    δθδX = _δθδXᵢ_fp(β₁, Ω, U, V, sX, sY, σxy)
-    δθδY = _δθδYᵢ_fp(β₁, Ω, U, V, sX, sY, σxy)
-    δβ₀δX = _δβ₀δXᵢ_fp(X̄, δθδX, δθδβ₁)
-    δβ₀δY = _δβ₀δYᵢ_fp(X̄, δθδY, δθδβ₁)
+    δθδβ₁ = _δθδβ₁_fp(β₁, Ω, u, v, σx, σy, σxy)
+    δθδX = _δθδXᵢ_fp(β₁, Ω, u, v, σx, σy, σxy)
+    δθδY = _δθδYᵢ_fp(β₁, Ω, u, v, σx, σy, σxy)
+    δβ₀δX = _δβ₀δXᵢ_fp(x̄, δθδX, δθδβ₁)
+    δβ₀δY = _δβ₀δYᵢ_fp(x̄, δθδY, δθδβ₁)
     # variance calculations
-    σβ₁² = sum(@.(δθδX^2 * sX^2 + δθδY^2 * sY^2 + 2 * σxy * δθδX * δθδY)) / δθδβ₁^2
-    σβ₀² = σβ₁² * X₀Y₀[1]
+    σβ₁² = sum(@.(δθδX^2 * σx^2 + δθδY^2 * σy^2 + 2 * σxy * δθδX * δθδY)) / δθδβ₁^2
+    σβ₀² = σβ₁² * x₀y₀[1]
     X_intercept = -β₀ / β₁
-    #= X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; sX ⇄ sY; X̄ ⇄ Ȳ}
+    #= X_intercept and variance {β₁ → 1/β₁; Xᵢ ⇄ Yᵢ; σx ⇄ σy; x̄ ⇄ ȳ}
     # if calc_X_intercept != false
-    Ω = @.(1 / (sX^2 + (1 / β₁)^2 * sY^2 - 2 * (1 / β₁) * σxy))
-    δθδβ₁ = _δθδβ₁_fp((1 / β₁), Ω, V, U, sY, sX, σxy)
-    δθδX = _δθδXᵢ_fp((1 / β₁), Ω, V, U, sY, sX, σxy)
-    δθδY = _δθδYᵢ_fp((1 / β₁), Ω, V, U, sY, sX, σxy)
-    δβ₀δX = _δβ₀δXᵢ_fp(Ȳ, δθδX, δθδβ₁)
-    δβ₀δY = _δβ₀δYᵢ_fp(Ȳ, δθδY, δθδβ₁)
-    σX_intercept² = sum(@.(δβ₀δX^2 * sX^2 + δβ₀δY^2 * sY^2 + 2 * σxy * δβ₀δX * δβ₀δY))
+    Ω = @.(1 / (σx^2 + (1 / β₁)^2 * σy^2 - 2 * (1 / β₁) * σxy))
+    δθδβ₁ = _δθδβ₁_fp((1 / β₁), Ω, v, u, σy, σx, σxy)
+    δθδX = _δθδXᵢ_fp((1 / β₁), Ω, v, u, σy, σx, σxy)
+    δθδY = _δθδYᵢ_fp((1 / β₁), Ω, v, u, σy, σx, σxy)
+    δβ₀δX = _δβ₀δXᵢ_fp(ȳ, δθδX, δθδβ₁)
+    δβ₀δY = _δβ₀δYᵢ_fp(ȳ, δθδY, δθδβ₁)
+    σX_intercept² = sum(@.(δβ₀δX^2 * σx^2 + δβ₀δY^2 * σy^2 + 2 * σxy * δβ₀δX * δβ₀δY))
     =#
     β₀SE = √(σβ₀²)
     β₁SE = √(σβ₁²)
-    σᵦ₁ᵦ₀::AbstractFloat = -X̄ * σβ₁²
+    σᵦ₁ᵦ₀::Float64 = -x̄ * σβ₁²
     X_interceptSE = sqrt((β₀SE / β₀)^2 + (β₁SE / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁)) #=√(σX_intercept²)=#
-    return MahonFixed(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, σᵦ₁ᵦ₀, nX, X₀Y₀)
+    return MahonFixed(β₀, β₀SE, β₁, β₁SE, X_intercept, X_interceptSE, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁, x₀y₀)
 end
 
 function _kroneckerδ(i::Integer, j::Integer)
@@ -236,54 +248,54 @@ end
 function _δθδβ₁(
     β₁::AbstractFloat,
     Ω::AbstractArray,
-    U::AbstractArray,
-    V::AbstractArray,
-    sX::AbstractArray,
-    sY::AbstractArray,
+    u::AbstractArray,
+    v::AbstractArray,
+    σx::AbstractArray,
+    σy::AbstractArray,
     σxy::AbstractArray,
 )
-    return sum(@.(Ω^2 * (2β₁ * (U * V * sX^2 - U^2 * σxy) + (U^2 * sY^2 - V^2 * sX^2)))) +
+    return sum(@.(Ω^2 * (2β₁ * (u * v * σx^2 - u^2 * σxy) + (u^2 * σy^2 - v^2 * σx^2)))) +
            4 * sum(
                @.(
                    Ω^3 *
-                   (σxy - β₁ * sX^2) *
+                   (σxy - β₁ * σx^2) *
                    (
-                       β₁^2 * (U * V * sX^2 - U^2 * σxy) + β₁ * (U^2 * sY^2 - V^2 * sX^2) -
-                       (U * V * sY^2 - V^2 * σxy)
+                       β₁^2 * (u * v * σx^2 - u^2 * σxy) + β₁ * (u^2 * σy^2 - v^2 * σx^2) -
+                       (u * v * σy^2 - v^2 * σxy)
                    )
                ),
            ) +
            2 *
-           sum(@.(Ω^2 * (-(β₁^2) * U * sX^2 + 2β₁ * V * sX^2 + U * sY^2 - 2 * V * σxy))) *
-           sum(@.(Ω^2 * V * (σxy - β₁ * sX^2))) / sum(Ω) +
+           sum(@.(Ω^2 * (-(β₁^2) * u * σx^2 + 2β₁ * v * σx^2 + u * σy^2 - 2 * v * σxy))) *
+           sum(@.(Ω^2 * v * (σxy - β₁ * σx^2))) / sum(Ω) +
            2 *
            sum(
                @.(
                    Ω^2 *
-                   (-(β₁^2) * V * sX^2 + 2(β₁^2) * U * σxy - 2β₁ * U * sY^2 + V * sY^2),
+                   (-(β₁^2) * v * σx^2 + 2(β₁^2) * u * σxy - 2β₁ * u * σy^2 + v * σy^2),
                )
            ) *
-           sum(@.(Ω^2 * U * (σxy - β₁ * sX^2))) / sum(Ω)
+           sum(@.(Ω^2 * u * (σxy - β₁ * σx^2))) / sum(Ω)
 end
 
 function _δθδXᵢ(
     i::Integer,
     β₁::AbstractFloat,
     Ω::AbstractArray,
-    U::AbstractArray,
-    V::AbstractArray,
-    sX::AbstractArray,
-    sY::AbstractArray,
+    u::AbstractArray,
+    v::AbstractArray,
+    σx::AbstractArray,
+    σy::AbstractArray,
     σxy::AbstractArray,
 )
-    δθδXᵢ = zeros(AbstractFloat, length(Ω))
+    δθδXᵢ = zeros(Float64, length(Ω))
     @simd for j ∈ eachindex(Ω)
         δθδXᵢ[j] =
             Ω[j]^2 *
             (_kroneckerδ(i, j) - Ω[i] / sum(Ω)) *
             (
-                β₁^2 * V[j] * sX[j]^2 - 2 * β₁^2 * U[j] * σxy[j] + 2 * β₁ * U[j] * sY[j]^2 -
-                V[j] * sY[j]^2
+                β₁^2 * v[j] * σx[j]^2 - 2 * β₁^2 * u[j] * σxy[j] + 2 * β₁ * u[j] * σy[j]^2 -
+                v[j] * σy[j]^2
             )
     end
     δθδXᵢ = sum(δθδXᵢ)
@@ -294,20 +306,20 @@ function _δθδYᵢ(
     i::Integer,
     β₁::AbstractFloat,
     Ω::AbstractArray,
-    U::AbstractArray,
-    V::AbstractArray,
-    sX::AbstractArray,
-    sY::AbstractArray,
+    u::AbstractArray,
+    v::AbstractArray,
+    σx::AbstractArray,
+    σy::AbstractArray,
     σxy::AbstractArray,
 )
-    δθδYᵢ = zeros(AbstractFloat, length(Ω))
+    δθδYᵢ = zeros(Float64, length(Ω))
     @simd for j ∈ eachindex(Ω)
         δθδYᵢ[j] =
             Ω[j]^2 *
             (_kroneckerδ(i, j) - Ω[i] / sum(Ω)) *
             (
-                β₁^2 * U[j] * sX[j]^2 - 2 * β₁ * V[j] * sX[j]^2 - U[j] * sY[j]^2 +
-                2 * V[j] * σxy[j]
+                β₁^2 * u[j] * σx[j]^2 - 2 * β₁ * v[j] * σx[j]^2 - u[j] * σy[j]^2 +
+                2 * v[j] * σxy[j]
             )
     end
     δθδYᵢ = sum(δθδYᵢ)
@@ -316,43 +328,43 @@ end
 
 function _δβ₀δXᵢ(
     i::Integer,
-    X̄::AbstractFloat,
+    x̄::AbstractFloat,
     β₁::AbstractFloat,
     Ω::AbstractArray,
     δθδX::AbstractArray,
     δθδβ₁::AbstractFloat,
 )
-    return -β₁ * Ω[i] / sum(Ω) - X̄ * δθδX[i] / δθδβ₁
+    return -β₁ * Ω[i] / sum(Ω) - x̄ * δθδX[i] / δθδβ₁
 end
 
 function _δβ₀δYᵢ(
     i::Integer,
-    X̄::AbstractFloat,
+    x̄::AbstractFloat,
     Ω::AbstractArray,
     δθδY::AbstractArray,
     δθδβ₁::AbstractFloat,
 )
-    return Ω[i] / sum(Ω) - X̄ * δθδY[i] / δθδβ₁
+    return Ω[i] / sum(Ω) - x̄ * δθδY[i] / δθδβ₁
 end
 
 # fixed point Mahon
 function _δθδβ₁_fp(
     β₁::AbstractFloat,
     Ω::AbstractArray,
-    U::AbstractArray,
-    V::AbstractArray,
-    sX::AbstractArray,
-    sY::AbstractArray,
+    u::AbstractArray,
+    v::AbstractArray,
+    σx::AbstractArray,
+    σy::AbstractArray,
     σxy::AbstractArray,
 )
-    return sum(@.(Ω^2 * (2β₁ * (U * V * sX^2 - U^2 * σxy) + (U^2 * sY^2 - V^2 * sX^2)))) +
+    return sum(@.(Ω^2 * (2β₁ * (u * v * σx^2 - u^2 * σxy) + (u^2 * σy^2 - v^2 * σx^2)))) +
            4 * sum(
         @.(
             Ω^3 *
-            (σxy - β₁ * sX^2) *
+            (σxy - β₁ * σx^2) *
             (
-                β₁^2 * (U * V * sX^2 - U^2 * σxy) + β₁ * (U^2 * sY^2 - V^2 * sX^2) -
-                (U * V * sY^2 - V^2 * σxy)
+                β₁^2 * (u * v * σx^2 - u^2 * σxy) + β₁ * (u^2 * σy^2 - v^2 * σx^2) -
+                (u * v * σy^2 - v^2 * σxy)
             ),
         )
     )
@@ -361,31 +373,31 @@ end
 function _δθδXᵢ_fp(
     β₁::AbstractFloat,
     Ω::AbstractArray,
-    U::AbstractArray,
-    V::AbstractArray,
-    sX::AbstractArray,
-    sY::AbstractArray,
+    u::AbstractArray,
+    v::AbstractArray,
+    σx::AbstractArray,
+    σy::AbstractArray,
     σxy::AbstractArray,
 )
-    return @.(Ω^2 * (β₁^2 * V * sX^2 - 2 * β₁^2 * U * σxy + 2 * β₁ * U * sY^2 - V * sY^2))
+    return @.(Ω^2 * (β₁^2 * v * σx^2 - 2 * β₁^2 * u * σxy + 2 * β₁ * u * σy^2 - v * σy^2))
 end
 
 function _δθδYᵢ_fp(
     β₁::AbstractFloat,
     Ω::AbstractArray,
-    U::AbstractArray,
-    V::AbstractArray,
-    sX::AbstractArray,
-    sY::AbstractArray,
+    u::AbstractArray,
+    v::AbstractArray,
+    σx::AbstractArray,
+    σy::AbstractArray,
     σxy::AbstractArray,
 )
-    return @.(Ω^2 * (β₁^2 * U * sX^2 - 2 * β₁ * V * sX^2 - U * sY^2 + 2 * V * σxy))
+    return @.(Ω^2 * (β₁^2 * u * σx^2 - 2 * β₁ * v * σx^2 - u * σy^2 + 2 * v * σxy))
 end
 
-function _δβ₀δXᵢ_fp(X̄::AbstractFloat, δθδX::AbstractArray, δθδβ₁::AbstractFloat)
-    return -X̄ * δθδX / δθδβ₁
+function _δβ₀δXᵢ_fp(x̄::AbstractFloat, δθδX::AbstractArray, δθδβ₁::AbstractFloat)
+    return -x̄ * δθδX / δθδβ₁
 end
 
-function _δβ₀δYᵢ_fp(X̄::AbstractFloat, δθδY::AbstractArray, δθδβ₁::AbstractFloat)
-    return -X̄ * δθδY / δθδβ₁
+function _δβ₀δYᵢ_fp(x̄::AbstractFloat, δθδY::AbstractArray, δθδβ₁::AbstractFloat)
+    return -x̄ * δθδY / δθδβ₁
 end

@@ -12,7 +12,7 @@ export yorkfit
 
 Compute line of best fit using York errors-in-variables linear regression algorithm.
 
-Input df as a DataFrame of 4 of 5 columns wide with column order (X, sX, Y, sY, [ρXY]).
+Input df as a DataFrame of 4 of 5 columns wide with column order (X, σx, y, σy, [ρxy]).
 
 # Keywords
 - `se_level_in::Int`: Standard error level of input data. Provide as a positive integer.
@@ -113,49 +113,60 @@ function yorkfit(
     return yfit
 end
 
-function _eivlr_york(X::AbstractArray, sX::AbstractArray, Y::AbstractArray, sY::AbstractArray, ρXY = nothing)
-    𝑁::Int = length(X)
-    if ρXY === nothing
-        ρXY::AbstractArray{AbstractFloat} = zeros(𝑁)
-    elseif length(ρXY) !== 𝑁
-        ρXY = push!(zeros(𝑁 - length(ρXY)))
+function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, σy::Vector{<:Real}, ρxy::Union{Nothing, Vector{<:Real}} = nothing)
+    if _check_equal_length(x, σx, y, σy) != true
+        throw(ArgumentError("The length of x, σx, y and σy must be the same."))
     end
-    β₀::AbstractFloat, β₁::AbstractFloat = coeffs(Polynomials.fit(X, Y, 1))
-    βₑ::AbstractFloat = β₁
-    ωXᵢ::AbstractArray{AbstractFloat} = 1 ./ sX .^ 2
-    ωYᵢ::AbstractArray{AbstractFloat} = 1 ./ sY .^ 2
-    α::AbstractArray{AbstractFloat} = .√(ωXᵢ .* ωYᵢ)
-    Ω::AbstractArray{AbstractFloat} = ωXᵢ .* ωYᵢ ./ (ωXᵢ .+ β₁^2 .* ωYᵢ .- 2 .* β₁ .* ρXY .* α)
-    X̄::AbstractFloat = sum(Ω .* X) / sum(Ω)
-    Ȳ::AbstractFloat = sum(Ω .* Y) / sum(Ω)
-    U::AbstractArray{AbstractFloat} = X .- X̄
-    V::AbstractArray{AbstractFloat} = Y .- Ȳ
-    βᵢ::AbstractArray{AbstractFloat} = Ω .* (U ./ ωYᵢ + β₁ * V ./ ωXᵢ - (β₁ * U + V) .* ρXY ./ α)
-    β₁ = sum(Ω .* βᵢ .* V) / sum(Ω .* βᵢ .* U)
+    𝑁::Int = length(x)
+    if ρxy === nothing
+        ρxy::Vector{Float64} = zeros(𝑁)
+    elseif length(ρxy) !== 𝑁
+        throw(ArgumentError("The length of ρxy must be the same as x, σx, y and σy."))
+    end
+
+    # initial slope and intercept from OLS
+    β₀::Float64, β₁::Float64 = hcat(ones(𝑁), x) \ y
+    βₑ::Float64 = β₁
+
+    # weights
+    ωx::Vector{Float64} = @. 1.0 / σx ^ 2
+    ωy::Vector{Float64} = @. 1.0 / σy ^ 2
+
+    # initial fit via York method
+    α::Vector{Float64} = sqrt.(ωx .* ωy)
+    Ω::Vector{Float64} = @. ωx * ωy / (ωx + β₁^2 * ωy - 2 * β₁ * ρxy * α)
+    x̄::Float64 = sum(Ω .* x) / sum(Ω)
+    ȳ::Float64 = sum(Ω .* y) / sum(Ω)
+    u::Vector{Float64} = x .- x̄
+    v::Vector{Float64} = y .- ȳ
+    βᵢ::Vector{Float64} = @. Ω * (u / ωy + β₁ * v / ωx - (β₁ * u + v) * ρxy / α)
+    β₁ = sum(Ω .* βᵢ .* v) / sum(Ω .* βᵢ .* u)
+
     n_iterations::Int = 1
+    # iterative solve via York method
     while (βₑ / β₁ - 1)^2 > eps() && n_iterations < 1e6
-        Ω = ωXᵢ .* ωYᵢ ./ (ωXᵢ .+ β₁^2 .* ωYᵢ .- 2 .* β₁ .* ρXY .* α)
-        X̄ = sum(Ω .* X) / sum(Ω)
-        Ȳ = sum(Ω .* Y) / sum(Ω)
-        U = X .- X̄
-        V = Y .- Ȳ
-        βᵢ = Ω .* (U ./ ωYᵢ + β₁ * V ./ ωXᵢ - (β₁ * U + V) .* ρXY ./ α)
+        Ω = @. ωx * ωy / (ωx + β₁^2 * ωy - 2 * β₁ * ρxy * α)
+        x̄ = sum(Ω .* x) / sum(Ω)
+        ȳ = sum(Ω .* y) / sum(Ω)
+        u = x .- x̄
+        v = y .- ȳ
+        βᵢ = @. Ω * (u / ωy + β₁ * v / ωx - (β₁ * u + v) * ρxy / α)
         βₑ = β₁
-        β₁ = sum(Ω .* βᵢ .* V) / sum(Ω .* βᵢ .* U)
+        β₁ = sum(Ω .* βᵢ .* v) / sum(Ω .* βᵢ .* u)
         n_iterations += 1
     end
-    β₀ = Ȳ - β₁ * X̄
-    xᵢ = X̄ .+ βᵢ
+    β₀ = ȳ - β₁ * x̄
+    xᵢ::Vector{Float64} = x̄ .+ βᵢ
     x̄ = sum(Ω .* xᵢ) / sum(Ω)
-    υ::AbstractArray{AbstractFloat} = xᵢ .- x̄
-    β₁SE::AbstractFloat = √(1 / sum(Ω .* υ .^ 2))
-    β₀SE::AbstractFloat = √(1 / sum(Ω) + (x̄ * β₁SE)^2)
-    σᵦ₁ᵦ₀::AbstractFloat = - x̄ * β₁SE^2
-    χ²::AbstractFloat = sum(Ω .* (Y .- β₁ .* X .- β₀) .^ 2)
+    u = xᵢ .- x̄
+    β₁SE::Float64 = √(1 / sum(Ω .* u .^ 2))
+    β₀SE::Float64 = √(1 / sum(Ω) + (x̄ * β₁SE)^2)
+    σᵦ₁ᵦ₀::Float64 = - x̄ * β₁SE^2
+    χ²::Float64 = sum(Ω .* (y .- β₁ .* x .- β₀) .^ 2)
     ν::Int = 𝑁 > 2 ? 𝑁 - 2 : 1
-    χ²ᵣ::AbstractFloat = χ² / ν
-    pval::AbstractFloat = ccdf(Chisq(ν), χ²)
-    x_intercept = -β₀ / β₁
-    x_intercept_se = sqrt((β₀SE / β₀)^2 + (β₁SE / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁))
-    return York(β₀, β₀SE, β₁, β₁SE, x_intercept, x_intercept_se, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁, X̄, Ȳ)
+    χ²ᵣ::Float64 = χ² / ν
+    pval::Float64 = ccdf(Chisq(ν), χ²)
+    x_intercept::Float64 = -β₀ / β₁
+    x_intercept_se::Float64 = sqrt((β₀SE / β₀)^2 + (β₁SE / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁))
+    return York(β₀, β₀SE, β₁, β₁SE, x_intercept, x_intercept_se, χ²ᵣ, pval, σᵦ₁ᵦ₀, 𝑁, x̄, ȳ)
 end
