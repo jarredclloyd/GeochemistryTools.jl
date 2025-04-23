@@ -1,5 +1,6 @@
-struct LAICPMS_ANALYSIS
+struct LAICPMSAnalysis
     session_date_start::Date
+    material::AbstractString
     sample::AbstractString
     analysis::AbstractString
     analysis_time::Time
@@ -10,12 +11,13 @@ struct LAICPMS_ANALYSIS
     spot_diameter::Integer
     gas_blank_start::Real
     gas_blank_end::Real
-    signal_start::Real
-    signal_end::Real
+    gas_blanks::Vector{Real}
+    signal_start::Tuple{Real, Integer}
+    signal_end::Tuple{Real, Integer}
     data::DataFrame
 end
 
-struct LAICPMS_SESSION
+struct LAICPMSSession
     laboratory::AbstractString
     session_date_start::Date
     session_date_end::Date
