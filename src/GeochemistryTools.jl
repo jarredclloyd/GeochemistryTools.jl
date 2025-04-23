@@ -65,9 +65,9 @@ include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__),"Chemistr
 function _check_equal_length(
     a::AbstractVector,
     b::AbstractVector,
-    c::Union{T,Nothing} = nothing,
-    d::Union{T,Nothing} = nothing,
-) where {T<:AbstractVector}
+    c::Union{AbstractVector,Nothing} = nothing,
+    d::Union{AbstractVector,Nothing} = nothing,
+)
     if c !== nothing && d !== nothing
         length(a) == length(b) == length(c) == length(d)
     elseif c !== nothing && d === nothing
