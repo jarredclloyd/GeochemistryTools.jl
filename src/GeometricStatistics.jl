@@ -12,7 +12,7 @@ International Journal of Research and Reviews in Applied Sciences, 11(3)
 =#
 
 # function exports
-export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros
+export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros, deltalognormal
 
 """
     geomean_zeros(x::AbstractVector)
@@ -180,4 +180,18 @@ function _geomean_zeros_cruz(x::AbstractVector, ϵ::AbstractFloat = 1e-5)
     end
     G = geomean(x .+ δ) - δ
     return (G, δ)
+end
+
+"""
+    deltalognormal(x::AbstractVector)
+
+    Compute the mean and variance of a delta-lognormal distribution from 'x'
+"""
+function deltalognormal(x::AbstractVector)
+    𝑁 = length(x)
+    dlog = fit(LogNormal, x[x .> 0])
+    𝜃 = length(x[x .== 0]) / 𝑁
+    γ = (1-𝜃)dlog.μ
+    δ = (1-𝜃)dlog.σ^2 + 𝜃*(1-𝜃)dlog.μ^2
+    return (exp(γ), exp(δ))
 end
