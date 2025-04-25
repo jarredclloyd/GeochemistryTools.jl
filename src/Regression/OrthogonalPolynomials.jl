@@ -1,8 +1,7 @@
 #= Preamble
 
 Author: Jarred C Lloyd: https://github.com/jarredclloyd
-Created: 2023-09-08
-Edited: 2023-11-29
+Last edited: 2025-04-25
 
 This source file contains functions to compute orthogonal polynomial fits (up to pₙ(5)) and
 their uncertainties. These are based on the equations provided in Bevington & Robinson 2003,
@@ -150,6 +149,7 @@ Input A as an Array of 4 of 5 columns wide with column order (X, sX, Y, sY, [ρX
   - `rm_outlier::Bool = false`: When set to true, will remove outliers (studentised residuals ≥ 3,
     based on fit with minimum akaike information criteria value).
   - `verbose::Bool = false`: When set to true will print the number of outliers determined during N passes.
+  - `st_residual_tol::Real = 3.0`: Tolerance for studentised residuals for outlier detection. Y-values with a studentised residual ≥ this value will be considered an outlier.
 
 # References
 
@@ -176,6 +176,7 @@ function fit_orthogonal(
     weight_type::AbstractString = "rel",
     rm_outlier::Bool = false,
     verbose::Bool = false,
+    st_residual_tol::Real = 3.0
 )
     if errors === false
         return _orthogonal_LSQ(
@@ -270,10 +271,11 @@ function _orthogonal_LSQ(
     weight_type::AbstractString = "abs",
     rm_outlier::Bool = false,
     verbose::Bool = false,
+    st_residual_tol::Real = 3.0
 )
     finite_indices = intersect(findall(isfinite, x), findall(isfinite, y))
-    x = x[finite_indices]
-    y = y[finite_indices]
+    x = Float64x4.(x[finite_indices])
+    y = Float64x4.(y[finite_indices])
     𝑁::Integer = length(x)
     if 𝑁 == length(y) && 𝑁 > 2
         x_sums::Vector{Float64x4} = Vector{Float64x4}(undef, 7)
@@ -284,8 +286,15 @@ function _orthogonal_LSQ(
         γ::Vector{Float64x4} = _gamma_orthogonal(𝑁, x_sums)
         δ::Vector{Float64x4} = _delta_orthogonal(𝑁, x_sums)
         ϵ::Vector{Float64x4} = _epsilon_orthogonal(𝑁, x_sums)
-        order::Vector{Integer}           = [0, 1, 2, 3, 4]
-        X::Matrix{Float64x4} = hcat(fill(1.0, 𝑁), (x .- β), (x .- γ[1]) .* (x .- γ[2]), (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]), (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]))
+        order::Vector{Int64} = [0, 1, 2, 3, 4]
+
+        # Construct design matrix, minimises allocations
+        X::Matrix{Float64x4} = Matrix{Float64x4}(undef, (𝑁,5))
+        X[:,1] .= 1.0
+        X[:,2] = x .- β
+        X[:,3] = (x .- γ[1]) .* (x .- γ[2])
+        X[:,4] = (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3])
+        X[:,5] = (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4])
         if y_weights === nothing
             ω::Vector{Float64x4} = fill(1.0, length(y))
         elseif occursin("rel", lowercase(weight_type)) === true
@@ -304,10 +313,16 @@ function _orthogonal_LSQ(
         ỹ::Vector{Float64x4} = exp(-0.5log(Ω)) * y
 
         if cond(X̃) ≤ 1e7
+            if verbose
+                println("Fitting via QR factorisation")
+            end
             F = qr(X̃)
             Λ::Vector{Float64x4} = F \ ỹ
             VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
         else
+            if verbose
+                println("Fitting via SVD method")
+            end
             F = svd(X̃)
             Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
             VarΛX = F.V * inv(Diagonal(F.S .^2)) * F.Vt
@@ -320,12 +335,13 @@ function _orthogonal_LSQ(
         AIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
         AIC = _akaike_information_criteria.(rss, 𝑁, order)
         if rm_outlier === true
-            𝑁prev::Integer = 0
-            n_iterations::Integer = 0
-            n_outliers::Integer = 0
+            𝑁prev::Int64 = 0
+            n_iterations::Int64 = 0
+            t_outliers::Int64 = 0
             while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
+                n_outliers::Int64 = 0
                 n_iterations += 1
-                minAIC::Integer = findmin(AIC)[2]
+                minAIC::Int64 = findmin(AIC)[2]
                 Xvar::Matrix{Float64x4} =
                     view(VarΛX, 1:minAIC, 1:minAIC) * view(X', 1:minAIC, :) * inv(Ω)
                 leverage::Vector{Float64x4} =
@@ -337,8 +353,12 @@ function _orthogonal_LSQ(
                     y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
                 mse::Vector{Float64x4} = rss ./ (𝑁 .- (order .+ 1))
                 studentised_residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
-                outlier_inds::Vector{Integer} = findall(>=(3), studentised_residuals)
+                outlier_inds::Vector{Int64} = findall(≥(st_residual_tol), abs.(studentised_residuals))
                 n_outliers += length(outlier_inds)
+                t_outliers += n_outliers
+                if verbose
+                            println("Pass number $n_iterations: Found $n_outliers outliers")
+                end
                 if n_outliers > 0
                     X = view(X, Not(outlier_inds), :) # high allocs
                     y = y[Not(outlier_inds)] # high allocs
@@ -347,12 +367,18 @@ function _orthogonal_LSQ(
                     X̃ = exp(-0.5log(Ω)) * X
                     ỹ = exp(-0.5log(Ω)) * y
                     if cond(X) ≤ 1e7
+                        if verbose
+                            println("Fitting via QR factorisation")
+                        end
                         F = qr(X̃)
                         Λ = F \ ỹ
                         VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
                     else
+                        if verbose
+                            println("Fitting via SVD method")
+                        end
                         F = svd(X̃)
-                        Λ = F.V * inv(Diagonal(F.S)) .* transpose(F.U) * ỹ
+                        Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
                         VarΛX = F.V * inv(Diagonal(F.S .^2)) .* F.Vt
                     end
                     @simd for i ∈ eachindex(order)
@@ -366,7 +392,7 @@ function _orthogonal_LSQ(
             end
             if verbose == true
                 println(
-                    "Determined $n_outliers $(n_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
+                    "Determined $t_outliers $(t_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
                 )
             end
         end
@@ -393,10 +419,10 @@ function _orthogonal_LSQ(
         return OrthogonalPolynomial(
             Float64.(Λ),
             UpperTriangular(Λ_SE),
-            big.(β),
-            big.(γ),
-            big.(δ),
-            big.(ϵ),
+            β,
+            γ,
+            δ,
+            ϵ,
             Float64.(VarΛX),
             order,
             R²,
@@ -462,13 +488,13 @@ function _beta_orthogonal(N::Integer, sums::AbstractVector)
 end
 
 function _gamma_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{BigFloat} =
+    vieta::Vector{Float64x4} =
         qr([-sums[1] N; -sums[2] sums[1]]) \ [-sums[2]; -sums[3]]
     return real(PolynomialRoots.roots([vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 
 function _delta_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{BigFloat} =
+    vieta::Vector{Float64x4} =
         qr([
             -sums[2] sums[1] -N
             -sums[3] sums[2] -sums[1]
@@ -477,7 +503,7 @@ function _delta_orthogonal(N::Integer, sums::AbstractVector)
     return real(PolynomialRoots.roots([-vieta[3], vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 function _epsilon_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{BigFloat} =
+    vieta::Vector{Float64x4} =
         qr([
             -sums[3] sums[2] -sums[1] N
             -sums[4] sums[3] -sums[2] sums[1]
