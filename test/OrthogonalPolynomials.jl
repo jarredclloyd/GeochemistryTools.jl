@@ -1,43 +1,39 @@
-using Random, GeochemistryTools, Distributions, LinearAlgebra, MultiFloats, StatsBase, GenericLinearAlgebra
-test_x = collect(0:0.05:10)
-𝑁::Integer = length(test_x)
+using Test, Random, GeochemistryTools, Distributions, LinearAlgebra, MultiFloats, StatsBase, GenericLinearAlgebra
+@testset "orthogonal polynomials"  begin
+    # setup
+    test_x = Float64x4.(collect(-1000000:1000:1000000));
+    𝑁 = length(test_x)
+    x_sums = Vector{MultiFloat{Float64,4}}(undef, 7)
+            @simd for i ∈ eachindex(x_sums)
+                x_sums[i] = sum(test_x.^ i)
+            end
+    β = GeochemistryTools._beta_orthogonal(𝑁, x_sums)
+    γ = GeochemistryTools._gamma_orthogonal(𝑁, x_sums)
+    δ = GeochemistryTools._delta_orthogonal(𝑁, x_sums)
+    ϵ = GeochemistryTools._epsilon_orthogonal(𝑁, x_sums)
+    order= [0, 1, 2, 3, 4]
+    X = hcat(fill(1.0, 𝑁), (test_x .- β), (test_x .- γ[1]) .* (test_x .- γ[2]), (test_x .- δ[1]) .* (test_x .- δ[2]) .* (test_x .- δ[3]), (test_x .- ϵ[1]) .* (test_x .- ϵ[2]) .* (test_x .- ϵ[3]) .* (test_x .- ϵ[4]))
 
-x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
-        @simd for i ∈ eachindex(x_sums)
-            x_sums[i] = sum(test_x .^ i)
-        end
-β::MultiFloat{Float64,4} = GeochemistryTools._beta_orthogonal(𝑁, x_sums)
-γ::Vector{MultiFloat{Float64,4}} = GeochemistryTools._gamma_orthogonal(𝑁, x_sums)
-δ::Vector{MultiFloat{Float64,4}} = GeochemistryTools._delta_orthogonal(𝑁, x_sums)
-ϵ::Vector{MultiFloat{Float64,4}} = GeochemistryTools._epsilon_orthogonal(𝑁, x_sums)
-order= [0, 1, 2, 3, 4]
+    per_err = abs.(rand(Xoshiro(), Normal(0.02,0.01), 𝑁));
 
-X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (test_x .- β), (test_x .- γ[1]) .* (test_x .- γ[2]), (test_x .- δ[1]) .* (test_x .- δ[2]) .* (test_x .- δ[3]), (test_x .- ϵ[1]) .* (test_x .- ϵ[2]) .* (test_x .- ϵ[3]) .* (test_x .- ϵ[4]))
+    # testing
+    Λ = [0.1, -0.1, 0.1, -0.1, 0.1];
+    test_y = GeochemistryTools._poly_orthogonal(test_x, Λ, β, γ, δ, ϵ, 4);
+    test_array = hcat(test_x, test_y);
+    test_errors = per_err .* test_y;
+    test_fit = fit_orthogonal(test_array);
+    test_fit_wt = fit_orthogonal(hcat(test_array, test_errors); errors=true);
+    @test isapprox(test_fit.lambda, Λ; rtol = sqrt(eps(Float64)))
+    @test isapprox(test_fit_wt.lambda, Λ; rtol = sqrt(eps(Float64)))
+    @test isapprox(poly_orthogonal(test_x, test_fit, 4), test_y; rtol = sqrt(eps(Float64)))
 
-Λ = [1, -1, 1, -1, 1]
-test_y = GeochemistryTools._poly_orthogonal(test_x, Λ, β, γ, δ, ϵ, 4)
-test_array = hcat(test_x, test_y)
-test_errors = abs.(rand(Xoshiro(), Normal(0.02,0.01), 𝑁)) .* test_y
-test_fit = fit_orthogonal(test_array)
-test_fit_wt = fit_orthogonal(hcat(test_array, test_errors); errors=true)
-
-@test test_fit.lambda .≈ Λ
-
-noise_x = rand(Xoshiro(), Normal(0, 0.1),𝑁)
-noise_y = rand(Xoshiro(), Normal(1, 0.1), 𝑁);
-test_x_noisy = test_x .+ noise_x
-test_y_noisy = test_y .* noise_y;
-test_array_noisy = hcat(test_x_noisy, test_y_noisy);
-test_fit_noisy = fit_orthogonal(test_array_noisy);
-coeffs = reshape(test_fit_noisy.lambda, 1, 5);
-
-for i ∈ 2:10000
-    noise_x = rand(Xoshiro(), Normal(0, 0.1),𝑁)
-    noise_y = rand(Xoshiro(), Normal(1, 0.1), 𝑁);
-    test_x_noisy = test_x .+ noise_x
-    test_y_noisy = test_y .* noise_y;
-    test_array_noisy = hcat(test_x_noisy, test_y_noisy);
-    test_fit_noisy = fit_orthogonal(test_array_noisy);
-    coeffs = vcat(coeffs, test_fit_noisy.lambda')
+    Λ = collect(rand(Xoshiro(), Normal(0,20), 5));
+    test_y = GeochemistryTools._poly_orthogonal(test_x, Λ, β, γ, δ, ϵ, 4);
+    test_array = hcat(test_x, test_y);
+    test_errors = per_err .* test_y;
+    test_fit = fit_orthogonal(test_array);
+    test_fit_wt = fit_orthogonal(hcat(test_array, test_errors); errors=true);
+    @test isapprox(test_fit_wt.lambda, Λ; rtol = sqrt(eps(Float64)))
+    @test isapprox(test_fit.lambda, Λ; rtol = sqrt(eps(Float64)))
+    @test isapprox(poly_orthogonal(test_x, test_fit, 4), test_y; rtol = sqrt(eps(Float64)))
 end
-coeff_mean_var = hcat(reshape(mean(coeffs; dims=1),5,1), reshape(var(coeffs; dims=1),5,1))
