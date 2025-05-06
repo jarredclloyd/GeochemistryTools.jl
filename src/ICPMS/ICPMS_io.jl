@@ -66,9 +66,9 @@ Load all relevant files in the `host_directory` using glob, concatenates the dat
       + Default is `true`.
       + Valid values are `true` or `false`
   - `central_tendency::AbstractString`: The algorithm to use for the measure of central
-    tendency (e.g. arithmetic mean, geometric mean, median)
+    tendency (e.g. mean of delta-lognormal distribution, arithmetic mean, geometric mean, median)
 
-      + Valid values are: `"amean"` or `"gmean"` or `"median"`
+      + Valid values are: `"deltalognormal"` or `"amean"` or `"gmean"` or `"median"`
   - `automatic_times::Bool`: Should laser, gas blank, and signal times be automatically determined.
 
       + Default is `true`.
@@ -123,7 +123,7 @@ function load_agilent(
     trim::Bool = false,
     aggregate_files::Bool = false,
     centre::Bool = true,
-    central_tendency::AbstractString = "gmean",
+    central_tendency::AbstractString = "deltalognormal",
     spot_size_filename::Bool = false,
     spot_size_value::Union{Missing,Integer} = missing,
 )
@@ -145,6 +145,15 @@ function load_agilent(
         date_time_constructor = date_time_constructor,
         day_first = day_first,
     )
+     if lowercase.(central_tendency) == "gmean"
+            ct_alg = geomean_zeros
+        elseif lowercase.(central_tendency) == "median"
+            ct_alg = median
+        elseif lowercase.(central_tendency) == "amean"
+            ct_alg = mean
+        elseif lowercase.(central_tendency) == "deltalognormal"
+            ct_alg =  deltalognormal
+    end
     for file in files
         if spot_size_filename === true
             spot_size = tryparse(
@@ -211,8 +220,8 @@ function load_agilent(
             insertcols!(df, 3, "spot_size" => spot_size)
             insertcols!(df, 4, "analysis_time" => analysis_time)
             insertcols!(df, 6, "beam_time" => df.signal_time .- laser_time)
-            gas_blank_cps_column1 = geomean_zeros(df[begin:gas_blank_ind, cps_column1])
-            gas_blank_cps_column2 = geomean_zeros(df[begin:gas_blank_ind, cps_column2])
+            gas_blank_cps_column1 = ct_alg(df[begin:gas_blank_ind, cps_column1])[1]
+            gas_blank_cps_column2 = ct_alg(df[begin:gas_blank_ind, cps_column2])[1]
             transform!(
                 df,
                 Cols(cps_column1, :signal_time) =>
@@ -258,14 +267,7 @@ function load_agilent(
                     ),
             )
             if centre == true
-                if central_tendency == "gmean"
-                    alg = geomean_zeros
-                elseif central_tendency == "median"
-                    alg = median
-                elseif central_tendency == "amean"
-                    alg = mean
-                end
-                centre_value = alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])
+                centre_value = ct_alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])[1]
                 df.ratio_centred = 1.0 .+ (df.ratio .- centre_value)
                 df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
             end
