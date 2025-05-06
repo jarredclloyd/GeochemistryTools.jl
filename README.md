@@ -1,3 +1,6 @@
+ <!-- <!-- SPDX-FileCopyrightText: 2024 Jarred Lloyd (https://github.com/jarredclloyd) -->
+ <!-- SPDX-License-Identifier: MIT -->
+
 GeochemistryTools.jl is an *in-development* [Julia](https://julialang.org/) package for geochronological and geochemical research.
 
 Functionality is influenced by [IsoplotR](https://github.com/pvermees/IsoplotR) and [global_geochemistry (MATLAB)](https://github.com/dhasterok/global_geochemistry).

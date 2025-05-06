@@ -1,19 +1,18 @@
-#= Preamble
+# SPDX-FileCopyrightText: 2024 Jarred Lloyd (https://github.com/jarredclloyd)
+# SPDX-License-Identifier: MIT
 
-Author: Jarred C Lloyd: https://github.com/jarredclloyd
-Created: 2023-10-05
-Edited: 2024-08-17
+#= Preamble
+Last updated: 2024-10-17
 
 This source file contains functions to compute geometric means and variances based on
 Habib (2012).
 
 Habib, EAE (2012) 'Geometric Mean for Negative and Zero Values',
-International Journal of Research and Reviews in Applied Sciences, 11(3),
-www.arpapress.com/Volumes/Vol11Issue3/IJRRAS_11_3_08.pdf
-
+International Journal of Research and Reviews in Applied Sciences, 11(3)
 =#
+
 # function exports
-export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros
+export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros, deltalognormal
 
 """
     geomean_zeros(x::AbstractVector)
@@ -41,7 +40,7 @@ end
 function geovar_zeros(x::AbstractVector)
     N = length(x)
     N2 = count(x .> 0)
-    if N2 > 0
+    if N2 > 1
         var₊ = exp(var(log.(x[x[:] .> 0, :])))
         varG = (N2 / N) * var₊
     else
@@ -51,13 +50,13 @@ function geovar_zeros(x::AbstractVector)
 end
 
 function geostd_zeros(x::AbstractVector)
-    return sqrt(geovar_zeros(x))
+    return std(log.(x[x[:] .> 0, :]))
 end
 
 function geosem_zeros(x::AbstractVector)
     N = length(x)
     N2 = count(x .> 0)
-    if N2 > 0
+    if N2 > 1
         sem₊ = exp(sem(log.(x[x[:] .> 0, :])))
         semG = (N2 / N) * sem₊
     else
@@ -181,4 +180,18 @@ function _geomean_zeros_cruz(x::AbstractVector, ϵ::AbstractFloat = 1e-5)
     end
     G = geomean(x .+ δ) - δ
     return (G, δ)
+end
+
+"""
+    deltalognormal(x::AbstractVector)
+
+    Compute the mean and variance of a delta-lognormal distribution from 'x'
+"""
+function deltalognormal(x::AbstractVector)
+    𝑁 = length(x)
+    dlog = fit(LogNormal, x[x .> 0])
+    𝜃 = length(x[x .== 0]) / 𝑁
+    γ = (1-𝜃)dlog.μ
+    δ = (1-𝜃)dlog.σ^2 + 𝜃*(1-𝜃)dlog.μ^2
+    return (exp(γ), exp(δ))
 end

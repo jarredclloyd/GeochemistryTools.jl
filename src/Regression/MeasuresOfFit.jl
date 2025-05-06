@@ -56,13 +56,7 @@ function _chi_squared(
     end
     if order == 0
         r = y .- λ[1]
-    elseif order == 1
-        r = y .- _poly_orthogonal(x, λ, β, γ, δ, ϵ, order)
-    elseif order == 2
-        r = y .- _poly_orthogonal(x, λ, β, γ, δ, ϵ, order)
-    elseif order == 3
-        r = y .- _poly_orthogonal(x, λ, β, γ, δ, ϵ, order)
-    elseif order == 4
+    elseif order ≥ 1
         r = y .- _poly_orthogonal(x, λ, β, γ, δ, ϵ, order)
     end
     χ² = transpose(r) * Ω * r

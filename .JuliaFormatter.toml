@@ -1,7 +1,8 @@
 style = "default"
 indent = 4
 margin = 92
-always_for_in = false
+always_for_in = true
+for_in_replacement = ∈
 whitespace_typdefs = true
 whitespace_ops_in_indices = true
 remove_extra_newline = true
@@ -28,3 +29,4 @@ separate_kwargs_with_semicolon = true
 surround_whereop_typeparameters = true
 variable_call_indent = []
 format_markdown = true
+verbose = true

@@ -6,12 +6,12 @@ Edited: 2023-09-16
 
 This source file contains functions to perform generalised least squares.
 
-β = (XᵀΩX)⁻¹XᵀΩy
-Cov(β|X) | C = (XᵀΩX)⁻¹
+β = (XᵀΩ⁻¹X)⁻¹XᵀΩ⁻¹y
+Cov(β|X) | C = (XᵀΩ⁻¹X)⁻¹
 H = X(XᵀC⁻¹X)⁻¹XᵀX⁻¹
-(error sum of squares) ess = (y - Xβ)ᵀΩ(y - Xβ)
+(residual sum of squares) rss = (y - Xβ)ᵀΩ(y - Xβ)
 (total sum of squares) tss = (y - ȳ)ᵀΩ(y - ȳ)
-MSE = ess / 𝑁
+MSE = rss / (𝑁-k+1)
 Model CI = yᵢ ± √(mse * row sum(X * (XC)) * t(1-α/2, n - p) where p is number of predictors (order)
 Model PI = yᵢ ± √(mse .* row sum(1 + x * (XC)) * t(1-α/2, n - p)
 (biased) R² = ess / tss
@@ -25,7 +25,7 @@ function _GLS(
     y::AbstractVector,
     order::Integer;
     y_weights::Union{Nothing,AbstractVector} = nothing,
-    weight_by::AbstractString = "abs",
+    weight_type::AbstractString = "abs",
     adjust_r::Bool = false
 )
     order = abs(order)
@@ -36,9 +36,9 @@ function _GLS(
     end
     if y_weights === nothing
         ω = repeat([1.0], length(y))
-    elseif occursin("abs", lowercase(weight_by)) === true
+    elseif occursin("abs", lowercase(weight_type)) === true
         ω = y_weights
-    elseif occursin("rel", lowercase(weight_by)) == true
+    elseif occursin("rel", lowercase(weight_type)) == true
         ω = y_weights ./ y
     else
         throw(
@@ -48,16 +48,16 @@ function _GLS(
             ),
         )
     end
-    ω = 1 ./ (ω ./ mean(ω)) .^2
+    ω = ω .^2
     Ω = Diagonal(ω)
     X = _design_matrix(x, order)
-    C = inv(transpose(X) * Ω * X)
-    β = inv(transpose(X) * Ω * X) * transpose(X) * Ω * y
-    ess = transpose(y .- X * β) * Ω * (y .- X * β)
-    β_SE = sqrt.(diag(abs.((C) * (ess / (length(x) - order)))))
-    tss = transpose((y .- mean(y))) * Ω * (y .- mean(y))
-    mse = ess / (length(x) - order)
-    R² = 1 - (ess / tss)
+    C = inv(transpose(X) * inv(Ω) * X)
+    β = inv(transpose(X) * inv(Ω) * X) * transpose(X) * inv(Ω) * y
+    rss = transpose(y .- X * β) * inv(Ω) * (y .- X * β)
+    β_SE = sqrt.(diag(abs.((C) * (rss / (length(x) - order)))))
+    tss = transpose((y .- mean(y))) * inv(Ω) * (y .- mean(y))
+    mse = rss / (length(x) - (order + 1))
+    R² = 1 - (rss / tss)
     if R² ≤ Base.rtoldefault(Float64)
         R² = 0
     end
@@ -83,9 +83,9 @@ function _design_matrix(x, order)
 end
 
 function _polyGLS(x::AbstractVector, fit::GeneralisedLeastSquares)
-    order = length(fit.β) - 1
+    order = length(fit.beta) - 1
     X = _design_matrix(x, order)
-    return X * fit.β[1:(order + 1)]
+    return X * fit.beta[1:(order + 1)]
 end
 
 function _polyCI(
@@ -93,10 +93,10 @@ function _polyCI(
     fit::GeneralisedLeastSquares;
     ci_level::AbstractFloat = 0.95,
 )
-    order = length(fit.β) - 1
-    tvalue = cquantile(TDist(fit.𝑁 - order), (1 - ci_level) / 2)
+    order = length(fit.beta) - 1
+    tvalue = cquantile(TDist(fit.n_observations - order), (1 - ci_level) / 2)
     X = _design_matrix(x, order)
-    return vec(sqrt.((fit.rmse^2) .* sum(X .* (X * fit.VarβX); dims = 2))) .* tvalue
+    return vec(sqrt.((fit.rmse^2) .* sum(X .* (X * fit.variance_covariance); dims = 2))) .* tvalue
 end
 
 function _polyPI(
@@ -104,10 +104,10 @@ function _polyPI(
     fit::GeneralisedLeastSquares;
     ci_level::AbstractFloat = 0.95,
 )
-    order = length(fit.β) - 1
-    tvalue = cquantile(TDist(fit.𝑁 - order), (1 - ci_level) / 2)
+    order = length(fit.beta) - 1
+    tvalue = cquantile(TDist(fit.n_observations - order), (1 - ci_level) / 2)
     X = _design_matrix(x, order)
     return vec(
-        sqrt.((fit.rmse^2) .* sum(1 .+ X .* (X * fit.VarβX) .* (fit.rmse^2); dims = 2)),
+        sqrt.((fit.rmse^2) .* sum(1 .+ X .* (X * fit.variance_covariance) .* (fit.rmse^2); dims = 2)),
     ) .* tvalue
 end

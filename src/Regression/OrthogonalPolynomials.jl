@@ -1,8 +1,7 @@
 #= Preamble
 
 Author: Jarred C Lloyd: https://github.com/jarredclloyd
-Created: 2023-09-08
-Edited: 2023-11-29
+Last edited: 2025-04-25
 
 This source file contains functions to compute orthogonal polynomial fits (up to pₙ(5)) and
 their uncertainties. These are based on the equations provided in Bevington & Robinson 2003,
@@ -23,16 +22,17 @@ export poly_orthogonal, poly_confidenceband, poly_predictionband, poly_standarde
 # structs and base extensions
 struct OrthogonalPolynomial <: LinearRegression
     lambda::Union{Vector{AbstractFloat},Nothing}
-    lambda_se::Union{SparseMatrixCSC,Nothing}
+    lambda_se::Union{AbstractMatrix,Nothing}
     beta::Union{AbstractFloat,Nothing}
     gamma::Union{Vector{AbstractFloat},Nothing}
     delta::Union{Vector{AbstractFloat},Nothing}
     epsilon::Union{Vector{AbstractFloat},Nothing}
-    variance_covariance::Union{Symmetric,Nothing}
+    variance_covariance::Union{AbstractMatrix,Nothing}
     order::Union{Vector{Integer},Nothing}
     r_squared::Union{Vector{AbstractFloat},Nothing}
     OP_r_squared::Union{Vector{AbstractFloat},Nothing}
     rmse::Union{Vector{AbstractFloat},Nothing}
+    nrmse::Union{Vector{AbstractFloat},Nothing}
     chi_squared::Union{Vector{AbstractFloat},Nothing}
     reduced_chi_squared::Union{Vector{AbstractFloat},Nothing}
     akaike_information_criteria::Union{Vector{AbstractFloat},Nothing}
@@ -105,7 +105,7 @@ function fit_orthogonal(
     x_name::Symbol,
     y_name::Symbol;
     y_weights::Union{Nothing,Symbol} = nothing,
-    weight_type::AbstractString = "rel",
+    weight_type::AbstractString = "abs",
     rm_outlier::Bool = false,
     verbose::Bool = false,
 )
@@ -149,6 +149,7 @@ Input A as an Array of 4 of 5 columns wide with column order (X, sX, Y, sY, [ρX
   - `rm_outlier::Bool = false`: When set to true, will remove outliers (studentised residuals ≥ 3,
     based on fit with minimum akaike information criteria value).
   - `verbose::Bool = false`: When set to true will print the number of outliers determined during N passes.
+  - `st_residual_tol::Real = 3.0`: Tolerance for studentised residuals for outlier detection. Y-values with a studentised residual ≥ this value will be considered an outlier.
 
 # References
 
@@ -175,6 +176,7 @@ function fit_orthogonal(
     weight_type::AbstractString = "rel",
     rm_outlier::Bool = false,
     verbose::Bool = false,
+    st_residual_tol::Real = 3.0
 )
     if errors === false
         return _orthogonal_LSQ(
@@ -220,10 +222,10 @@ function poly_standarderror(
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    X::Matrix{Float64} = _design_matrix(x, fit, order)
+    X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
-        sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* se_level,
+        sqrt.(fit.reduced_chi_squared[order + 1] .* sum(X .* (X * VarΛX); dims = 2)) .* se_level,
     )
 end
 
@@ -236,10 +238,12 @@ function poly_confidenceband(
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
-    X::Matrix{Float64} = _design_matrix(x, fit, order)
+    tvalue = cquantile(TDist(length(x) - order + 1), (1 - ci_level) / 2)
+    X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
-    return vec(sqrt.((fit.rmse[order + 1]^2) .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue)
+    return vec(
+        sqrt.(fit.reduced_chi_squared[order + 1] .* sum(X .* (X * VarΛX); dims = 2)) .* tvalue
+        )
 end
 
 function poly_predictionband(
@@ -251,11 +255,11 @@ function poly_predictionband(
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
-    tvalue = cquantile(TDist(length(x) - order), (1 - ci_level) / 2)
-    X::Matrix{Float64} = _design_matrix(x, fit, order)
+    tvalue = cquantile(TDist(length(x) - order + 1), (1 - ci_level) / 2)
+    X = _design_matrix(x, fit, order)
     VarΛX = view(fit.variance_covariance, 1:(order + 1), 1:(order + 1))
     return vec(
-        sqrt.((fit.rmse[order + 1]^2) .* sum(1 .+ X .* (X * VarΛX); dims = 2)) .* tvalue,
+        sqrt.(fit.reduced_chi_squared[order + 1] .* (1 .+ sum(X .* (X * VarΛX); dims = 2))) .* tvalue,
     )
 end
 
@@ -267,28 +271,36 @@ function _orthogonal_LSQ(
     weight_type::AbstractString = "abs",
     rm_outlier::Bool = false,
     verbose::Bool = false,
+    st_residual_tol::Real = 3.0
 )
-    x = x[isfinite.(y) .== true]
-    y_weights = y_weights[isfinite.(y) .== true]
-    y = y[isfinite.(y) .== true]
+    finite_indices = intersect(findall(isfinite, x), findall(isfinite, y))
+    x = Float64x4.(x[finite_indices])
+    y = Float64x4.(y[finite_indices])
     𝑁::Integer = length(x)
     if 𝑁 == length(y) && 𝑁 > 2
-        x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
+        x_sums::Vector{Float64x4} = Vector{Float64x4}(undef, 7)
         @simd for i ∈ eachindex(x_sums)
             x_sums[i] = sum(x .^ i)
         end
-        β::MultiFloat{Float64,4}         = _beta_orthogonal(𝑁, x_sums)
-        γ::Vector{MultiFloat{Float64,4}} = _gamma_orthogonal(𝑁, x_sums)
-        δ::Vector{MultiFloat{Float64,4}} = _delta_orthogonal(𝑁, x_sums)
-        ϵ::Vector{MultiFloat{Float64,4}} = _epsilon_orthogonal(𝑁, x_sums)
-        order::Vector{Integer}           = [0, 1, 2, 3, 4]
-        X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (x .- β), (x .- γ[1]) .* (x .- γ[2]), (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3]), (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4]))
+        β::Float64x4         = _beta_orthogonal(𝑁, x_sums)
+        γ::Vector{Float64x4} = _gamma_orthogonal(𝑁, x_sums)
+        δ::Vector{Float64x4} = _delta_orthogonal(𝑁, x_sums)
+        ϵ::Vector{Float64x4} = _epsilon_orthogonal(𝑁, x_sums)
+        order::Vector{Int64} = [0, 1, 2, 3, 4]
+
+        # Construct design matrix, minimises allocations
+        X::Matrix{Float64x4} = Matrix{Float64x4}(undef, (𝑁,5))
+        X[:,1] .= 1.0
+        X[:,2] = x .- β
+        X[:,3] = (x .- γ[1]) .* (x .- γ[2])
+        X[:,4] = (x .- δ[1]) .* (x .- δ[2]) .* (x .- δ[3])
+        X[:,5] = (x .- ϵ[1]) .* (x .- ϵ[2]) .* (x .- ϵ[3]) .* (x .- ϵ[4])
         if y_weights === nothing
-            ω::Vector{MultiFloat{Float64,4}} = fill(1.0, length(y))
+            ω::Vector{Float64x4} = fill(1.0, length(y))
         elseif occursin("rel", lowercase(weight_type)) === true
-            ω = y_weights
+            ω = y_weights[finite_indices] .* y[finite_indices]
         elseif occursin("abs", lowercase(weight_type)) == true
-            ω = abs.(y_weights) ./ abs.(y)
+            ω = y_weights[finite_indices]
         else
             throw(
                 ArgumentError(
@@ -296,49 +308,82 @@ function _orthogonal_LSQ(
                 ),
             )
         end
-        Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} =
-            Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
-        Xᵀ::Transpose{MultiFloat{Float64,4},Matrix{MultiFloat{Float64,4}}} = transpose(X)
-        rss::Vector{Float64} = Vector{Float64}(undef, 5)
-        AIC::Vector{Float64} = Vector{Float64}(undef, 5)
-        VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
-        Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
-        @simd for i ∈ eachindex(order)
-            residuals::Vector{MultiFloat{Float64,4}} = (y .- (view(X, :, 1:i) * Λ[1:i]))
-            rss[i] = transpose(residuals) * Ω * (residuals)
+        Ω::Diagonal{Float64x4,Vector{Float64x4}} = Diagonal(ω .^ 2)
+        X̃::Matrix{Float64x4} = exp(-0.5log(Ω)) * X
+        ỹ::Vector{Float64x4} = exp(-0.5log(Ω)) * y
+
+        if cond(X̃) ≤ 1e7
+            if verbose
+                println("Fitting via QR factorisation")
+            end
+            F = qr(X̃)
+            Λ::Vector{Float64x4} = F \ ỹ
+            VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
+        else
+            if verbose
+                println("Fitting via SVD method")
+            end
+            F = svd(X̃)
+            Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
+            VarΛX = F.V * inv(Diagonal(F.S .^2)) * F.Vt
         end
+        rss::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
+        @simd for i ∈ eachindex(order)
+            residuals::Vector{Float64x4} = (y .- (view(X, :, 1:i) * Λ[1:i]))
+            rss[i] = transpose(residuals) * inv(Ω) * (residuals)
+        end
+        AIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
         AIC = _akaike_information_criteria.(rss, 𝑁, order)
         if rm_outlier === true
-            𝑁prev::Integer = 0
-            n_iterations::Integer = 0
-            n_outliers::Integer = 0
+            𝑁prev::Int64 = 0
+            n_iterations::Int64 = 0
+            t_outliers::Int64 = 0
             while 𝑁prev - 𝑁 != 0 && n_iterations ≤ 10
+                n_outliers::Int64 = 0
                 n_iterations += 1
-                minAIC::Integer = findmin(AIC)[2]
-                Xvar::Matrix{MultiFloat{Float64,4}} =
-                    view(VarΛX, 1:minAIC, 1:minAIC) * view(Xᵀ, 1:minAIC, :) * Ω
-                leverage::Vector{MultiFloat{Float64,4}} =
-                    Vector{MultiFloat{Float64,4}}(undef, size(X, 1))
+                minAIC::Int64 = findmin(AIC)[2]
+                Xvar::Matrix{Float64x4} =
+                    view(VarΛX, 1:minAIC, 1:minAIC) * view(X', 1:minAIC, :) * inv(Ω)
+                leverage::Vector{Float64x4} =
+                    Vector{Float64x4}(undef, size(X, 1))
                 Threads.@threads for i ∈ axes(X, 1)
                     leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
                 end
-                studentised_residuals::Vector{MultiFloat{Float64,4}} =
+                studentised_residuals::Vector{Float64x4} =
                     y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
-                mse::Vector{MultiFloat{Float64,4}} = rss ./ (𝑁 .- (order .+ 1))
+                mse::Vector{Float64x4} = rss ./ (𝑁 .- (order .+ 1))
                 studentised_residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
-                outlier_inds::Vector{Integer} = findall(>=(3), studentised_residuals)
+                outlier_inds::Vector{Int64} = findall(≥(st_residual_tol), abs.(studentised_residuals))
                 n_outliers += length(outlier_inds)
+                t_outliers += n_outliers
+                if verbose
+                            println("Pass number $n_iterations: Found $n_outliers outliers")
+                end
                 if n_outliers > 0
                     X = view(X, Not(outlier_inds), :) # high allocs
                     y = y[Not(outlier_inds)] # high allocs
                     ω = ω[Not(outlier_inds)] # high allocs
-                    Xᵀ = transpose(X)
-                    Ω = Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
-                    VarΛX = Symmetric(inv(Xᵀ * (Ω) * X))
-                    Λ = VarΛX * Xᵀ * Ω * y
+                    Ω = Diagonal(ω .^ 2)
+                    X̃ = exp(-0.5log(Ω)) * X
+                    ỹ = exp(-0.5log(Ω)) * y
+                    if cond(X) ≤ 1e7
+                        if verbose
+                            println("Fitting via QR factorisation")
+                        end
+                        F = qr(X̃)
+                        Λ = F \ ỹ
+                        VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
+                    else
+                        if verbose
+                            println("Fitting via SVD method")
+                        end
+                        F = svd(X̃)
+                        Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
+                        VarΛX = F.V * inv(Diagonal(F.S .^2)) .* F.Vt
+                    end
                     @simd for i ∈ eachindex(order)
                         residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
-                        rss[i] = transpose(residuals) * Ω * (residuals)
+                        rss[i] = transpose(residuals) * inv(Ω) * (residuals)
                     end
                     AIC = _akaike_information_criteria.(rss, 𝑁, order)
                 end
@@ -347,24 +392,24 @@ function _orthogonal_LSQ(
             end
             if verbose == true
                 println(
-                    "Determined $n_outliers $(n_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
+                    "Determined $t_outliers $(t_outliers == 1 ?  "outlier" : "outliers") for current fit in $n_iterations $(n_iterations == 1 ?  "pass" : "passes")",
                 )
             end
         end
         for i in eachindex(Λ)
-            Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
+            Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64x4) ? 0.0 : Λ[i]
         end
         mse = rss ./ (𝑁 .- (order .+ 1))
-        Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
+        Λ_SE::AbstractMatrix{Float64x4} = zeros(Float64x4, 5, 5)
         for i ∈ eachindex(order)
             Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
         end
-        sparse(Λ_SE)
-        tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
-        rmse::Vector{Float64} = sqrt.(mse)
-        R²::Vector{Float64} = 1 .- (rss ./ (tss))
-        R²ₒₚ::Vector{Float64} = _olkin_pratt.(R², 𝑁, order .+ 1)
-        BIC::Vector{Float64} = Vector{Float64}(undef, 5)
+        tss::Float64x4 = transpose((y .- mean(y))) * inv(Ω) * (y .- mean(y))
+        rmse::Vector{Float64x4} = sqrt.(mse)
+        nrmse::Vector{Float64x4} = rmse ./ (maximum(y) - minimum(y))
+        R²::Vector{Float64x4} = 1 .- (rss ./ (tss))
+        R²ₒₚ::Vector{Float64x4} = _olkin_pratt.(R², 𝑁, order .+ 1)
+        BIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
         BIC = _bayesian_information_criteria.(rss, 𝑁, order)
         BICw =
             exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
@@ -372,17 +417,18 @@ function _orthogonal_LSQ(
         AICw =
             exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
         return OrthogonalPolynomial(
-            Λ,
-            Λ_SE,
-            Float64.(β),
-            Float64.(γ),
-            Float64.(δ),
-            Float64.(ϵ),
-            VarΛX,
+            Float64.(Λ),
+            UpperTriangular(Λ_SE),
+            β,
+            γ,
+            δ,
+            ϵ,
+            Float64.(VarΛX),
             order,
             R²,
             R²ₒₚ,
             rmse,
+            nrmse,
             rss,
             mse,
             AIC,
@@ -392,7 +438,7 @@ function _orthogonal_LSQ(
             𝑁,
         )
     else
-        println("Unable to fit data as there are less than three values")
+        throw(error(("Unable to fit data as there are less than three values")))
         return OrthogonalPolynomial(
             fill(nothing, length(fieldnames(OrthogonalPolynomial)))...,
         )
@@ -438,33 +484,33 @@ end
 
 # functions for parameter calculations
 function _beta_orthogonal(N::Integer, sums::AbstractVector)
-    return 1 / N * sums[1]
+    return Float64x4(1) / Float64x4(N) * sums[1]
 end
 
 function _gamma_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{MultiFloat{Float64,4}} =
-        [-sums[1] N; -sums[2] sums[1]] \ [-sums[2]; -sums[3]]
-    return real(PolynomialRoots.roots(([vieta[2], -vieta[1], 1])))
+    vieta::Vector{Float64x4} =
+        qr([-sums[1] N; -sums[2] sums[1]]) \ [-sums[2]; -sums[3]]
+    return real(PolynomialRoots.roots([vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 
 function _delta_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{MultiFloat{Float64,4}} =
-        [
+    vieta::Vector{Float64x4} =
+        qr([
             -sums[2] sums[1] -N
             -sums[3] sums[2] -sums[1]
             -sums[4] sums[3] -sums[2]
-        ] \ [-sums[3]; -sums[4]; -sums[5]]
-    return real(PolynomialRoots.roots(([-vieta[3], vieta[2], -vieta[1], 1])))
+        ]) \ [-sums[3]; -sums[4]; -sums[5]]
+    return real(PolynomialRoots.roots([-vieta[3], vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 function _epsilon_orthogonal(N::Integer, sums::AbstractVector)
-    vieta::Vector{MultiFloat{Float64,4}} =
-        [
+    vieta::Vector{Float64x4} =
+        qr([
             -sums[3] sums[2] -sums[1] N
             -sums[4] sums[3] -sums[2] sums[1]
             -sums[5] sums[4] -sums[3] sums[2]
             -sums[6] sums[5] -sums[4] sums[3]
-        ] \ [-sums[4]; -sums[5]; -sums[6]; -sums[7]]
-    return real(PolynomialRoots.roots(([vieta[4], -vieta[3], vieta[2], -vieta[1], 1])))
+        ]) \ [-sums[4]; -sums[5]; -sums[6]; -sums[7]]
+    return real(PolynomialRoots.roots([vieta[4], -vieta[3], vieta[2], -vieta[1], 1]; polish=true, epsilon=eps(Float64x4)))
 end
 
 function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Integer)
@@ -472,7 +518,7 @@ function _design_matrix(x::AbstractVector, fit::OrthogonalPolynomial, order::Int
         throw(ArgumentError("Polynomial order must be positive"))
     end
     if order == 0
-        X::Matrix{Real} = repeat([1.0], length(x))
+        X = repeat([1.0], length(x))
     elseif order == 1
         X = hcat(repeat([1.0], length(x)), (x .- fit.beta))
     elseif order == 2
