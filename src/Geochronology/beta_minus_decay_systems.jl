@@ -103,8 +103,8 @@ function RbSrAgeNorm(β₁::AbstractFloat, β₁_se::AbstractFloat = 0.0)
             ),
         )
     end
-    date = log(β₁ + 1) / λRb87
-    date_se = abs(log(β₁_se + 1) / λRb87)
+    date = log(β₁ + 1) / LAMBDA_Rb87
+    date_se = abs(log(β₁_se + 1) / LAMBDA_Rb87)
     return date, date_se
 end
 
@@ -123,10 +123,10 @@ function RbSrAgeInv(
         )
     end
     ratio = inv(-β₀ / β₁)
-    date = log(ratio + 1) / λRb87
+    date = log(ratio + 1) / LAMBDA_Rb87
     ratio_se = ratio * sqrt((β₀_se / β₀)^2 + (β₁_se / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁))
     date_se = abs(
-        log(ratio_se + (β₀^2 * β₀_se^2 + β₁^2 * β₁_se^2 + 2 * β₀ * β₁ * σᵦ₁ᵦ₀) + 1) / λRb87,
+        log(ratio_se + (β₀^2 * β₀_se^2 + β₁^2 * β₁_se^2 + 2 * β₀ * β₁ * σᵦ₁ᵦ₀) + 1) / LAMBDA_Rb87,
     )
     return date, date_se
 end

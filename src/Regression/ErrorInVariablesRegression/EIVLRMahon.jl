@@ -31,7 +31,7 @@ Input df as a DataFrame of 4 of 5 columns wide with column order (x, σx, y, σy
     numeric value, or as a vector of the initial and its standard error (same `se_level_in` as input data). E.g. initial =
     "MDCInv", initial = 0.72, OR initial = [0.72, 0.01].
 
-      + Dictionaries available are `dict_sr87_sr86i`
+      + Dictionaries available are `INITIAL_Sr`
       + For a full list of available keys ∈ any dictionary type `keys(<dict_name>)`
 
 # References

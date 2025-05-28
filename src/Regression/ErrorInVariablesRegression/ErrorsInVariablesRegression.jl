@@ -147,7 +147,7 @@ Algorithms available are `"mahon"` and `"york"`.
     numeric value, or as a vector of the initial and its standard error (same `se_level_in` as input data). E.g. initial =
     "MDCInv", initial = 0.72, OR initial = [0.72, 0.01].
 
-      + Dictionaries available are `dict_sr87_sr86i`
+      + Dictionaries available are `INITIAL_Sr`
       + For a full list of available keys in any dictionary type `keys(<dict_name>)`
 
 # Example
@@ -179,20 +179,20 @@ function fit_eivlr(
     dfCols::Int = ncol(df)
     dfRows::Int = nrow(df)
     if initial !== nothing
-        if isa(initial, AbstractString) == true && haskey(dict_sr87_sr86i, initial) == true
+        if isa(initial, AbstractString) == true && haskey(INITIAL_Sr, initial) == true
             if algorithm .== "mahon"
                 initial = [
                     0,
                     0,
-                    deepcopy(dict_sr87_sr86i[initial])[1],
-                    deepcopy(dict_sr87_sr86i[initial])[2] * se_level_in,
+                    copy(INITIAL_Sr[initial])[1],
+                    copy(INITIAL_Sr[initial])[2] * se_level_in,
                 ]
             else
                 initial = [
                     1e-12,
                     1e-12,
-                    deepcopy(dict_sr87_sr86i[initial])[1],
-                    deepcopy(dict_sr87_sr86i[initial])[2] * se_level_in,
+                    copy(INITIAL_Sr[initial])[1],
+                    copy(INITIAL_Sr[initial])[2] * se_level_in,
                 ]
             end
         elseif length(initial) == 1 && isa(initial, AbstractFloat)
@@ -227,7 +227,7 @@ Or input a single numeric value or two-length numeric vector:
 
 For a full list of available reference material keys in a relevant dictionary: keys(<dict_name>)
 
-Dictionaries currently available are `dict_sr87_sr86i`
+Dictionaries currently available are `INITIAL_Sr`
 """,
                 ),
             )

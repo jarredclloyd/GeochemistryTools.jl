@@ -22,7 +22,7 @@ Input df as a DataFrame of 4 of 5 columns wide with column order (X, σx, y, σy
 - `initial::Any`: A value for the y-intercept. Can be input as a string key from an appropriate dictionary, as a single
     numeric value, or as a vector of the initial and its standard error (same `se_level_in` as input data). E.g. initial =
         "MDCInv", initial = 0.72, OR initial = [0.72, 0.01].
-    - Dictionaries available are `dict_sr87_sr86i`
+    - Dictionaries available are `INITIAL_Sr`
     - For a full list of available keys in any dictionary type `keys(<dict_name>)`
 
 # Example
@@ -46,8 +46,8 @@ function yorkfit(
     dfCols::Int = ncol(df)
     dfRows::Int = nrow(df)
     if initial !== nothing
-        if isa(initial, String) == true && haskey(dict_sr87_sr86i, initial) == true
-            initial = deepcopy(dict_sr87_sr86i[initial])
+        if isa(initial, String) == true && haskey(INITIAL_Sr, initial) == true
+            initial = copy(INITIAL_Sr[initial])
         elseif length(initial) == 1 && isa(initial, AbstractFloat)
             initial = [1e-15, 1e-15, initial, 0.01]
         elseif length(initial) == 2 && isa(initial[1], AbstractFloat) && isa(initial[2], AbstractFloat)
@@ -64,7 +64,7 @@ function yorkfit(
 
             For a full list of available reference material keys in a relevant dictionary: keys(<dict_name>)
 
-            Dictionaries currently available are `dict_sr87_sr86i`
+            Dictionaries currently available are `INITIAL_Sr`
             """))
         end
         if dfCols == 4

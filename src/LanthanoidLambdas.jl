@@ -8,14 +8,14 @@ function LambdaREE(
     lanth_uncertainties::Union{Nothing, AbstractArray} = nothing;
     weight_type::AbstractString = "abs",
     normalise::Bool = true,
-    normalisation_values::AbstractString = "ci-chondrite, PO2016",
+    normalisation_values::AbstractString = "CI-chondrite, PO2016",
     fit_ce::Bool = false,
     fit_eu::Bool = false,
     fit_gd::Bool = true,
 )
     lanthanoids =
         ["La", "Ce", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
-    lanth_radii = deepcopy(cn_eight_IR.(lanthanoids .* "_3+"))
+    lanth_radii = deepcopy(IONIC_RADIUS_CNEIGHT.(lanthanoids .* "_3+"))
     lanth_uncertainties = lanth_uncertainties[isfinite.(lanth_values) .== true]
     lanth_values = lanth_values[isfinite.(lanth_values) .== true]
     𝑁::Integer = length(lanth_radii)
