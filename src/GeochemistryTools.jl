@@ -62,6 +62,7 @@ include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__),"Chemistr
 @inline    Base.round(x::MultiFloat{T,N} where {T,N}, r::RoundingMode) = Base.round(big.(x), r)
 @inline    Base.trunc(x::MultiFloat{T,N} where {T,N}, r::RoundingMode{:ToZero}) = Base.trunc(big.(x), r)
 
+# Helper functions
 function _check_equal_length(
     a::AbstractVector,
     b::AbstractVector,
@@ -90,6 +91,14 @@ function timeout(f, args, seconds, fail)
     end
 end
 
+# To allow construction of multikey immutable dictionaries
+function Base.ImmutableDict(KV::Pair{K,V}, KVs::Pair{K,V}...) where {K,V}
+    d = Base.ImmutableDict(KV)
+    for p in KVs
+        d = Base.ImmutableDict(d,p)
+    end
+    return d
+end
 
 # switch to PythonCall and CondaPkg when open_ssl is updated, or write baselines into native julia
 #=
