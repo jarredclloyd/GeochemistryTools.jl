@@ -8,29 +8,22 @@ function LambdaREE(
     lanth_uncertainties::Union{Nothing, AbstractArray} = nothing;
     weight_type::AbstractString = "abs",
     normalise::Bool = true,
-<<<<<<< Updated upstream
-    normalisation_values::AbstractString = "CI-chondrite, PO2016",
-=======
     normalisation_values::AbstractString = "CI_PO2016",
->>>>>>> Stashed changes
     fit_ce::Bool = false,
     fit_eu::Bool = false,
     fit_gd::Bool = true,
 )
     lanthanoids =
         ["La", "Ce", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
-<<<<<<< Updated upstream
-    lanth_radii = deepcopy(IONIC_RADIUS_CNEIGHT.(lanthanoids .* "_3+"))
-=======
-    lanth_radii = deepcopy(cn_eight_IR.(lanthanoids .* "_3+"))
+    lanth_radii = IONIC_RADIUS_CNEIGHT.(lanthanoids .* "_3+")
     if isnothing(lanth_uncertainties) != true
         finite_indices = findall(isfinite, lanth_values)
+        # lanth_values =
     else
         finite_indices = intersect(findall(isfinite, lanth_values), findall(isfinite, lanth_measured))
     end
->>>>>>> Stashed changes
-    lanth_uncertainties = lanth_uncertainties[isfinite.(lanth_values) .== true]
-    lanth_values = lanth_values[isfinite.(lanth_values) .== true]
+
+
     𝑁::Integer = length(lanth_radii)
     if 𝑁 == length(lanth_values) && 𝑁 > 2
         x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
@@ -51,7 +44,7 @@ function LambdaREE(
             norm_values::Vector{Real} = Vector{Real}(undef, length(measured_elements))
             if lowercase(normalisation_values) == "CI_PO2016"
                 for i in eachindex(measured_elements)
-                    norm_values[i] = deepcopy(ci_chondrite_PO2016(measured_elements[i])[1])
+                    norm_values[i] = CI_CHONDRITE_PO2016[Symbol(measured_elements[i])][1]
                 end
                 # elseif lowercase(normalisation_values) == "PAAS"
                 #     for i in eachindex(measured_elements)
