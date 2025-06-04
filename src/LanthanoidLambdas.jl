@@ -8,14 +8,27 @@ function LambdaREE(
     lanth_uncertainties::Union{Nothing, AbstractArray} = nothing;
     weight_type::AbstractString = "abs",
     normalise::Bool = true,
+<<<<<<< Updated upstream
     normalisation_values::AbstractString = "CI-chondrite, PO2016",
+=======
+    normalisation_values::AbstractString = "CI_PO2016",
+>>>>>>> Stashed changes
     fit_ce::Bool = false,
     fit_eu::Bool = false,
     fit_gd::Bool = true,
 )
     lanthanoids =
         ["La", "Ce", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
+<<<<<<< Updated upstream
     lanth_radii = deepcopy(IONIC_RADIUS_CNEIGHT.(lanthanoids .* "_3+"))
+=======
+    lanth_radii = deepcopy(cn_eight_IR.(lanthanoids .* "_3+"))
+    if isnothing(lanth_uncertainties) != true
+        finite_indices = findall(isfinite, lanth_values)
+    else
+        finite_indices = intersect(findall(isfinite, lanth_values), findall(isfinite, lanth_measured))
+    end
+>>>>>>> Stashed changes
     lanth_uncertainties = lanth_uncertainties[isfinite.(lanth_values) .== true]
     lanth_values = lanth_values[isfinite.(lanth_values) .== true]
     𝑁::Integer = length(lanth_radii)
@@ -29,13 +42,14 @@ function LambdaREE(
         δ::Vector{MultiFloat{Float64,4}} = _delta_orthogonal(𝑁, x_sums)
         ϵ::Vector{MultiFloat{Float64,4}} = _epsilon_orthogonal(𝑁, x_sums)
         X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (lanth_radii .- β), (lanth_radii .- γ[1]) .* (lanth_radii .- γ[2]), (lanth_radii .- δ[1]) .* (lanth_radii .- δ[2]) .* (lanth_radii .- δ[3]), (lanth_radii .- ϵ[1]) .* (lanth_radii .- ϵ[2]) .* (lanth_radii .- ϵ[3]) .* (lanth_radii .- ϵ[4]))
-        X                                = X[1:size(X, 1) .!= findfirst(occursin("Pm"), lanthanoids), :]
+
+        X = X[1:size(X, 1) .!= findfirst(occursin("Pm"), lanthanoids), :]
         deleteat!(lanthanoids, occursin.("Pm", lanthanoids))
 
         measured_elements::Vector{AbstractString} = names(input_data)
         if normalise == true
             norm_values::Vector{Real} = Vector{Real}(undef, length(measured_elements))
-            if lowercase(normalisation_values) == "ci-chondrite, PO2016"
+            if lowercase(normalisation_values) == "CI_PO2016"
                 for i in eachindex(measured_elements)
                     norm_values[i] = deepcopy(ci_chondrite_PO2016(measured_elements[i])[1])
                 end
@@ -71,31 +85,41 @@ function LambdaREE(
                 ),
             )
         end
-        Ω::Diagonal{MultiFloat{Float64,4},Vector{MultiFloat{Float64,4}}} =
-            Diagonal(1 ./ (ω ./ mean(ω)) .^ 2)
-        Xᵀ::Transpose{MultiFloat{Float64,4},Matrix{MultiFloat{Float64,4}}} = transpose(X)
-        VarΛX::Symmetric{Float64,Matrix{Float64}} = Symmetric(inv(Xᵀ * (Ω) * X))
-        Λ::Vector{Float64} = VarΛX * Xᵀ * Ω * y
-        for i in eachindex(Λ)
-            Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64) ? 0.0 : Λ[i]
+        Ω::Diagonal{Float64x4,Vector{Float64x4}} = Diagonal(ω .^ 2)
+        X̃::Matrix{Float64x4} = exp(-0.5log(Ω)) * X
+        ỹ::Vector{Float64x4} = exp(-0.5log(Ω)) * y
+
+        if cond(X̃) ≤ 1e7
+            F = qr(X̃)
+            Λ::Vector{Float64x4} = F \ ỹ
+            VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
+        else
+            F = svd(X̃)
+            Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
+            VarΛX = F.V * inv(Diagonal(F.S .^2)) * F.Vt
         end
-        rss::Vector{Float64} = Vector{Float64}(undef, 5)
+        rss::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
         @simd for i ∈ eachindex(order)
-            residuals::Vector{MultiFloat{Float64,4}} = (y .- (view(X, :, 1:i) * Λ[1:i]))
-            rss[i] = transpose(residuals) * Ω * (residuals)
+            residuals::Vector{Float64x4} = (y .- (view(X, :, 1:i) * Λ[1:i]))
+            rss[i] = transpose(residuals) * inv(Ω) * (residuals)
+        end
+        AIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
+        AIC = _akaike_information_criteria.(rss, 𝑁, order)
+
+        for i in eachindex(Λ)
+            Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64x4) ? 0.0 : Λ[i]
         end
         mse = rss ./ (𝑁 .- (order .+ 1))
-        Λ_SE::AbstractMatrix{Float64} = zeros(Float64, 5, 5)
+        Λ_SE::AbstractMatrix{Float64x4} = zeros(Float64x4, 5, 5)
         for i ∈ eachindex(order)
             Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
         end
-        sparse(Λ_SE)
-        tss::Float64 = transpose((y .- mean(y))) * Ω * (y .- mean(y))
-        rmse::Vector{Float64} = sqrt.(mse)
-        R²::Vector{Float64} = 1 .- (rss ./ (tss))
-        R²ₒₚ::Vector{Float64} = _olkin_pratt.(R², 𝑁, order .+ 1)
-        BIC::Vector{Float64} = Vector{Float64}(undef, 5)
-        AIC::Vector{Float64} = Vector{Float64}(undef, 5)
+        tss::Float64x4 = transpose((y .- mean(y))) * inv(Ω) * (y .- mean(y))
+        rmse::Vector{Float64x4} = sqrt.(mse)
+        nrmse::Vector{Float64x4} = rmse ./ (maximum(y) - minimum(y))
+        R²::Vector{Float64x4} = 1 .- (rss ./ (tss))
+        R²ₒₚ::Vector{Float64x4} = _olkin_pratt.(R², 𝑁, order .+ 1)
+        BIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
         BIC = _bayesian_information_criteria.(rss, 𝑁, order)
         BICw =
             exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
@@ -103,17 +127,18 @@ function LambdaREE(
         AICw =
             exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
         return OrthogonalPolynomial(
-            Λ,
-            Λ_SE,
-            Float64.(β),
-            Float64.(γ),
-            Float64.(δ),
-            Float64.(ϵ),
-            VarΛX,
+            Float64.(Λ),
+            UpperTriangular(Λ_SE),
+            big.(β),
+            big.(γ),
+            big.(δ),
+            big.(ϵ),
+            Float64.(VarΛX),
             order,
             R²,
             R²ₒₚ,
             rmse,
+            nrmse,
             rss,
             mse,
             AIC,
