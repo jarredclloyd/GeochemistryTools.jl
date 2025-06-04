@@ -38,7 +38,7 @@ include("GCTDictionaries.jl")
 include("Regression/ErrorInVariablesRegression/ErrorsInVariablesRegression.jl")
 include("Geochronology/beta_minus_decay_systems.jl")
 include("Geochronology/UPb.jl")
-include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__),"ICPMS/"); join=true)))
+include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__), "ICPMS/"); join=true)))
 include("RamanSpectroscopy.jl")
 include("Profilometry.jl")
 include("Minerals/minerals.jl")
@@ -54,20 +54,20 @@ include("GeometricStatistics.jl")
 include("ErrorEllipse.jl")
 include("DateTimeParser.jl")
 include("BarycentricConversions.jl")
-include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__),"ChemistryTools/"); join=true)))
+include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__), "ChemistryTools/"); join=true)))
 
 # To enable use of MultiFloats in Julia 1.11 until MultiFloats v3.0 is released
 @inline Base.precision(::Type{MultiFloat{T,N}}) where {T,N} =
-           N * precision(T) + (N - 1) # implicit bits of precision between limbs
-@inline    Base.round(x::MultiFloat{T,N} where {T,N}, r::RoundingMode) = Base.round(big.(x), r)
-@inline    Base.trunc(x::MultiFloat{T,N} where {T,N}, r::RoundingMode{:ToZero}) = Base.trunc(big.(x), r)
+    N * precision(T) + (N - 1) # implicit bits of precision between limbs
+@inline Base.round(x::MultiFloat{T,N} where {T,N}, r::RoundingMode) = Base.round(big.(x), r)
+@inline Base.trunc(x::MultiFloat{T,N} where {T,N}, r::RoundingMode{:ToZero}) = Base.trunc(big.(x), r)
 
 # Helper functions
 function _check_equal_length(
     a::AbstractVector,
     b::AbstractVector,
-    c::Union{AbstractVector,Nothing} = nothing,
-    d::Union{AbstractVector,Nothing} = nothing,
+    c::Union{AbstractVector,Nothing}=nothing,
+    d::Union{AbstractVector,Nothing}=nothing,
 )
     if c !== nothing && d !== nothing
         length(a) == length(b) == length(c) == length(d)
@@ -95,7 +95,7 @@ end
 function Base.ImmutableDict(KV::Pair{K,V}, KVs::Pair{K,V}...) where {K,V}
     d = Base.ImmutableDict(KV)
     for p in KVs
-        d = Base.ImmutableDict(d,p)
+        d = Base.ImmutableDict(d, p)
     end
     return d
 end

@@ -12,8 +12,8 @@ struct LAICPMSAnalysis
     gas_blank_start::Real
     gas_blank_end::Real
     gas_blanks::Vector{Real}
-    signal_start::Tuple{Real, Integer}
-    signal_end::Tuple{Real, Integer}
+    signal_start::Tuple{Real,Integer}
+    signal_end::Tuple{Real,Integer}
     data::DataFrame
 end
 

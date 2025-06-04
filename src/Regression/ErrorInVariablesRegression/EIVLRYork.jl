@@ -38,10 +38,10 @@ Journal of Physics*, 72(3), doi:https://doi.org/10.1119/1.1632486.
 """
 function yorkfit(
     df::AbstractDataFrame;
-    se_level_in::Int = 2,
+    se_level_in::Int=2,
     # se_level_out::Int = 2,
-    se_type::AbstractString = "abs",
-    initial::Any = nothing,
+    se_type::AbstractString="abs",
+    initial::Any=nothing,
 )
     dfCols::Int = ncol(df)
     dfRows::Int = nrow(df)
@@ -75,8 +75,8 @@ function yorkfit(
         end
     end
     if occursin('a', lowercase.(se_type)) == true ||
-        occursin("abs", lowercase.(se_type)) == true ||
-        occursin("absolute", lowercase.(se_type)) == true
+       occursin("abs", lowercase.(se_type)) == true ||
+       occursin("absolute", lowercase.(se_type)) == true
         if dfCols == 5
             yfit = _eivlr_york(
                 df[!, 1], df[!, 2] ./ se_level_in, df[!, 3], df[!, 4] ./ se_level_in, df[!, 5]
@@ -89,8 +89,8 @@ function yorkfit(
             throw(ArgumentError("Column width is not equal to 4 or 5. Some data is missing."))
         end
     elseif occursin('r', lowercase.(se_type)) == true ||
-        occursin("rel", lowercase.(se_type)) == true ||
-        occursin("relative", lowercase.(se_type)) == true
+           occursin("rel", lowercase.(se_type)) == true ||
+           occursin("relative", lowercase.(se_type)) == true
         if dfCols == 5
             yfit = _eivlr_york(
                 df[!, 1],
@@ -113,7 +113,7 @@ function yorkfit(
     return yfit
 end
 
-function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, σy::Vector{<:Real}, ρxy::Union{Nothing, Vector{<:Real}} = nothing)
+function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, σy::Vector{<:Real}, ρxy::Union{Nothing,Vector{<:Real}}=nothing)
     if _check_equal_length(x, σx, y, σy) != true
         throw(ArgumentError("The length of x, σx, y and σy must be the same."))
     end
@@ -129,8 +129,8 @@ function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, 
     βₑ::Float64 = β₁
 
     # weights
-    ωx::Vector{Float64} = @. 1.0 / σx ^ 2
-    ωy::Vector{Float64} = @. 1.0 / σy ^ 2
+    ωx::Vector{Float64} = @. 1.0 / σx^2
+    ωy::Vector{Float64} = @. 1.0 / σy^2
 
     # initial fit via York method
     α::Vector{Float64} = sqrt.(ωx .* ωy)
@@ -161,7 +161,7 @@ function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, 
     u = xᵢ .- x̄
     β₁SE::Float64 = √(1 / sum(Ω .* u .^ 2))
     β₀SE::Float64 = √(1 / sum(Ω) + (x̄ * β₁SE)^2)
-    σᵦ₁ᵦ₀::Float64 = - x̄ * β₁SE^2
+    σᵦ₁ᵦ₀::Float64 = -x̄ * β₁SE^2
     χ²::Float64 = sum(Ω .* (y .- β₁ .* x .- β₀) .^ 2)
     ν::Int = 𝑁 > 2 ? 𝑁 - 2 : 1
     χ²ᵣ::Float64 = χ² / ν

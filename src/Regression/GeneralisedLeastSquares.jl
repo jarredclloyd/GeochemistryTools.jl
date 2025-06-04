@@ -24,9 +24,9 @@ function _GLS(
     x::AbstractVector,
     y::AbstractVector,
     order::Integer;
-    y_weights::Union{Nothing,AbstractVector} = nothing,
-    weight_type::AbstractString = "abs",
-    adjust_r::Bool = false
+    y_weights::Union{Nothing,AbstractVector}=nothing,
+    weight_type::AbstractString="abs",
+    adjust_r::Bool=false
 )
     order = abs(order)
     if length(x) != length(y)
@@ -48,7 +48,7 @@ function _GLS(
             ),
         )
     end
-    ω = ω .^2
+    ω = ω .^ 2
     Ω = Diagonal(ω)
     X = _design_matrix(x, order)
     C = inv(transpose(X) * inv(Ω) * X)
@@ -85,29 +85,29 @@ end
 function _polyGLS(x::AbstractVector, fit::GeneralisedLeastSquares)
     order = length(fit.beta) - 1
     X = _design_matrix(x, order)
-    return X * fit.beta[1:(order + 1)]
+    return X * fit.beta[1:(order+1)]
 end
 
 function _polyCI(
     x::AbstractVector,
     fit::GeneralisedLeastSquares;
-    ci_level::AbstractFloat = 0.95,
+    ci_level::AbstractFloat=0.95,
 )
     order = length(fit.beta) - 1
     tvalue = cquantile(TDist(fit.n_observations - order), (1 - ci_level) / 2)
     X = _design_matrix(x, order)
-    return vec(sqrt.((fit.rmse^2) .* sum(X .* (X * fit.variance_covariance); dims = 2))) .* tvalue
+    return vec(sqrt.((fit.rmse^2) .* sum(X .* (X * fit.variance_covariance); dims=2))) .* tvalue
 end
 
 function _polyPI(
     x::AbstractVector,
     fit::GeneralisedLeastSquares;
-    ci_level::AbstractFloat = 0.95,
+    ci_level::AbstractFloat=0.95,
 )
     order = length(fit.beta) - 1
     tvalue = cquantile(TDist(fit.n_observations - order), (1 - ci_level) / 2)
     X = _design_matrix(x, order)
     return vec(
-        sqrt.((fit.rmse^2) .* sum(1 .+ X .* (X * fit.variance_covariance) .* (fit.rmse^2); dims = 2)),
+        sqrt.((fit.rmse^2) .* sum(1 .+ X .* (X * fit.variance_covariance) .* (fit.rmse^2); dims=2)),
     ) .* tvalue
 end

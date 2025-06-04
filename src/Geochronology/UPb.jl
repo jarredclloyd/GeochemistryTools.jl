@@ -242,7 +242,7 @@ end
 
 function ratioprimePb207Pb206(age) #  d/dt(((e^(λU235 * age) - 1)/(e^(λU238 * age) - 1))/137.818)
     inv(RATIO_U238U235) * ((LAMBDA_U235) * exp(LAMBDA_U235 * age) * (exp(LAMBDA_U238 * age) - 1) - LAMBDA_U238 *
-    exp(LAMBDA_U238 * age) * (exp(LAMBDA_U235 * age) - 1)) / (exp(LAMBDA_U238 * age) - 1)^2
+                                                                                                   exp(LAMBDA_U238 * age) * (exp(LAMBDA_U235 * age) - 1)) / (exp(LAMBDA_U238 * age) - 1)^2
 end
 
 function agePb206U238(ratio)
@@ -297,8 +297,8 @@ function aitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
         signPb = sign(aPb207Pb206)
         signU = sign(aPb206U238)
         (signPb * signU) * ((log(rU238Pb206) - log(exp(LAMBDA_U238 * abs(aPb207Pb206)) - 1)) * sin(atan((log(rPb207Pb206) -
-        log(inv(RATIO_U238U235) * (exp(LAMBDA_U235 * abs(aPb206U238)) - 1) / (exp(LAMBDA_U238 * abs(aPb206U238)) - 1))) /
-        (log(rU238Pb206) - log(exp(LAMBDA_U238 * abs(aPb207Pb206)) - 1)))))
+                                                                                                         log(inv(RATIO_U238U235) * (exp(LAMBDA_U235 * abs(aPb206U238)) - 1) / (exp(LAMBDA_U238 * abs(aPb206U238)) - 1))) /
+                                                                                                        (log(rU238Pb206) - log(exp(LAMBDA_U238 * abs(aPb207Pb206)) - 1)))))
     else
         throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
         Please check your data."))

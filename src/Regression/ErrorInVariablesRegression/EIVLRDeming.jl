@@ -48,7 +48,7 @@ function deming(x::AbstractVector{<:Real}, y::AbstractVector{<:Real})
 end
 
 #jackknife deming
-function jackknife(df::AbstractDataFrame, method::AbstractString = "deming")
+function jackknife(df::AbstractDataFrame, method::AbstractString="deming")
     𝑁::Int = nrow(df)
     if method == "deming"
         jackknifed_estimates::AbstractVector{Float64} = zeros(Float64, 𝑁, 2)

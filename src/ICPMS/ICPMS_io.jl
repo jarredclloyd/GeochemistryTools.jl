@@ -110,22 +110,22 @@ function load_agilent(
     host_directory::AbstractString,
     cps_column1::AbstractString,
     cps_column2::AbstractString;
-    sample::Union{Nothing,AbstractString} = nothing,
-    date_time_constructor::AbstractString = "automatic",
-    day_first::Bool = true,
-    header_row::Integer = 4,
-    first_row::Integer = 5,
-    footer_skip::Integer = 3,
-    automatic_times::Bool = true,
-    gas_blank::Real = 27.5,
-    stable_time::Real = 32,
-    signal_end::Real = Inf,
-    trim::Bool = false,
-    aggregate_files::Bool = false,
-    centre::Bool = true,
-    central_tendency::AbstractString = "deltalognormal",
-    spot_size_filename::Bool = false,
-    spot_size_value::Union{Missing,Integer} = missing,
+    sample::Union{Nothing,AbstractString}=nothing,
+    date_time_constructor::AbstractString="automatic",
+    day_first::Bool=true,
+    header_row::Integer=4,
+    first_row::Integer=5,
+    footer_skip::Integer=3,
+    automatic_times::Bool=true,
+    gas_blank::Real=27.5,
+    stable_time::Real=32,
+    signal_end::Real=Inf,
+    trim::Bool=false,
+    aggregate_files::Bool=false,
+    centre::Bool=true,
+    central_tendency::AbstractString="deltalognormal",
+    spot_size_filename::Bool=false,
+    spot_size_value::Union{Missing,Integer}=missing,
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -142,45 +142,45 @@ function load_agilent(
     end
     date_time_format::DateFormat = date_format_test(
         files[1];
-        date_time_constructor = date_time_constructor,
-        day_first = day_first,
+        date_time_constructor=date_time_constructor,
+        day_first=day_first,
     )
-     if lowercase.(central_tendency) == "gmean"
-            ct_alg = geomean_zeros
-        elseif lowercase.(central_tendency) == "median"
-            ct_alg = median
-        elseif lowercase.(central_tendency) == "amean"
-            ct_alg = mean
-        elseif lowercase.(central_tendency) == "deltalognormal"
-            ct_alg =  deltalognormal
+    if lowercase.(central_tendency) == "gmean"
+        ct_alg = geomean_zeros
+    elseif lowercase.(central_tendency) == "median"
+        ct_alg = median
+    elseif lowercase.(central_tendency) == "amean"
+        ct_alg = mean
+    elseif lowercase.(central_tendency) == "deltalognormal"
+        ct_alg = deltalognormal
     end
     for file in files
         if spot_size_filename === true
             spot_size = tryparse(
                 Int,
-                file[(findlast("_", file)[1] + 1):(findnext(
+                file[(findlast("_", file)[1]+1):(findnext(
                     " ",
                     file,
                     findlast("_", file)[1],
-                )[1] - 1)],
+                )[1]-1)],
             )
         elseif ismissing(spot_size_value) !== true && typeof(spot_size_value) <: Number
             spot_size = spot_size_value
         end
         head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
+        analysis_name = chop(head_info[1]; head=findlast("\\", head_info[1])[1], tail=3)
         sample_name = rstrip(
             chop(
                 analysis_name;
-                tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
+                tail=length(analysis_name) - findlast("-", analysis_name)[1] + 1,
             ),
         )
         analysis_time = rstrip(
             chop(
-                head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
+                head_info[3][(findfirst(":", head_info[3])[1]+2):(findlast(
                     "using",
                     head_info[3],
-                )[1] - 1)],
+                )[1]-1)],
             ),
         )
         analysis_time = DateTime(analysis_time, date_time_format)
@@ -190,12 +190,12 @@ function load_agilent(
         df = CSV.read(
             file,
             DataFrame;
-            header = header_row,
-            skipto = first_row,
-            footerskip = footer_skip,
-            ignoreemptyrows = true,
-            normalizenames = true,
-            delim = ',',
+            header=header_row,
+            skipto=first_row,
+            footerskip=footer_skip,
+            ignoreemptyrows=true,
+            normalizenames=true,
+            delim=',',
         )
         if automatic_times == true
             transform!(df, AsTable(Not(1)) => ByRow(sum) => :total_signal)
@@ -232,7 +232,7 @@ function load_agilent(
             )
             insertcols!(
                 df,
-                cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])),
+                cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1*"_gbsub"])),
             )
             transform!(
                 df,
@@ -244,7 +244,7 @@ function load_agilent(
             )
             insertcols!(
                 df,
-                cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])),
+                cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2*"_gbsub"])),
             )
             transform!(
                 df,
@@ -259,15 +259,15 @@ function load_agilent(
                 "ratio_σ" =>
                     sqrt.(
                         df[!, :ratio] .^ 2 .* (
-                            (df[!, cps_column1 * "_σ"] ./ df[!, cps_column1 * "_gbsub"]) .^
+                            (df[!, cps_column1*"_σ"] ./ df[!, cps_column1*"_gbsub"]) .^
                             2 +
-                            (df[!, cps_column2 * "_σ"] ./ df[!, cps_column2 * "_gbsub"]) .^
+                            (df[!, cps_column2*"_σ"] ./ df[!, cps_column2*"_gbsub"]) .^
                             2
                         )
                     ),
             )
             if centre == true
-                centre_value = ct_alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])[1]
+                centre_value = ct_alg(df[stable_time.≤df.signal_time.≤signal_end, :ratio])[1]
                 df.ratio_centred = 1.0 .+ (df.ratio .- centre_value)
                 df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
             end
@@ -335,13 +335,13 @@ table, the median-centred ratio, and sorts the table by time.
 function load_agilent2(
     host_directory::AbstractString,
     ;
-    sample::Union{Nothing,AbstractString} = nothing,
-    date_time_constructor::AbstractString = "automatic",
-    day_first::Bool = true,
-    header_row::Integer = 4,
-    first_row::Integer = 5,
-    footer_skip::Integer = 3,
-    aggregate_files::Bool = false,
+    sample::Union{Nothing,AbstractString}=nothing,
+    date_time_constructor::AbstractString="automatic",
+    day_first::Bool=true,
+    header_row::Integer=4,
+    first_row::Integer=5,
+    footer_skip::Integer=3,
+    aggregate_files::Bool=false,
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -360,24 +360,24 @@ function load_agilent2(
     end
     date_time_format::DateFormat = date_format_test(
         files[1];
-        date_time_constructor = date_time_constructor,
-        day_first = day_first,
+        date_time_constructor=date_time_constructor,
+        day_first=day_first,
     )
     for file in files
         head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
+        analysis_name = chop(head_info[1]; head=findlast("\\", head_info[1])[1], tail=3)
         sample_name = rstrip(
             chop(
                 analysis_name;
-                tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
+                tail=length(analysis_name) - findlast("-", analysis_name)[1] + 1,
             ),
         )
         analysis_time = rstrip(
             chop(
-                head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
+                head_info[3][(findfirst(":", head_info[3])[1]+2):(findlast(
                     "using",
                     head_info[3],
-                )[1] - 1)],
+                )[1]-1)],
             ),
         )
         analysis_time = DateTime(analysis_time, date_time_format)
@@ -387,12 +387,12 @@ function load_agilent2(
         df = CSV.read(
             file,
             DataFrame;
-            header = header_row,
-            skipto = first_row,
-            footerskip = footer_skip,
-            ignoreemptyrows = true,
-            normalizenames = true,
-            delim = ',',
+            header=header_row,
+            skipto=first_row,
+            footerskip=footer_skip,
+            ignoreemptyrows=true,
+            normalizenames=true,
+            delim=',',
         )
         rename!(df, "Time_Sec_" => "time")
         insertcols!(df, 1, "sample" => sample_name)
@@ -457,9 +457,9 @@ julia> automatic_laser_times(G00.time, G00.signal_total)
 function automatic_laser_times(
     time::AbstractVector{<:Real},
     signal::AbstractVector{<:Real};
-    bandwidth::Integer = UInt8(cld(sqrt(length(signal)), 2)),
-    gas_blank_trim::Integer = 5,
-    verbose::Bool = false,
+    bandwidth::Integer=UInt8(cld(sqrt(length(signal)), 2)),
+    gas_blank_trim::Integer=5,
+    verbose::Bool=false,
 )
     medians = Vector{Float64}(undef, Integer(cld(length(signal), bandwidth)))
     for i in eachindex(medians)
@@ -475,7 +475,7 @@ function automatic_laser_times(
             @view(medians[begin:round(UInt, end / 2)]),
             @view(medians[round(UInt, end / 2):end]),
         ),
-    ) > 0.05 || pvalue(JarqueBeraTest(signal; adjusted = true)) > 0.05
+    ) > 0.05 || pvalue(JarqueBeraTest(signal; adjusted=true)) > 0.05
         println("no signal detected")
     else
         z = Array{Float64}(undef, length(signal), 3)
@@ -483,20 +483,20 @@ function automatic_laser_times(
             z[i, 1] = if i < bandwidth
                 geomean_zeros(@view(signal[begin:i]))
             else
-                geomean_zeros(@view(signal[(i - bandwidth + 1):i]))
+                geomean_zeros(@view(signal[(i-bandwidth+1):i]))
             end
             z[i, 2] = if i < bandwidth
                 geovar_zeros(@view(signal[begin:i]))
             else
-                geovar_zeros(@view(signal[(i - bandwidth + 1):i]))
+                geovar_zeros(@view(signal[(i-bandwidth+1):i]))
             end
             z[i, 3] = if i < 3
                 Inf
             else
-                pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i - 1), 2]))))
+                pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i-1), 2]))))
             end
         end
-        z[:,3] = replace!(x -> isnan(x) ? Inf : x, z[:,3])
+        z[:, 3] = replace!(x -> isnan(x) ? Inf : x, z[:, 3])
         laser_start_ind = findmin(@view(z[:, 3]))[2]
         laser_start_time = time[laser_start_ind]
         q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])

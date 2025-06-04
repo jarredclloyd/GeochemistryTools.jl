@@ -23,7 +23,7 @@ function geomean_zeros(x::AbstractVector)
     N = length(x)
     N2 = count(x .> 0)
     if N2 > 0
-        G₊ = geomean(x[x[:] .> 0, :])
+        G₊ = geomean(x[x[:].>0, :])
         G = (N2 / N) * G₊
     else
         G = 0
@@ -41,7 +41,7 @@ function geovar_zeros(x::AbstractVector)
     N = length(x)
     N2 = count(x .> 0)
     if N2 > 1
-        var₊ = exp(var(log.(x[x[:] .> 0, :])))
+        var₊ = exp(var(log.(x[x[:].>0, :])))
         varG = (N2 / N) * var₊
     else
         varG = 0
@@ -50,14 +50,14 @@ function geovar_zeros(x::AbstractVector)
 end
 
 function geostd_zeros(x::AbstractVector)
-    return std(log.(x[x[:] .> 0, :]))
+    return std(log.(x[x[:].>0, :]))
 end
 
 function geosem_zeros(x::AbstractVector)
     N = length(x)
     N2 = count(x .> 0)
     if N2 > 1
-        sem₊ = exp(sem(log.(x[x[:] .> 0, :])))
+        sem₊ = exp(sem(log.(x[x[:].>0, :])))
         semG = (N2 / N) * sem₊
     else
         semG = 0
@@ -82,8 +82,8 @@ function tri_geomean(x::AbstractVector)
     #         ),
     #     )
     # end
-    𝑁₁ > 0 ? G₋ = -(geomean(abs.(x[x[:] .< 0, :]))) : G₋ = 0
-    𝑁₂ > 0 ? G₊ = geomean(x[x[:] .> 0, :]) : G₊ = 0
+    𝑁₁ > 0 ? G₋ = -(geomean(abs.(x[x[:].<0, :]))) : G₋ = 0
+    𝑁₂ > 0 ? G₊ = geomean(x[x[:].>0, :]) : G₊ = 0
     return (𝑁₁ * G₋ + 𝑁₂ * G₊) / 𝑁ₜ
 end
 
@@ -100,8 +100,8 @@ function tri_geovar(x::AbstractVector)
     end
     if 𝑁₁ > 0
         𝑁₁𝑁 = 𝑁₁ / 𝑁ₜ
-        G₋ = geomean(abs.(x[x[:] .< 0, :]))
-        varlogG₋ = -(var(log.(abs.(x[x[:] .< 0, :]))))
+        G₋ = geomean(abs.(x[x[:].<0, :]))
+        varlogG₋ = -(var(log.(abs.(x[x[:].<0, :]))))
         𝐸G₋ = _expectation_g_negative(G₋, varlogG₋, 𝑁₁, 𝑁ₜ)
         varG₋ = (𝑁₁𝑁)^2 * (varlogG₋ / 𝑁₁) * (G₋)^2
     else
@@ -113,8 +113,8 @@ function tri_geovar(x::AbstractVector)
     end
     if 𝑁₂ > 0
         𝑁₂𝑁 = 𝑁₂ / 𝑁ₜ
-        G₊ = geomean(x[x[:] .> 0, :])
-        varlogG₊ = var(log.(abs.(x[x[:] .> 0, :])))
+        G₊ = geomean(x[x[:].>0, :])
+        varlogG₊ = var(log.(abs.(x[x[:].>0, :])))
         𝐸G₊ = _expectation_g_positive(G₊, varlogG₊, 𝑁₂, 𝑁ₜ)
         varG₊ = (𝑁₂𝑁)^2 * (varlogG₊ / 𝑁₂) * (G₊)^2
     else
@@ -166,17 +166,17 @@ function _expectation_g_weighted(
     return G + (G / 2) * ((𝑁₁𝑁)^2 * (varlogG₋ / 𝑁₁) + (𝑁₂𝑁)^2 * (varlogG₊ / 𝑁₂))
 end
 
-function _geomean_zeros_cruz(x::AbstractVector, ϵ::AbstractFloat = 1e-5)
-    G₊ = geomean(x[x[:] .> 0, :])
+function _geomean_zeros_cruz(x::AbstractVector, ϵ::AbstractFloat=1e-5)
+    G₊ = geomean(x[x[:].>0, :])
     δmin = 0
-    δmax = G₊ - minimum(x[x[:] .> 0, :])
+    δmax = G₊ - minimum(x[x[:].>0, :])
     δ = (δmin + δmax) / 2
     ϵ = ϵ * G₊
-    auxExp = geomean(x[x[:] .> 0, :] .+ δ) - δ
+    auxExp = geomean(x[x[:].>0, :] .+ δ) - δ
     while (auxExp - G₊) > ϵ
         auxExp < G₊ ? δmin = δ : δmax = δ
         δ = (δmin + δmax) / 2
-        auxExp = geomean(x[x[:] .> 0, :] .+ δ) - δ
+        auxExp = geomean(x[x[:].>0, :] .+ δ) - δ
     end
     G = geomean(x .+ δ) - δ
     return (G, δ)
@@ -189,9 +189,9 @@ end
 """
 function deltalognormal(x::AbstractVector)
     𝑁 = length(x)
-    dlog = Distributions.fit(LogNormal, x[x .> 0])
-    𝜃 = length(x[x .== 0]) / 𝑁
-    γ = (1-𝜃)dlog.μ
-    δ = (1-𝜃)dlog.σ^2 + 𝜃*(1-𝜃)dlog.μ^2
+    dlog = Distributions.fit(LogNormal, x[x.>0])
+    𝜃 = length(x[x.==0]) / 𝑁
+    γ = (1 - 𝜃)dlog.μ
+    δ = (1 - 𝜃)dlog.σ^2 + 𝜃 * (1 - 𝜃)dlog.μ^2
     return (exp(γ), exp(δ))
 end

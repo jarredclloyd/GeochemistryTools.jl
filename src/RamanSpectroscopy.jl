@@ -34,7 +34,7 @@ function load_raman(hostdir, sample::AbstractString;
     normalisation::AbstractString="area")
     file = glob(sample * "*.txt", hostdir)
     data = CSV.read(file, DataFrame; header=[:wavenumber, :intensity], skipto=firstrow,
-     types=Float64, footerskip=trailing_rows, ignoreemptyrows=true)
+        types=Float64, footerskip=trailing_rows, ignoreemptyrows=true)
     if process == true
         fit_base(data; intensity_col=:intensity)
     elseif process == false
@@ -317,7 +317,7 @@ function _correct_raman(
     ω = ω * 100 # convert cm⁻¹ to m⁻¹
     temp_cor_boltz::AbstractFloat = (
         1 - exp(-planck * speedoflight * ω / (boltzmann * temperature))
-        )
+    )
     if lowercase(method) == "long"
         Iᵣ::AbstractFloat = _long_correction(ω, I, ν, temp_cor_boltz)
     elseif lowercase(method) == "galeener"
@@ -379,7 +379,7 @@ Remove spikes in time-series data. Implements a simple algorithm outlined in
 Whitaker & Hayes (2018) that uses modified z-scores to detect outlier points.
 
 """
-function despike(x::AbstractVector, y::AbstractVector; threshold::Real = 6.0, bandwidth::Integer = 5)
+function despike(x::AbstractVector, y::AbstractVector; threshold::Real=6.0, bandwidth::Integer=5)
     if length(x) ≠ length(y)
         error("Vector lengths are not equal")
     else
@@ -388,10 +388,10 @@ function despike(x::AbstractVector, y::AbstractVector; threshold::Real = 6.0, ba
         zy_median = median(z_score)
         zy_mad = mad(z_score, normalize=true) # normalise accounts for bias in MAD calculation
         z_score .= abs.((z_score .- zy_median) ./ zy_mad)
-        spikes = [1, findall(>(threshold), z_score).+1..., lastindex(y)]
+        spikes = [1, findall(>(threshold), z_score) .+ 1..., lastindex(y)]
         for i ∈ spikes
-            despiked_y[i] = mean(y[[collect(max(firstindex(z_score), i-bandwidth):i-1)...,
-             collect(i+1:min(lastindex(z_score), i+bandwidth))...]])
+            despiked_y[i] = mean(y[[collect(max(firstindex(z_score), i - bandwidth):i-1)...,
+                collect(i+1:min(lastindex(z_score), i + bandwidth))...]])
         end
     end
     return despiked_y

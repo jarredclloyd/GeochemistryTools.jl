@@ -63,13 +63,13 @@ function _chi_squared(
     return χ²
 end
 
-function _reduced_chi_squared_ci(dof::Integer, confidence_level::AbstractFloat = 0.95)
+function _reduced_chi_squared_ci(dof::Integer, confidence_level::AbstractFloat=0.95)
     lower_χ²ᵣ = cquantile(Chisq(dof), 1 - (1 - confidence_level) / 2) / dof
     upper_χ²ᵣ = cquantile(Chisq(dof), (1 - confidence_level) / 2) / dof
     return (lower_χ²ᵣ, upper_χ²ᵣ)
 end
 
-function _hypergeometric2F1_taylor(a::Real, b::Real, c::Real, z::Real, tol = eps(Float64))
+function _hypergeometric2F1_taylor(a::Real, b::Real, c::Real, z::Real, tol=eps(Float64))
     Cⱼ, Sⱼ = 1, 1
     j = 0
     while abs(Cⱼ) / abs(Sⱼ) > tol && j ≤ 1000

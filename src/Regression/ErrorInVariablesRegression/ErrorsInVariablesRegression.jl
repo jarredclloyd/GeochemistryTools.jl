@@ -171,10 +171,10 @@ https://doi.org/10.1016/j.ijms.2023]].117053
 """
 function fit_eivlr(
     df::AbstractDataFrame,
-    algorithm::AbstractString = "mahon";
-    se_level_in::Integer = 2,
-    se_type::AbstractString = "abs",
-    initial::Any = nothing,
+    algorithm::AbstractString="mahon";
+    se_level_in::Integer=2,
+    se_type::AbstractString="abs",
+    initial::Any=nothing,
 )
     dfCols::Int = ncol(df)
     dfRows::Int = nrow(df)
@@ -298,38 +298,38 @@ end
 function linear_standarderror(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
-    se_level::Integer = 1,
+    se_level::Integer=1,
 )
     X = hcat(repeat([1.0], length(x)), x)
-    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit. covariance_beta fit.beta1_se^2]
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta fit.beta1_se^2]
     return vec(
-        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* se_level
+        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims=2)) .* se_level
     )
 end
 function linear_confidenceband(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
-    confidence_level::AbstractFloat = 0.95,
+    confidence_level::AbstractFloat=0.95,
 )
     ν = fit.n_observations - 2
     tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
     X = hcat(repeat([1.0], length(x)), x)
-    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta fit.beta1_se^2]
     return vec(
-        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* tvalue
+        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims=2)) .* tvalue
     )
 end
 
 function linear_predictionband(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
-    confidence_level::AbstractFloat = 0.95,
+    confidence_level::AbstractFloat=0.95,
 )
     ν = fit.n_observations - 2
     tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
     X = hcat(repeat([1.0], length(x)), x)
-    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta fit.beta1_se^2]
     return vec(
-        sqrt.(fit.reduced_chi_squared[order + 1] .* (1 .+ sum(X .* (X * VarCovar); dims = 2))) .* tvalue,
+        sqrt.(fit.reduced_chi_squared[order+1] .* (1 .+ sum(X .* (X * VarCovar); dims=2))) .* tvalue,
     )
 end

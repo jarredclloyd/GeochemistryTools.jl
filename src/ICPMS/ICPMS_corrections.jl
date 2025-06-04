@@ -18,7 +18,7 @@ export correct_interference
 
 function correct_interference(
     data::DataFrame,
-    distorted_signal::Union{Symbol, Integer, AbstractString, AbstractChar}, interference::Union{Symbol, Integer, AbstractString, AbstractChar},
+    distorted_signal::Union{Symbol,Integer,AbstractString,AbstractChar}, interference::Union{Symbol,Integer,AbstractString,AbstractChar},
     isotope_ratio::AbstractFloat,
     mass_bias::AbstractFloat)
 
@@ -27,6 +27,6 @@ function correct_interference(
         Cols(distorted_signal, interference) =>
             ByRow(
                 (ds, int) ->
-                ds - int * isotope_ratio * mass_bias) => distorted_signal * "_corr"
+                    ds - int * isotope_ratio * mass_bias) => distorted_signal * "_corr"
     )
 end

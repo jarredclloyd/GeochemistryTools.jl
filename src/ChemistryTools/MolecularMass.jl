@@ -35,7 +35,7 @@ Molecular mass of input formula {K0.6Cu18[AsO2(OH)2]4[AsO3OH]10(AsO4)(OH)9.6(H2O
 3767.5411050000007 gmol⁻¹.
 ```
 """
-function molecular_mass(formula::Union{String, Vector{String}};
+function molecular_mass(formula::Union{String,Vector{String}};
     verbose::Bool=true)
     if isa(formula, Vector{String})
         mass = zeros(size(formula))
@@ -44,15 +44,15 @@ function molecular_mass(formula::Union{String, Vector{String}};
             mass[i] = computemoleculemass(formula[i])
             if verbose == true
                 printstyled("Molecular mass of input formula {" * string(formula[i]) * "} is:\n" * string(mass[i]) *
-                        " gmol⁻¹.\n", bold=true)
+                            " gmol⁻¹.\n", bold=true)
             end
         end
         return mass
     else
         mass = computemoleculemass(formula)
         if verbose == true
-        printstyled("Molecular mass of input formula {" * string(formula) * "} is:\n" * string(mass) *
-                    " gmol⁻¹.", bold=true)
+            printstyled("Molecular mass of input formula {" * string(formula) * "} is:\n" * string(mass) *
+                        " gmol⁻¹.", bold=true)
         end
         return mass
     end
@@ -88,13 +88,13 @@ function computeionmass(formula::AbstractString, left_index::Integer, formula_la
     # find parentheses and brackets
     if formula[left_index] == '['
         sqrbrac_close = findnext(']', formula, left_index)[1]
-        sqrbracmass, left_index = _sqrbracsum(formula, left_index+1, sqrbrac_close,formula_lastind)
+        sqrbracmass, left_index = _sqrbracsum(formula, left_index + 1, sqrbrac_close, formula_lastind)
         left_index = nextind(formula, left_index)
     end
-        if isnothing(sqrbracmass)
+    if isnothing(sqrbracmass)
         if formula[left_index] == '('
             paren_close = findnext(')', formula, left_index)[1]
-            parenmass, left_index =_parensum(formula, left_index+1, paren_close,formula_lastind)
+            parenmass, left_index = _parensum(formula, left_index + 1, paren_close, formula_lastind)
             left_index = nextind(formula, left_index)
         end
     end
@@ -131,17 +131,17 @@ function _get_element!(formula::AbstractString, elem_start_ind::Integer, formula
             elem_end_ind = elem_start_ind
         end
         if elem_start_ind < formula_lastind && occursin(r"[A-Z][a-z]", formula[elem_start_ind:elem_end_ind]) &&
-            in(Symbol(formula[elem_start_ind:elem_end_ind]), keys(PeriodicTable.elements.bysymbol))
+           in(Symbol(formula[elem_start_ind:elem_end_ind]), keys(PeriodicTable.elements.bysymbol))
             return element = formula[elem_start_ind:elem_end_ind]
         elseif elem_start_ind ≤ formula_lastind &&
-            occursin(r"[A-Z]", string(formula[elem_start_ind])) &&
-            in(Symbol(formula[elem_start_ind]), keys(PeriodicTable.elements.bysymbol))
+               occursin(r"[A-Z]", string(formula[elem_start_ind])) &&
+               in(Symbol(formula[elem_start_ind]), keys(PeriodicTable.elements.bysymbol))
             return element = formula[elem_start_ind]
         end
         if isnothing(element)
-                error("Invalid element symbol ($(formula[elem_start_ind:elem_end_ind])) found in formula at position $elem_start_ind")
+            error("Invalid element symbol ($(formula[elem_start_ind:elem_end_ind])) found in formula at position $elem_start_ind")
         else
-        return element
+            return element
         end
     end
 end
@@ -149,9 +149,9 @@ end
 function _get_nmoles(formula::AbstractString, nmole_start_ind::Integer, formula_lastind::Integer)
     if nmole_start_ind == formula_lastind
         nmoles = tryparse(Int, string(formula[nmole_start_ind]))
-        nmole_end_ind = nextind(formula, nmole_start_ind)+1
+        nmole_end_ind = nextind(formula, nmole_start_ind) + 1
     else
-        nmole_end_ind = findnext(r"[A-Za-z()\[\]]",formula, nmole_start_ind)
+        nmole_end_ind = findnext(r"[A-Za-z()\[\]]", formula, nmole_start_ind)
         if isnothing(nmole_end_ind)
             nmole_end_ind = formula_lastind
             nmoles = tryparse(Float64, string(formula[nmole_start_ind:nmole_end_ind]))

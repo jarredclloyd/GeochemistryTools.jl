@@ -31,7 +31,7 @@ julia> element_to_oxide(1; element="Si",element_multiplicity=1,oxide="SiO2")
 2.1393352441651383
 ```
 """
-function element_to_oxide(value::Real; element::Union{AbstractString, AbstractChar, Symbol, Integer}, element_multiplicity::Integer=1, oxide::AbstractString, units::AbstractString="wt%")
+function element_to_oxide(value::Real; element::Union{AbstractString,AbstractChar,Symbol,Integer}, element_multiplicity::Integer=1, oxide::AbstractString, units::AbstractString="wt%")
     if units == "wt%"
         return value / (get_atomicmass(element) * element_multiplicity) * molecular_mass(oxide; verbose=false)
     elseif units == "ppm"

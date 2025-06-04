@@ -15,7 +15,7 @@ export automatic_datetime
 
     Assumes a delimiter in the the date string, and `:` as the delimiter for time string.
 """
-function automatic_datetime(datetime_string::AbstractString; day_first::Bool = true)
+function automatic_datetime(datetime_string::AbstractString; day_first::Bool=true)
     if occursin(r"-", datetime_string) == true
         date_delim = '-'
     elseif occursin(r"/", datetime_string) == true
@@ -39,14 +39,14 @@ end
 function date_format_test(
     file::AbstractString;
     date_time_constructor::AbstractString,
-    day_first::Bool = true,
+    day_first::Bool=true,
 )
     lines = split(readuntil(file, "Time "), "\n")
     date_time = rstrip(
-        lines[3][(findfirst(":", lines[3])[1] + 2):(findfirst("using", lines[3])[1] - 1)],
+        lines[3][(findfirst(":", lines[3])[1]+2):(findfirst("using", lines[3])[1]-1)],
     )
     if occursin("auto", date_time_constructor) === true
-        date_time_format = automatic_datetime(date_time; day_first = day_first)
+        date_time_format = automatic_datetime(date_time; day_first=day_first)
     else
         date_time_format = Dates.DateFormat(date_time_constructor)
     end

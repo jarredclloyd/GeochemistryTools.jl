@@ -27,7 +27,7 @@ julia> get_atomicmass(6)
 12.001 u
 ```
 """
-function get_atomicmass(element::Union{T} where T <: Union{AbstractString, AbstractChar, Symbol, Integer})
+function get_atomicmass(element::Union{T} where T<:Union{AbstractString,AbstractChar,Symbol,Integer})
     # Convert the input to uppercase to handle both symbol and name inputs uniformly.
     if typeof(element) <: Symbol
     elseif (typeof(element) <: Integer)
