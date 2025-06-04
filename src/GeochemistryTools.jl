@@ -100,6 +100,9 @@ function Base.ImmutableDict(KV::Pair{K,V}, KVs::Pair{K,V}...) where {K,V}
     return d
 end
 
+# to allow quick access of multiple keys for vector construction
+(d::AbstractDict)(key) = d[key]
+
 # switch to PythonCall and CondaPkg when open_ssl is updated, or write baselines into native julia
 #=
 const pybaselines = Ref{Py}()
