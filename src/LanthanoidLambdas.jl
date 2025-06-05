@@ -13,7 +13,7 @@ function _lambdaREE(
     fit_gd::Bool=true,
 )
     lanthanoids =
-        ["La", "Ce", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
+        ["La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
     lanth_radii = IONIC_RADIUS_CNEIGHT.(lanthanoids .* "_3+")
     finite_indices = findall(isfinite, lanth_values)
     if length(finite_indices) ≤ 4
@@ -40,7 +40,7 @@ function _lambdaREE(
             finite_indices = intersect(finite_indices, findall(isfinite, lanth_uncertainties))
             lanth_uncertainties = lanth_uncertainties[finite_indices]
         end
-        lanth_values = log.(lanth_values[finite_indices])
+        lanth_values = lanth_values[finite_indices]
         lanth_measured = lanthanoids[finite_indices]
         if normalise == true
             norm_values::Vector{Real} = Vector{Real}(undef, length(lanth_measured))
@@ -52,7 +52,7 @@ function _lambdaREE(
             for i in eachindex(lanth_measured)
                 norm_values[i] = lookup_dict[Symbol(lanth_measured[i])][1]
             end
-            lanth_values ./= log.(norm_values)
+            lanth_values = log.(lanth_values ./ norm_values)
         end
         fitting_indices = deepcopy(finite_indices)
         if fit_gd == false
