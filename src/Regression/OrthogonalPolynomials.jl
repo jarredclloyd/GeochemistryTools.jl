@@ -198,7 +198,7 @@ function fit_orthogonal(
     end
 end
 
-function poly_orthogonal(x::AbstractVector, fit::OrthogonalPolynomial, order::Integer)
+function poly_orthogonal(x::Union{AbstractVector, Real}, fit::OrthogonalPolynomial, order::Integer)
     if order < 0
         throw(ArgumentError("Polynomial order must be positive"))
     end
@@ -447,7 +447,7 @@ end
 
 # polynomial functions
 function _poly_orthogonal(
-    x::AbstractVector,
+    x::Union{AbstractVector, Real},
     λ::AbstractVector,
     β::AbstractFloat,
     γ::AbstractVector,
