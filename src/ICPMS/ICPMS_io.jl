@@ -126,6 +126,7 @@ function load_agilent(
     central_tendency::AbstractString="deltalognormal",
     spot_size_filename::Bool=false,
     spot_size_value::Union{Missing,Integer}=missing,
+    verbose::Bool=false
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -186,6 +187,9 @@ function load_agilent(
         analysis_time = DateTime(analysis_time, date_time_format)
         if Dates.Year(analysis_time) < Dates.Year(2000)
             analysis_time = analysis_time + Dates.Year(2000)
+        end
+        if verbose === true
+            println("processing $file")
         end
         df = CSV.read(
             file,
