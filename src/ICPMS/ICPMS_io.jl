@@ -484,7 +484,8 @@ function automatic_laser_times(
             @view(medians[begin:round(UInt, end / 2)]),
             @view(medians[round(UInt, end / 2):end]),
         ),
-    ) > 0.05 || pvalue(JarqueBeraTest(signal[begin:end-10]; adjusted=true)) > 0.05
+    ) > 0.05 ||
+       pvalue(JarqueBeraTest(signal[begin:round(UInt, 3 * (end / 4))]; adjusted = true)) > 0.05
         println("no signal detected")
     else
         z = Array{Float64}(undef, length(signal), 3)
