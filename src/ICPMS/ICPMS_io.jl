@@ -216,7 +216,9 @@ function load_agilent(
         end
         if automatic_times == true && isnothing(auto_times) == true
             df = nothing
+            @warn "No signal defined for $file"
         else
+            try
             df = select!(df, r"Time", "total_signal", r"" * cps_column1, r"" * cps_column2)
             rename!(df, ["signal_time", "total_cps", cps_column1, cps_column2])
             insertcols!(df, 1, "sample" => sample_name)
@@ -279,6 +281,9 @@ function load_agilent(
                 filter!(:signal_time => x -> stable_time .≤ x .≤ signal_end, df)
             end
             append!(data, df)
+        catch
+            @warn "could not process: $file"
+        end
         end
     end
     if !isempty(data) == true
@@ -479,7 +484,7 @@ function automatic_laser_times(
             @view(medians[begin:round(UInt, end / 2)]),
             @view(medians[round(UInt, end / 2):end]),
         ),
-    ) > 0.05 || pvalue(JarqueBeraTest(signal; adjusted=true)) > 0.05
+    ) > 0.05 || pvalue(JarqueBeraTest(signal[begin:end-10]; adjusted=true)) > 0.05
         println("no signal detected")
     else
         z = Array{Float64}(undef, length(signal), 3)
