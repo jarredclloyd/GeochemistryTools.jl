@@ -2,38 +2,69 @@
 This file contains functions to load lanthanoid elemental data (+Y) and calculate lambda fits.
 =#
 
+export REE_lambda
+
+# Handler function for REE lambda fitting and anomaly calculation
+function REE_lambda(data::DataFrame;
+    uncertainties::Bool = false,
+    uncertainty_type::AbstractString = "abs",
+    uncertainty_level::Integer = 2,
+    uncertainty_suffix::AbstractString ="_2SE",
+    normalise::Bool = true,
+    normalisation_values::AbstractString = "CI_PO2016",
+    fit_ce::Bool = false,
+    fit_eu::Bool = false,
+    fit_gd::Bool = true,
+
+)
+    lanthanoids = [
+        "La",
+        "Ce",
+        "Pr",
+        "Nd",
+        "Sm",
+        "Eu",
+        "Gd",
+        "Tb",
+        "Dy",
+        "Ho",
+        "Er",
+        "Tm",
+        "Yb",
+        "Lu",
+    ]
+    if nrow(data) > 1
+        indices = 1:1:nrow(data)
+    end
+    # _lambdaREE(Vector(select(data[i:])))
+end
+
+# Main function for calculating REE lambda
 function _lambdaREE(
     lanth_values::AbstractVector{T} where T<:Real,
-    lanth_uncertainties::Union{Nothing,AbstractArray}=nothing;
+    lanth_uncertainties::Union{Nothing,AbstractVector{T}} where {T<:Real} = nothing;
     weight_type::AbstractString="abs",
     normalise::Bool=true,
     normalisation_values::AbstractString="CI_PO2016",
     fit_ce::Bool=false,
     fit_eu::Bool=false,
     fit_gd::Bool=true,
+    operator_matrix::Union{Nothing, Tuple}=nothing
 )
     lanthanoids =
         ["La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"]
-    lanth_radii = IONIC_RADIUS_CNEIGHT.(lanthanoids .* "_3+")
     finite_indices = findall(isfinite, lanth_values)
     if length(finite_indices) ≤ 4
-        throw(error("Four or fewer values for sample, fit will be unreliable."))
+        throw(error("Four or fewer values for sample, fit will be too unreliable."))
         return OrthogonalPolynomial(
             fill(nothing, length(fieldnames(OrthogonalPolynomial)))...,
         )
     else
-        𝑁::Integer = length(lanth_radii)
-        x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
-        @simd for i ∈ eachindex(x_sums)
-            x_sums[i] = sum(lanth_radii .^ i)
+        if isnothing(operator_matrix)
+            X, β, γ, δ, ϵ = _X_REE(lanthanoids)
+        else
+            X, β, γ, δ, ϵ = operator_matrix
         end
-        β::MultiFloat{Float64,4} = _beta_orthogonal(𝑁, x_sums)
-        γ::Vector{MultiFloat{Float64,4}} = _gamma_orthogonal(𝑁, x_sums)
-        δ::Vector{MultiFloat{Float64,4}} = _delta_orthogonal(𝑁, x_sums)
-        ϵ::Vector{MultiFloat{Float64,4}} = _epsilon_orthogonal(𝑁, x_sums)
-        X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (lanth_radii .- β), (lanth_radii .- γ[1]) .* (lanth_radii .- γ[2]), (lanth_radii .- δ[1]) .* (lanth_radii .- δ[2]) .* (lanth_radii .- δ[3]), (lanth_radii .- ϵ[1]) .* (lanth_radii .- ϵ[2]) .* (lanth_radii .- ϵ[3]) .* (lanth_radii .- ϵ[4]))
-
-        X = X[Not(findfirst(occursin("Pm"), lanthanoids)), :]
         deleteat!(lanthanoids, occursin.("Pm", lanthanoids))
 
         if isnothing(lanth_uncertainties) != true
@@ -42,6 +73,7 @@ function _lambdaREE(
         end
         lanth_values = lanth_values[finite_indices]
         lanth_measured = lanthanoids[finite_indices]
+
         if normalise == true
             norm_values::Vector{Real} = Vector{Real}(undef, length(lanth_measured))
             if uppercase(normalisation_values) == "CI_PO2016"
@@ -79,6 +111,7 @@ function _lambdaREE(
                 ),
             )
         end
+        𝑁::Integer = length(fitting_indices)
         Ω::Diagonal{Float64x4,Vector{Float64x4}} = Diagonal(ω .^ 2)
         X̃::Matrix{Float64x4} = exp(-0.5log(Ω)) * X
         ỹ::Vector{Float64x4} = exp(-0.5log(Ω)) * lanth_values[fitting_indices]
@@ -142,4 +175,24 @@ function _lambdaREE(
             𝑁,
         )
     end
+end
+
+
+function _X_REE(lanthanoids::Vector{String} =
+    ["La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu"])
+    lanth_radii = IONIC_RADIUS_CNEIGHT.(lanthanoids .* "_3+")
+    𝑁::Integer = length(lanth_radii)
+        x_sums::Vector{MultiFloat{Float64,4}} = Vector{MultiFloat{Float64,4}}(undef, 7)
+        @simd for i ∈ eachindex(x_sums)
+            x_sums[i] = sum(lanth_radii .^ i)
+        end
+        β::MultiFloat{Float64,4} = _beta_orthogonal(𝑁, x_sums)
+        γ::Vector{MultiFloat{Float64,4}} = _gamma_orthogonal(𝑁, x_sums)
+        δ::Vector{MultiFloat{Float64,4}} = _delta_orthogonal(𝑁, x_sums)
+        ϵ::Vector{MultiFloat{Float64,4}} = _epsilon_orthogonal(𝑁, x_sums)
+        X::Matrix{MultiFloat{Float64,4}} = hcat(fill(1.0, 𝑁), (lanth_radii .- β), (lanth_radii .- γ[1]) .* (lanth_radii .- γ[2]), (lanth_radii .- δ[1]) .* (lanth_radii .- δ[2]) .* (lanth_radii .- δ[3]), (lanth_radii .- ϵ[1]) .* (lanth_radii .- ϵ[2]) .* (lanth_radii .- ϵ[3]) .* (lanth_radii .- ϵ[4]))
+
+        X = X[Not(findfirst(occursin("Pm"), lanthanoids)), :]
+
+    return (X, β, γ, δ, ϵ)
 end
