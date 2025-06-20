@@ -191,7 +191,7 @@ function deltalognormal(x::AbstractVector)
     𝑁 = length(x)
     dlog = Distributions.fit(LogNormal, x[x.>0])
     𝜃 = length(x[x.==0]) / 𝑁
-    γ = (1 - 𝜃)dlog.μ
-    δ = (1 - 𝜃)dlog.σ^2 + 𝜃 * (1 - 𝜃)dlog.μ^2
-    return (exp(γ), exp(δ))
+    γ = (1 - 𝜃)exp(dlog.μ + dlog.σ^2 / 2)
+    δ = (1 - 𝜃) * exp(2 * dlog.μ + dlog.σ^2) * exp(dlog.σ^2 - (1 - 𝜃))
+    return γ, δ
 end
