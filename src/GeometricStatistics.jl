@@ -195,13 +195,14 @@ function deltalognormal(x::AbstractVector{T}) where {T<:Real}
         δ = 0
         return γ, δ
     else
+        𝜃 = 𝑁z / 𝑁
         if 𝑁 - 𝑁z == 1
-            γ = x[x .> 0][1]
-            δ = 0
+            μ, σ = log(x[x .> 0][1]), log(1.0)
+            γ = (1 - 𝜃) * exp(μ + σ^2 / 2)
+            δ = (1 - 𝜃) * exp(2 * μ + σ^2) * exp(σ^2 - (1 - 𝜃))
         else
             dlog = Distributions.fit(LogNormal, x[x .> 0])
-            𝜃 = 𝑁z / 𝑁
-            γ = (1 - 𝜃)exp(dlog.μ + dlog.σ^2 / 2)
+            γ = (1 - 𝜃) * exp(dlog.μ + dlog.σ^2 / 2)
             δ = (1 - 𝜃) * exp(2 * dlog.μ + dlog.σ^2) * exp(dlog.σ^2 - (1 - 𝜃))
         end
         return γ, δ
