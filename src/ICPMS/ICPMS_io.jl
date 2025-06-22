@@ -614,3 +614,80 @@ function _analysis_name(
 
     return (sample_name, analysis_string)
 end
+
+# Developmental Change to IO for LAICIPMS data to decrease file size and read time
+
+function _dev_read_agilent(
+    file::AbstractString;
+    material::AbstractString = "unspecified",
+    analysis_type::AbstractString = "unknown",
+    laser_fluence::Union{Real,Quantity} = Inf,
+    laser_repetition_rate::Union{Real,Quantity} = Inf,
+    spot_diameter::Union{Real,Quantity} = Inf,
+    date_time_constructor::AbstractString = "automatic",
+    day_first::Bool = true,
+    header_row::Integer = 4,
+    first_row::Integer = 5,
+    footer_skip::Integer = 3,
+)
+
+    date_time_format::DateFormat = date_format_test(
+        file;
+        date_time_constructor = date_time_constructor,
+        day_first = day_first,
+    )
+
+    head_info = split(readuntil(file, "Time "), "\n")
+    analysis_name, sample_name = _analysis_name(head_info[1])
+    analysis_time = rstrip(
+        chop(
+            head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
+                "using",
+                head_info[3],
+            )[1] - 1)],
+        ),
+    )
+    analysis_time = DateTime(analysis_time, date_time_format)
+    if Dates.Year(analysis_time) < Dates.Year(2000)
+        analysis_time = analysis_time + Dates.Year(2000)
+    end
+    data = CSV.read(
+        file,
+        DataFrame;
+        header = header_row,
+        skipto = first_row,
+        footerskip = footer_skip,
+        ignoreemptyrows = true,
+        normalizenames = true,
+        delim = ',',
+    )
+    rename!(data, "Time_Sec_" => "signal_time")
+    transform!(data, AsTable(Not(1)) => ByRow(sum) => :total_signal)
+    auto_times = automatic_laser_times(data[!, 1], data[!, :total_signal])
+    gas_blank_start, gas_blank_end, laser_on, stable_time, signal_start, signal_end =
+        ((0, 1), auto_times...)
+    laser_fluence = (laser_fluence)u"J/cm^2"
+    laser_repetition_rate = (laser_repetition_rate)u"Hz"
+    spot_diameter = (spot_diameter)u"μm"
+    gas_blanks = nothing
+
+    # return (sample, material, analysis_name, analysis_time, data)
+    return LAICPMSAnalysis(
+        sample_name,
+        material,
+        analysis_time,
+        analysis_name,
+        analysis_type,
+        laser_fluence,
+        laser_repetition_rate,
+        spot_diameter,
+        laser_on,
+        stable_time,
+        gas_blank_start,
+        gas_blank_end,
+        data,
+        gas_blanks,
+        signal_start,
+        signal_end,
+    )
+end
