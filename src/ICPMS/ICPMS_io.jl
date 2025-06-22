@@ -591,7 +591,7 @@ function _analysis_name(
     analysis_string = chop(
         filestring;
         head = findlast(headpattern, filestring)[end],
-        tail = length(findlast(tailpattern, filestring)),
+        tail = 1+length(findlast(tailpattern, filestring)),
     )
 
     sample_name = rstrip(
