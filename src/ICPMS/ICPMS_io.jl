@@ -169,7 +169,7 @@ function load_agilent(
             spot_size = spot_size_value
         end
         head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name, sample_name = _analysis_name(head_info[1])
+        sample_name, analysis_name = _analysis_name(head_info[1])
         analysis_time = rstrip(
             chop(
                 head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
@@ -383,7 +383,7 @@ function load_agilent2(
     )
     for file ∈ files
         head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name, sample_name = _analysis_name(head_info[1])
+        sample_name, analysis_name = _analysis_name(head_info[1])
         analysis_time = rstrip(
             chop(
                 head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
