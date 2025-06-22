@@ -188,8 +188,8 @@ end
     Compute the mean and variance of a delta-lognormal distribution from 'x'
 """
 function deltalognormal(x::AbstractVector{T}) where {T<:Real}
-    𝑁 = length(x)
-    𝑁z = length(x[x .== 0])
+    𝑁 = length(x[isfinite.(x)])
+    𝑁z = length(x[isfinite.(x) .&& x .== 0])
     if 𝑁z == 𝑁
         γ = 0
         δ = 0
@@ -197,11 +197,11 @@ function deltalognormal(x::AbstractVector{T}) where {T<:Real}
     else
         𝜃 = 𝑁z / 𝑁
         if 𝑁 - 𝑁z == 1
-            μ, σ = log(x[x .> 0][1]), log(1.0)
+            μ, σ = log(x[isfinite.(x) .&& x .> 0][1]), log(1.0)
             γ = (1 - 𝜃) * exp(μ + σ^2 / 2)
             δ = (1 - 𝜃) * exp(2 * μ + σ^2) * exp(σ^2 - (1 - 𝜃))
         else
-            dlog = Distributions.fit(LogNormal, x[x .> 0])
+            dlog = Distributions.fit(LogNormal, x[isfinite.(x) .&& x .> 0])
             γ = (1 - 𝜃) * exp(dlog.μ + dlog.σ^2 / 2)
             δ = (1 - 𝜃) * exp(2 * dlog.μ + dlog.σ^2) * exp(dlog.σ^2 - (1 - 𝜃))
         end
