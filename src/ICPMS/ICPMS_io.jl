@@ -169,7 +169,7 @@ function load_agilent(
             spot_size = spot_size_value
         end
         head_info = split(readuntil(file, "Time "), "\n")
-        sample_name, analysis_name = _analysis_name(head_info[1])
+        sample_name, analysis_name = _analysis_name(head_info[1]; adjustforlineread = true)
         analysis_time = rstrip(
             chop(
                 head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
@@ -383,7 +383,7 @@ function load_agilent2(
     )
     for file ∈ files
         head_info = split(readuntil(file, "Time "), "\n")
-        sample_name, analysis_name = _analysis_name(head_info[1])
+        sample_name, analysis_name = _analysis_name(head_info[1]; adjustforlineread = true)
         analysis_time = rstrip(
             chop(
                 head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
@@ -586,18 +586,19 @@ function _analysis_name(
     tailpattern::AbstractString = ".d",
     analysis_sample_separator::AbstractString = "-",
     padlength::Integer = 3,
+    adjustforlineread::Bool=false
 )
 
     analysis_string = chop(
         filestring;
         head = findlast(headpattern, filestring)[end],
-        tail = 1+length(findlast(tailpattern, filestring)),
+        tail = adjustforlineread + length(findlast(tailpattern, filestring)),
     )
 
     sample_name = rstrip(
         chop(
             analysis_string;
-            tail = 1 + length(analysis_string) -
+            tail = adjustforlineread + length(analysis_string) -
                    findlast(analysis_sample_separator, analysis_string)[begin],
         ),
     )
@@ -638,7 +639,8 @@ function _dev_read_agilent(
     )
 
     head_info = split(readuntil(file, "Time "), "\n")
-    analysis_name, sample_name = _analysis_name(head_info[1])
+    analysis_name, sample_name =
+        _analysis_name(head_info[1]; adjustforlineread = true)
     analysis_time = rstrip(
         chop(
             head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
