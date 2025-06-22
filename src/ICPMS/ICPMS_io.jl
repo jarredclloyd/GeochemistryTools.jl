@@ -110,23 +110,23 @@ function load_agilent(
     host_directory::AbstractString,
     cps_column1::AbstractString,
     cps_column2::AbstractString;
-    sample::Union{Nothing,AbstractString}=nothing,
-    date_time_constructor::AbstractString="automatic",
-    day_first::Bool=true,
-    header_row::Integer=4,
-    first_row::Integer=5,
-    footer_skip::Integer=3,
-    automatic_times::Bool=true,
-    gas_blank::Real=27.5,
-    stable_time::Real=32,
-    signal_end::Real=Inf,
-    trim::Bool=false,
-    aggregate_files::Bool=false,
-    centre::Bool=true,
-    central_tendency::AbstractString="deltalognormal",
-    spot_size_filename::Bool=false,
-    spot_size_value::Union{Missing,Integer}=missing,
-    verbose::Bool=false
+    sample::Union{Nothing,AbstractString} = nothing,
+    date_time_constructor::AbstractString = "automatic",
+    day_first::Bool = true,
+    header_row::Integer = 4,
+    first_row::Integer = 5,
+    footer_skip::Integer = 3,
+    automatic_times::Bool = true,
+    gas_blank::Real = 27.5,
+    stable_time::Real = 32,
+    signal_end::Real = Inf,
+    trim::Bool = false,
+    aggregate_files::Bool = false,
+    centre::Bool = true,
+    central_tendency::AbstractString = "deltalognormal",
+    spot_size_filename::Bool = false,
+    spot_size_value::Union{Missing,Integer} = missing,
+    verbose::Bool = false,
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -143,8 +143,8 @@ function load_agilent(
     end
     date_time_format::DateFormat = date_format_test(
         files[1];
-        date_time_constructor=date_time_constructor,
-        day_first=day_first,
+        date_time_constructor = date_time_constructor,
+        day_first = day_first,
     )
     if lowercase.(central_tendency) == "gmean"
         ct_alg = geomean_zeros
@@ -155,33 +155,27 @@ function load_agilent(
     elseif lowercase.(central_tendency) == "deltalognormal"
         ct_alg = deltalognormal
     end
-    for file in files
+    for file ∈ files
         if spot_size_filename === true
             spot_size = tryparse(
                 Int,
-                file[(findlast("_", file)[1]+1):(findnext(
+                file[(findlast("_", file)[1] + 1):(findnext(
                     " ",
                     file,
                     findlast("_", file)[1],
-                )[1]-1)],
+                )[1] - 1)],
             )
         elseif ismissing(spot_size_value) !== true && typeof(spot_size_value) <: Number
             spot_size = spot_size_value
         end
         head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name = chop(head_info[1]; head=findlast("\\", head_info[1])[1], tail=3)
-        sample_name = rstrip(
-            chop(
-                analysis_name;
-                tail=length(analysis_name) - findlast("-", analysis_name)[1] + 1,
-            ),
-        )
+        analysis_name, sample_name = _analysis_name(head_info[1])
         analysis_time = rstrip(
             chop(
-                head_info[3][(findfirst(":", head_info[3])[1]+2):(findlast(
+                head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
                     "using",
                     head_info[3],
-                )[1]-1)],
+                )[1] - 1)],
             ),
         )
         analysis_time = DateTime(analysis_time, date_time_format)
@@ -194,12 +188,12 @@ function load_agilent(
         df = CSV.read(
             file,
             DataFrame;
-            header=header_row,
-            skipto=first_row,
-            footerskip=footer_skip,
-            ignoreemptyrows=true,
-            normalizenames=true,
-            delim=',',
+            header = header_row,
+            skipto = first_row,
+            footerskip = footer_skip,
+            ignoreemptyrows = true,
+            normalizenames = true,
+            delim = ',',
         )
         if automatic_times == true
             transform!(df, AsTable(Not(1)) => ByRow(sum) => :total_signal)
@@ -219,71 +213,86 @@ function load_agilent(
             @warn "No signal defined for $file"
         else
             try
-            df = select!(df, r"Time", "total_signal", r"" * cps_column1, r"" * cps_column2)
-            rename!(df, ["signal_time", "total_cps", cps_column1, cps_column2])
-            insertcols!(df, 1, "sample" => sample_name)
-            insertcols!(df, 2, "analysis_name" => analysis_name)
-            insertcols!(df, 3, "spot_size" => spot_size)
-            insertcols!(df, 4, "analysis_time" => analysis_time)
-            insertcols!(df, 6, "beam_time" => df.signal_time .- laser_time)
-            gas_blank_cps_column1 = ct_alg(df[begin:gas_blank_ind, cps_column1])[1]
-            gas_blank_cps_column2 = ct_alg(df[begin:gas_blank_ind, cps_column2])[1]
-            transform!(
-                df,
-                Cols(cps_column1, :signal_time) =>
-                    ByRow(
-                        (value, time) ->
-                            time ≤ laser_time ? value : value - gas_blank_cps_column1,
-                    ) => cps_column1 * "_gbsub",
-            )
-            insertcols!(
-                df,
-                cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1*"_gbsub"])),
-            )
-            transform!(
-                df,
-                Cols(cps_column2, :signal_time) =>
-                    ByRow(
-                        (value, time) ->
-                            time ≤ laser_time ? value : value - gas_blank_cps_column2,
-                    ) => cps_column2 * "_gbsub",
-            )
-            insertcols!(
-                df,
-                cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2*"_gbsub"])),
-            )
-            transform!(
-                df,
-                Cols(cps_column1 * "_gbsub", cps_column2 * "_gbsub", :signal_time) =>
-                    ByRow(
-                        (cps1, cps2, time) ->
-                            time ≤ laser_time && iszero(cps2) == true ? 0.0 : cps1 / cps2,
-                    ) => :ratio,
-            )
-            insertcols!(
-                df,
-                "ratio_σ" =>
-                    sqrt.(
-                        df[!, :ratio] .^ 2 .* (
-                            (df[!, cps_column1*"_σ"] ./ df[!, cps_column1*"_gbsub"]) .^
-                            2 +
-                            (df[!, cps_column2*"_σ"] ./ df[!, cps_column2*"_gbsub"]) .^
-                            2
-                        )
-                    ),
-            )
-            if centre == true
-                centre_value = ct_alg(df[stable_time.≤df.signal_time.≤signal_end, :ratio])[1]
-                df.ratio_centred = 1.0 .+ (df.ratio .- centre_value)
-                df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
+                df = select!(
+                    df,
+                    r"Time",
+                    "total_signal",
+                    r"" * cps_column1,
+                    r"" * cps_column2,
+                )
+                rename!(df, ["signal_time", "total_cps", cps_column1, cps_column2])
+                insertcols!(df, 1, "sample" => sample_name)
+                insertcols!(df, 2, "analysis_name" => analysis_name)
+                insertcols!(df, 3, "spot_size" => spot_size)
+                insertcols!(df, 4, "analysis_time" => analysis_time)
+                insertcols!(df, 6, "beam_time" => df.signal_time .- laser_time)
+                gas_blank_cps_column1 = ct_alg(df[begin:gas_blank_ind, cps_column1])[1]
+                gas_blank_cps_column2 = ct_alg(df[begin:gas_blank_ind, cps_column2])[1]
+                transform!(
+                    df,
+                    Cols(cps_column1, :signal_time) =>
+                        ByRow(
+                            (value, time) ->
+                                time ≤ laser_time ? value : value - gas_blank_cps_column1,
+                        ) => cps_column1 * "_gbsub",
+                )
+                insertcols!(
+                    df,
+                    cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])),
+                )
+                transform!(
+                    df,
+                    Cols(cps_column2, :signal_time) =>
+                        ByRow(
+                            (value, time) ->
+                                time ≤ laser_time ? value : value - gas_blank_cps_column2,
+                        ) => cps_column2 * "_gbsub",
+                )
+                insertcols!(
+                    df,
+                    cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])),
+                )
+                transform!(
+                    df,
+                    Cols(cps_column1 * "_gbsub", cps_column2 * "_gbsub", :signal_time) =>
+                        ByRow(
+                            (cps1, cps2, time) ->
+                                if time ≤ laser_time && iszero(cps2) == true
+                                    0.0
+                                else
+                                    cps1 / cps2
+                                end,
+                        ) => :ratio,
+                )
+                insertcols!(
+                    df,
+                    "ratio_σ" =>
+                        sqrt.(
+                            df[!, :ratio] .^ 2 .* (
+                                (
+                                    df[!, cps_column1 * "_σ"] ./
+                                    df[!, cps_column1 * "_gbsub"]
+                                ) .^ 2 +
+                                (
+                                    df[!, cps_column2 * "_σ"] ./
+                                    df[!, cps_column2 * "_gbsub"]
+                                ) .^ 2
+                            )
+                        ),
+                )
+                if centre == true
+                    centre_value =
+                        ct_alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])[1]
+                    df.ratio_centred = 1.0 .+ (df.ratio .- centre_value)
+                    df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
+                end
+                if trim == true
+                    filter!(:signal_time => x -> stable_time .≤ x .≤ signal_end, df)
+                end
+                append!(data, df)
+            catch
+                @warn "could not process: $file"
             end
-            if trim == true
-                filter!(:signal_time => x -> stable_time .≤ x .≤ signal_end, df)
-            end
-            append!(data, df)
-        catch
-            @warn "could not process: $file"
-        end
         end
     end
     if !isempty(data) == true
@@ -344,13 +353,13 @@ table, the median-centred ratio, and sorts the table by time.
 function load_agilent2(
     host_directory::AbstractString,
     ;
-    sample::Union{Nothing,AbstractString}=nothing,
-    date_time_constructor::AbstractString="automatic",
-    day_first::Bool=true,
-    header_row::Integer=4,
-    first_row::Integer=5,
-    footer_skip::Integer=3,
-    aggregate_files::Bool=false,
+    sample::Union{Nothing,AbstractString} = nothing,
+    date_time_constructor::AbstractString = "automatic",
+    day_first::Bool = true,
+    header_row::Integer = 4,
+    first_row::Integer = 5,
+    footer_skip::Integer = 3,
+    aggregate_files::Bool = false,
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -369,24 +378,18 @@ function load_agilent2(
     end
     date_time_format::DateFormat = date_format_test(
         files[1];
-        date_time_constructor=date_time_constructor,
-        day_first=day_first,
+        date_time_constructor = date_time_constructor,
+        day_first = day_first,
     )
-    for file in files
+    for file ∈ files
         head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name = chop(head_info[1]; head=findlast("\\", head_info[1])[1], tail=3)
-        sample_name = rstrip(
-            chop(
-                analysis_name;
-                tail=length(analysis_name) - findlast("-", analysis_name)[1] + 1,
-            ),
-        )
+        analysis_name, sample_name = _analysis_name(head_info[1])
         analysis_time = rstrip(
             chop(
-                head_info[3][(findfirst(":", head_info[3])[1]+2):(findlast(
+                head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
                     "using",
                     head_info[3],
-                )[1]-1)],
+                )[1] - 1)],
             ),
         )
         analysis_time = DateTime(analysis_time, date_time_format)
@@ -396,12 +399,12 @@ function load_agilent2(
         df = CSV.read(
             file,
             DataFrame;
-            header=header_row,
-            skipto=first_row,
-            footerskip=footer_skip,
-            ignoreemptyrows=true,
-            normalizenames=true,
-            delim=',',
+            header = header_row,
+            skipto = first_row,
+            footerskip = footer_skip,
+            ignoreemptyrows = true,
+            normalizenames = true,
+            delim = ',',
         )
         rename!(df, "Time_Sec_" => "time")
         insertcols!(df, 1, "sample" => sample_name)
@@ -466,12 +469,12 @@ julia> automatic_laser_times(G00.time, G00.signal_total)
 function automatic_laser_times(
     time::AbstractVector{<:Real},
     signal::AbstractVector{<:Real};
-    bandwidth::Integer=UInt8(cld(sqrt(length(signal)), 2)),
-    gas_blank_trim::Integer=5,
-    verbose::Bool=false,
+    bandwidth::Integer = UInt8(cld(sqrt(length(signal)), 2)),
+    gas_blank_trim::Integer = 5,
+    verbose::Bool = false,
 )
     medians = Vector{Float64}(undef, Integer(cld(length(signal), bandwidth)))
-    for i in eachindex(medians)
+    for i ∈ eachindex(medians)
         medians[i] = median(
             signal[round(UInt, max((i - 1) * bandwidth, firstindex(signal))):round(
                 UInt,
@@ -485,25 +488,26 @@ function automatic_laser_times(
             @view(medians[round(UInt, end / 2):end]),
         ),
     ) > 0.05 ||
-       pvalue(JarqueBeraTest(signal[begin:round(UInt, 3 * (end / 4))]; adjusted = true)) > 0.05
+       pvalue(JarqueBeraTest(signal[begin:round(UInt, 3 * (end / 4))]; adjusted = true)) >
+       0.05
         println("no signal detected")
     else
         z = Array{Float64}(undef, length(signal), 3)
-        for i in eachindex(signal)
+        for i ∈ eachindex(signal)
             z[i, 1] = if i < bandwidth
                 geomean_zeros(@view(signal[begin:i]))
             else
-                geomean_zeros(@view(signal[(i-bandwidth+1):i]))
+                geomean_zeros(@view(signal[(i - bandwidth + 1):i]))
             end
             z[i, 2] = if i < bandwidth
                 geovar_zeros(@view(signal[begin:i]))
             else
-                geovar_zeros(@view(signal[(i-bandwidth+1):i]))
+                geovar_zeros(@view(signal[(i - bandwidth + 1):i]))
             end
             z[i, 3] = if i < 3
                 Inf
             else
-                pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i-1), 2]))))
+                pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i - 1), 2]))))
             end
         end
         z[:, 3] = replace!(x -> isnan(x) ? Inf : x, z[:, 3])
@@ -574,4 +578,39 @@ function automatic_laser_times(
             (signal_end_ind, signal_end_time),
         )
     end
+end
+
+function _analysis_name(
+    filestring::AbstractString;
+    headpattern::AbstractString = ".b\\",
+    tailpattern::AbstractString = ".d",
+    analysis_sample_separator::AbstractString = "-",
+    padlength::Integer = 3,
+)
+
+    analysis_string = chop(
+        filestring;
+        head = findlast(headpattern, filestring)[end],
+        tail = length(findlast(tailpattern, filestring)),
+    )
+
+    sample_name = rstrip(
+        chop(
+            analysis_string;
+            tail = 1 + length(analysis_string) -
+                   findlast(analysis_sample_separator, analysis_string)[begin],
+        ),
+    )
+
+    analysis_number = lstrip(
+        chop(
+            analysis_string;
+            head = findlast(analysis_sample_separator, analysis_string)[end],
+            tail = 0,
+        ),
+    )
+
+    analysis_string = (sample_name * "-" * lpad(analysis_number, padlength, "0"))
+
+    return (sample_name, analysis_string)
 end
