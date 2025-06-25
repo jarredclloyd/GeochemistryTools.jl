@@ -282,8 +282,10 @@ function load_agilent(
                 )
                 if centre == true
                     centre_value =
-                        ct_alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])[1]
-                    df.ratio_centred = 1.0 .+ (df.ratio .- centre_value)
+                        ct_alg(
+                            pseudolog.(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio],
+                        ))[1]
+                    df.ratio_centred = 1.0 .+ (pseudolog.(df.ratio) .- centre_value)
                     df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
                 end
                 if trim == true
