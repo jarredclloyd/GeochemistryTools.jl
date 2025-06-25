@@ -493,66 +493,65 @@ function automatic_laser_times(
         println("no signal detected")
         return ((0, NaN), (0, NaN), (0, NaN), (0, NaN), (0, NaN))
     else
-        z = Array{Float64}(undef, length(signal), 5)
+        z = Array{Float64}(undef, length(signal), 4)
         for i ∈ eachindex(signal)
-            z[i, 1] = mean(@view(signal[max(i - 1, firstindex(signal)):min(i + 1, lastindex(signal))]))[1]
-            z[i, 2] = std(@view(z[max(i - bandwidth, firstindex(signal)):i, 1]))
-            z[i, 3] = if i < 3
-                Inf
+            z[i, 1] = mean(
+                @view(signal[max(i - 1, firstindex(signal)):min(i + 1, lastindex(signal))])
+            )[1]
+            z[i, 2] =
+                i == 1 ? 0 : std(@view(z[max(i - bandwidth, firstindex(signal)):i, 1]))
+            z[i, 3] = if i ≤ 2
+                1.0
             else
                 pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i - 1), 2]))))
             end
-            z[i, 4] = z[i, 3] - z[max(i - 1, firstindex(signal)), 3]
-            z[i, 5] = z[i, 4] - z[max(i - 1, firstindex(signal)), 4]
+            z[i, 4] = sign.(z[i, 3] - z[max(i - 1, firstindex(signal)), 3])
         end
-        z[begin, 2] = 0
-        z[:, 3] = replace!(x -> isinf(x) ? 1 : x, z[:, 3])
         laser_start_ind = findmin(@view(z[:, 3]))[2]
-        laser_start_time = time[laser_start_ind]
-        # aerosol_arrival_ind = laser_start_ind + findmin(z[laser_start_ind:laser_start_ind+10,])[2]
-        q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
-        aerosol_arrival_ind =
-            laser_start_ind + findfirst(≥(q[2]), @view(z[laser_start_ind:end, 1])) - 1
-        aerosol_arrival_time = time[aerosol_arrival_ind]
-        q = quantile(@view(z[aerosol_arrival_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
-        signal_start_ind = min(
-            aerosol_arrival_ind + findfirst(>(q[4]), @view(z[aerosol_arrival_ind:end, 1])),
-            lastindex(time),
+        aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
+        q = quantile(@view(z[aerosol_arrival_ind:end, 3]), [0.05, 0.1, 0.9, 0.95])
+        signal_start_ind = findnext(
+            <(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
+            z[:, 3],
+            aerosol_arrival_ind,
         )
-        q = quantile(@view(z[signal_start_ind:end, 2]), [0.05, 0.25, 0.5, 0.75, 0.95])
-        signal_end_ind = min(findlast(<(q[5]), @view(z[:, 2])), lastindex(time))
-        signal_start_time = time[signal_start_ind]
-        signal_end_time = time[signal_end_ind]
-        slope = sign(
-            GeochemistryTools._GLS(
-                @view(time[signal_start_ind:signal_end_ind]),
-                @view(signal[signal_start_ind:signal_end_ind]),
-                1,
-            ).beta[2],
-        )
-        if slope > 0 || signal_end_time - signal_start_time < 10
-            q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
-            aerosol_arrival_ind =
-                laser_start_ind + findfirst(≥(q[1]), @view(z[laser_start_ind:end, 1])) - 1
-            aerosol_arrival_time = time[aerosol_arrival_ind]
-            q = quantile(
-                @view(z[aerosol_arrival_ind:end, 1]),
-                [0.05, 0.25, 0.5, 0.75, 0.95],
-            )
-            signal_start_ind = min(
-                aerosol_arrival_ind +
-                findfirst(<(q[1]), @view(z[aerosol_arrival_ind:end, 1])),
-                lastindex(time),
-            )
-            q = quantile(@view(z[signal_start_ind:end, 2]), [0.05, 0.25, 0.5, 0.75, 0.95])
-            signal_end_ind = min(findlast(<(q[5]), @view(z[:, 2])), lastindex(time))
-            signal_start_time = time[signal_start_ind]
-            signal_end_time = time[signal_end_ind]
+        signal_end_ind =
+            findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
+
+        if ShapiroWilkTest(z[signal_start_ind:signal_end_ind, 1]).W < 0.90
+            try
+                aerosol_arrival_ind += findmin(@view(z[aerosol_arrival_ind:end, 3]))[2]
+                signal_start_ind = findnext(
+                    >(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
+                    z[:, 3],
+                    aerosol_arrival_ind,
+                )
+                q = quantile(@view(z[signal_start_ind:end, 3]), 0.1)
+                signal_end_ind =
+                    findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
+            catch
+                @warn "error occurred in automatic signal estimate - reverting to initial guess"
+                laser_start_ind = findmin(@view(z[:, 3]))[2]
+                aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
+                q = quantile(@view(z[aerosol_arrival_ind:end, 3]), [0.05, 0.1, 0.9, 0.95])
+                signal_start_ind = findnext(
+                    <(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
+                    z[:, 3],
+                    aerosol_arrival_ind,
+                )
+                signal_end_ind =
+                    findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
+            end
         end
+
         gas_blank_end_ind = max(
             laser_start_ind - (round(Int, gas_blank_trim / (time[2] - time[1]))),
             firstindex(time),
         )
+        laser_start_time = time[laser_start_ind]
+        aerosol_arrival_time = time[aerosol_arrival_ind]
+        signal_start_time = time[signal_start_ind]
+        signal_end_time = time[signal_end_ind]
         if verbose == true
             println(
                 "gas blank: ",
