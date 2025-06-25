@@ -491,35 +491,25 @@ function automatic_laser_times(
        pvalue(JarqueBeraTest(signal[begin:round(UInt, 3 * (end / 4))]; adjusted = true)) >
        0.05
         println("no signal detected")
-        return (
-            (0, NaN),
-            (0, NaN),
-            (0, NaN),
-            (0, NaN),
-            (0, NaN),
-        )
+        return ((0, NaN), (0, NaN), (0, NaN), (0, NaN), (0, NaN))
     else
-        z = Array{Float64}(undef, length(signal), 3)
+        z = Array{Float64}(undef, length(signal), 5)
         for i ∈ eachindex(signal)
-            z[i, 1] = if i < bandwidth
-                geomean_zeros(@view(signal[begin:i]))
-            else
-                geomean_zeros(@view(signal[max(i - bandwidth + 1, firstindex(signal)):i]))
-            end
-            z[i, 2] = if i < bandwidth
-                geovar_zeros(@view(signal[begin:i]))
-            else
-                geovar_zeros(@view(signal[(i - bandwidth + 1):i]))
-            end
+            z[i, 1] = mean(@view(signal[max(i - 1, firstindex(signal)):min(i + 1, lastindex(signal))]))[1]
+            z[i, 2] = std(@view(z[max(i - bandwidth, firstindex(signal)):i, 1]))
             z[i, 3] = if i < 3
                 Inf
             else
                 pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i - 1), 2]))))
             end
+            z[i, 4] = z[i, 3] - z[max(i - 1, firstindex(signal)), 3]
+            z[i, 5] = z[i, 4] - z[max(i - 1, firstindex(signal)), 4]
         end
-        z[:, 3] = replace!(x -> isnan(x) ? Inf : x, z[:, 3])
+        z[begin, 2] = 0
+        z[:, 3] = replace!(x -> isinf(x) ? 1 : x, z[:, 3])
         laser_start_ind = findmin(@view(z[:, 3]))[2]
         laser_start_time = time[laser_start_ind]
+        # aerosol_arrival_ind = laser_start_ind + findmin(z[laser_start_ind:laser_start_ind+10,])[2]
         q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
         aerosol_arrival_ind =
             laser_start_ind + findfirst(≥(q[2]), @view(z[laser_start_ind:end, 1])) - 1
@@ -673,7 +663,7 @@ function _dev_read_agilent(
     transform!(data, AsTable(Not(1)) => ByRow(sum) => :total_signal)
     auto_times = automatic_laser_times(data[!, 1], data[!, :total_signal])
     gas_blank_start, gas_blank_end, laser_on, stable_time, signal_start, signal_end =
-            ((0, 1), auto_times...)
+        ((0, 1), auto_times...)
     laser_fluence = (laser_fluence)u"J/cm^2"
     laser_repetition_rate = (laser_repetition_rate)u"Hz"
     spot_diameter = (spot_diameter)u"μm"
