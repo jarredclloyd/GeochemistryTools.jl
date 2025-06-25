@@ -491,13 +491,20 @@ function automatic_laser_times(
        pvalue(JarqueBeraTest(signal[begin:round(UInt, 3 * (end / 4))]; adjusted = true)) >
        0.05
         println("no signal detected")
+        return (
+            (0, NaN),
+            (0, NaN),
+            (0, NaN),
+            (0, NaN),
+            (0, NaN),
+        )
     else
         z = Array{Float64}(undef, length(signal), 3)
         for i ∈ eachindex(signal)
             z[i, 1] = if i < bandwidth
                 geomean_zeros(@view(signal[begin:i]))
             else
-                geomean_zeros(@view(signal[(i - bandwidth + 1):i]))
+                geomean_zeros(@view(signal[max(i - bandwidth + 1, firstindex(signal)):i]))
             end
             z[i, 2] = if i < bandwidth
                 geovar_zeros(@view(signal[begin:i]))
@@ -586,7 +593,7 @@ function _analysis_name(
     tailpattern::AbstractString = ".d",
     analysis_sample_separator::AbstractString = "-",
     padlength::Integer = 3,
-    adjustforlineread::Bool=false
+    adjustforlineread::Bool = false,
 )
 
     analysis_string = chop(
@@ -639,8 +646,7 @@ function _dev_read_agilent(
     )
 
     head_info = split(readuntil(file, "Time "), "\n")
-    analysis_name, sample_name =
-        _analysis_name(head_info[1]; adjustforlineread = true)
+    analysis_name, sample_name = _analysis_name(head_info[1]; adjustforlineread = true)
     analysis_time = rstrip(
         chop(
             head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
@@ -667,7 +673,7 @@ function _dev_read_agilent(
     transform!(data, AsTable(Not(1)) => ByRow(sum) => :total_signal)
     auto_times = automatic_laser_times(data[!, 1], data[!, :total_signal])
     gas_blank_start, gas_blank_end, laser_on, stable_time, signal_start, signal_end =
-        ((0, 1), auto_times...)
+            ((0, 1), auto_times...)
     laser_fluence = (laser_fluence)u"J/cm^2"
     laser_repetition_rate = (laser_repetition_rate)u"Hz"
     spot_diameter = (spot_diameter)u"μm"
