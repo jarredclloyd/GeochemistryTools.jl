@@ -12,7 +12,8 @@ International Journal of Research and Reviews in Applied Sciences, 11(3)
 =#
 
 # function exports
-export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros, deltalognormal
+export geomean_zeros,
+    geovar_zeros, geostd_zeros, geosem_zeros, deltalognormal, pseudolog, pseudolog_undo
 
 """
     geomean_zeros(x::AbstractVector)
@@ -207,4 +208,12 @@ function deltalognormal(x::AbstractVector{T}) where {T<:Real}
         end
         return γ, δ
     end
+end
+
+function pseudolog(x, σ = 0.05, base = ℯ)
+    return asinh(x / (2 * σ) / log(base))
+end
+
+function pseudolog_undo(x, σ = 0.05, base = ℯ)
+    return 2 * σ * sinh(x * log(base))
 end
