@@ -509,7 +509,6 @@ function automatic_laser_times(
         end
         laser_start_ind = findmin(@view(z[:, 3]))[2]
         aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
-        q = quantile(@view(z[aerosol_arrival_ind:end, 3]), [0.05, 0.1, 0.9, 0.95])
         signal_start_ind = findnext(
             <(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
             z[:, 3],
@@ -526,14 +525,12 @@ function automatic_laser_times(
                     z[:, 3],
                     aerosol_arrival_ind,
                 )
-                q = quantile(@view(z[signal_start_ind:end, 3]), 0.1)
                 signal_end_ind =
                     findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
             catch
                 @warn "error occurred in automatic signal estimate - reverting to initial guess"
                 laser_start_ind = findmin(@view(z[:, 3]))[2]
                 aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
-                q = quantile(@view(z[aerosol_arrival_ind:end, 3]), [0.05, 0.1, 0.9, 0.95])
                 signal_start_ind = findnext(
                     <(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
                     z[:, 3],
