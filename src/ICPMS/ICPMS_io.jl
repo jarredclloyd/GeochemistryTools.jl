@@ -525,7 +525,7 @@ function automatic_laser_times(
             aerosol_arrival_ind,
         )
         signal_end_ind =
-            findlast(<(quantile(@view(z[signal_start_ind:end, 2]), 0.90)), z[:, 2])
+            findlast(<(quantile(@view(z[signal_start_ind:end, 2]), 0.90)), z[:, 2]) - 1
 
         # for i ∈ eachindex(signal)
         #     z[i, 4] = if i ≤ signal_start_ind
