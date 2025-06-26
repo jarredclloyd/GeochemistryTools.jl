@@ -511,37 +511,58 @@ function automatic_laser_times(
         end
         laser_start_ind = findmin(@view(z[:, 3]))[2]
         aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
+
+        for i in eachindex(signal)
+            if i < aerosol_arrival_ind
+                z[i, 2] = 1.0
+            else
+                z[i, 2] = std(@view(z[aerosol_arrival_ind:i, 3]))
+            end
+        end
         signal_start_ind = findnext(
-            <(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
-            z[:, 3],
+            <(0.5),
+            z[:, 2],
             aerosol_arrival_ind,
         )
         signal_end_ind =
-            findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
+            findlast(<(quantile(@view(z[signal_start_ind:end, 2]), 0.90)), z[:, 2])
 
-        if ShapiroWilkTest(z[signal_start_ind:signal_end_ind, 1]).W < 0.90
-            try
-                aerosol_arrival_ind += findmin(@view(z[aerosol_arrival_ind:end, 3]))[2]
-                signal_start_ind = findnext(
-                    >(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
-                    z[:, 3],
-                    aerosol_arrival_ind,
-                )
-                signal_end_ind =
-                    findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
-            catch
-                @warn "error occurred in automatic signal estimate - reverting to initial guess"
-                laser_start_ind = findmin(@view(z[:, 3]))[2]
-                aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
-                signal_start_ind = findnext(
-                    <(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
-                    z[:, 3],
-                    aerosol_arrival_ind,
-                )
-                signal_end_ind =
-                    findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
-            end
-        end
+        # for i ∈ eachindex(signal)
+        #     z[i, 4] = if i ≤ signal_start_ind
+        #         1.0
+        #     else
+        #         pvalue(
+        #             OneSampleTTest(@view(z[signal_start_ind:i, 2]), mean(@view(z[signal_start_ind:(i - 1), 2]))),
+        #         )
+        #     end
+        # end
+
+        # if OneSampleTTest(
+        #     @view(z[signal_start_ind:signal_end_ind, 2]),
+        #     mean(@view(z[signal_end_ind:(i - 1), 2])),
+        # )
+        #     try
+        #         aerosol_arrival_ind += findmin(@view(z[aerosol_arrival_ind:end, 3]))[2]
+        #         signal_start_ind = findnext(
+        #             >(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
+        #             z[:, 3],
+        #             aerosol_arrival_ind,
+        #         )
+        #         signal_end_ind =
+        #             findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
+        #     catch
+        #         @warn "error occurred in automatic signal estimate - reverting to initial guess"
+        #         laser_start_ind = findmin(@view(z[:, 3]))[2]
+        #         aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
+        #         signal_start_ind = findnext(
+        #             <(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
+        #             z[:, 3],
+        #             aerosol_arrival_ind,
+        #         )
+        #         signal_end_ind =
+        #             findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
+        #     end
+        # end
 
         gas_blank_end_ind = max(
             laser_start_ind - (round(Int, gas_blank_trim / (time[2] - time[1]))),
