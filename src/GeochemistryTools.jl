@@ -54,6 +54,7 @@ include("GeometricStatistics.jl")
 include("ErrorEllipse.jl")
 include("DateTimeParser.jl")
 include("BarycentricConversions.jl")
+include("Smoothing.jl")
 include.(filter(contains(r".jl$"), readdir(joinpath(normpath(@__DIR__), "ChemistryTools/"); join=true)))
 
 # To enable use of MultiFloats in Julia 1.11 until MultiFloats v3.0 is released
