@@ -537,18 +537,6 @@ function automatic_laser_times(
         q = quantile(z[aerosol_arrival_ind:(end - 5), 1], [0.1, 0.9])
         signal_indices = sort(findall(x -> q[1] ≤ x ≤ q[2], z[:, 1]))
         signal_indices = signal_indices[signal_indices .> aerosol_arrival_ind]
-        # continuity = Vector{Bool}(undef, length(signal_indices))
-        # for i ∈ eachindex(signal_indices)
-        #     continuity[i] = if i == 1 || (signal_indices[i] - signal_indices[i - 1]) == 1
-        #         true
-        #     else
-        #         false
-        #     end
-        # end
-        # missingind = findfirst(==(0), continuity)
-        # if !isnothing(missingind)
-        #     signal_indices = signal_indices[begin:(missingind - 1)]
-        # end
         signal_start_ind = signal_indices[begin]
         signal_end_ind = signal_indices[end]
         signal_end_ind -= 1
