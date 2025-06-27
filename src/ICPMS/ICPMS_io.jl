@@ -511,7 +511,8 @@ function automatic_laser_times(
             end
         end
         laser_start_ind = findmin(@view(z[:, 3]))[2]
-        z[laser_start_ind:end,1] .= whittaker_smooth(signal[laser_start_ind:end]; lambda = bandwidth)
+        z[laser_start_ind:end, 1] .=
+            whittaker_smooth(signal[laser_start_ind:end]; lambda = bandwidth)
 
         for i ∈ eachindex(signal)
             z[i, 4] = if i ≤ laser_start_ind
@@ -526,22 +527,35 @@ function automatic_laser_times(
             if i ≤ laser_start_ind
                 z[i, 5] = 1.0
             else
-                z[i, 5] = sign(z[min(i+1, lastindex(signal)),4] - z[i, 4])
+                z[i, 5] = sign(z[min(i + 1, lastindex(signal)), 4] - z[i, 4])
             end
         end
-        aerosol_arrival_ind =  findnext(==(-1.0), z[:, 5], laser_start_ind)
+        aerosol_arrival_ind = findnext(==(-1.0), z[:, 5], laser_start_ind)
         z[aerosol_arrival_ind:end, 1] .=
             whittaker_smooth(signal[aerosol_arrival_ind:end]; lambda = bandwidth)
 
-        q = quantile(z[aerosol_arrival_ind:end-5, 1], [0.1, 0.9])
+        q = quantile(z[aerosol_arrival_ind:(end - 5), 1], [0.1, 0.9])
         signal_indices = sort(findall(x -> q[1] ≤ x ≤ q[2], z[:, 1]))
-        signal_indices =  signal_indices[signal_indices .> aerosol_arrival_ind]
+        signal_indices = signal_indices[signal_indices .> aerosol_arrival_ind]
+        # continuity = Vector{Bool}(undef, length(signal_indices))
+        # for i ∈ eachindex(signal_indices)
+        #     continuity[i] = if i == 1 || (signal_indices[i] - signal_indices[i - 1]) == 1
+        #         true
+        #     else
+        #         false
+        #     end
+        # end
+        # missingind = findfirst(==(0), continuity)
+        # if !isnothing(missingind)
+        #     signal_indices = signal_indices[begin:(missingind - 1)]
+        # end
         signal_start_ind = signal_indices[begin]
         signal_end_ind = signal_indices[end]
         signal_end_ind -= 1
 
         gas_blank_end_ind = max(
-            laser_start_ind - (round(Int, gas_blank_trim / (signal_time[2] - signal_time[1]))),
+            laser_start_ind -
+            (round(Int, gas_blank_trim / (signal_time[2] - signal_time[1]))),
             firstindex(signal_time),
         )
         laser_start_time = signal_time[laser_start_ind]
