@@ -281,10 +281,11 @@ function load_agilent(
                         ),
                 )
                 if centre == true
-                    centre_value =
-                        ct_alg(
-                            pseudolog.(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio],
-                        ))[1]
+                    centre_value = ct_alg(
+                        pseudolog.(
+                            df[stable_time .≤ df.signal_time .≤ signal_end, :ratio],
+                        ),
+                    )[1]
                     df.ratio_centred = 1.0 .+ (pseudolog.(df.ratio) .- centre_value)
                     df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
                 end
@@ -469,9 +470,9 @@ julia> automatic_laser_times(G00.time, G00.signal_total)
 ```
 """
 function automatic_laser_times(
-    time::AbstractVector{<:Real},
+    signal_time::AbstractVector{<:Real},
     signal::AbstractVector{<:Real};
-    bandwidth::Integer = UInt8(cld(sqrt(length(signal)), 2)),
+    bandwidth::Integer = Integer(cld(sqrt(length(signal)), 2)),
     gas_blank_trim::Integer = 5,
     verbose::Bool = false,
 )
@@ -495,7 +496,8 @@ function automatic_laser_times(
         println("no signal detected")
         return ((0, NaN), (0, NaN), (0, NaN), (0, NaN), (0, NaN))
     else
-        z = Array{Float64}(undef, length(signal), 4)
+        z = Array{Float64}(undef, length(signal), 5)
+
         for i ∈ eachindex(signal)
             z[i, 1] = mean(
                 @view(signal[max(i - 1, firstindex(signal)):min(i + 1, lastindex(signal))])
@@ -507,75 +509,49 @@ function automatic_laser_times(
             else
                 pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i - 1), 2]))))
             end
-            z[i, 4] = sign.(z[i, 3] - z[max(i - 1, firstindex(signal)), 3])
         end
         laser_start_ind = findmin(@view(z[:, 3]))[2]
-        aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
+        z[laser_start_ind:end,1] .= whittaker_smooth(signal[laser_start_ind:end]; lambda = bandwidth)
 
-        for i in eachindex(signal)
-            if i < aerosol_arrival_ind
-                z[i, 2] = 1.0
+        for i ∈ eachindex(signal)
+            z[i, 4] = if i ≤ laser_start_ind
+                0.0
             else
-                z[i, 2] = std(@view(z[aerosol_arrival_ind:i, 3]))
+                z[min(i + 1, lastindex(signal)), 1] -
+                z[max(i - 1, firstindex(signal)), 1] /
+                (min(i + 1, lastindex(signal)) - max(i - 1, firstindex(signal)))
             end
         end
-        signal_start_ind = findnext(
-            <(0.5),
-            z[:, 2],
-            aerosol_arrival_ind,
-        )
-        signal_end_ind =
-            findlast(<(quantile(@view(z[signal_start_ind:end, 2]), 0.90)), z[:, 2]) - 1
+        for i ∈ eachindex(signal)
+            if i ≤ laser_start_ind
+                z[i, 5] = 1.0
+            else
+                z[i, 5] = sign(z[min(i+1, lastindex(signal)),4] - z[i, 4])
+            end
+        end
+        aerosol_arrival_ind =  findnext(==(-1.0), z[:, 5], laser_start_ind)
+        z[aerosol_arrival_ind:end, 1] .=
+            whittaker_smooth(signal[aerosol_arrival_ind:end]; lambda = bandwidth)
 
-        # for i ∈ eachindex(signal)
-        #     z[i, 4] = if i ≤ signal_start_ind
-        #         1.0
-        #     else
-        #         pvalue(
-        #             OneSampleTTest(@view(z[signal_start_ind:i, 2]), mean(@view(z[signal_start_ind:(i - 1), 2]))),
-        #         )
-        #     end
-        # end
-
-        # if OneSampleTTest(
-        #     @view(z[signal_start_ind:signal_end_ind, 2]),
-        #     mean(@view(z[signal_end_ind:(i - 1), 2])),
-        # )
-        #     try
-        #         aerosol_arrival_ind += findmin(@view(z[aerosol_arrival_ind:end, 3]))[2]
-        #         signal_start_ind = findnext(
-        #             >(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
-        #             z[:, 3],
-        #             aerosol_arrival_ind,
-        #         )
-        #         signal_end_ind =
-        #             findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
-        #     catch
-        #         @warn "error occurred in automatic signal estimate - reverting to initial guess"
-        #         laser_start_ind = findmin(@view(z[:, 3]))[2]
-        #         aerosol_arrival_ind = findnext(==(-1.0), z[:, 4], laser_start_ind + 1)
-        #         signal_start_ind = findnext(
-        #             <(quantile(@view(z[aerosol_arrival_ind:end, 3]), 0.9)),
-        #             z[:, 3],
-        #             aerosol_arrival_ind,
-        #         )
-        #         signal_end_ind =
-        #             findlast(>(quantile(@view(z[signal_start_ind:end, 3]), 0.1)), z[:, 3])
-        #     end
-        # end
+        q = quantile(z[aerosol_arrival_ind:end-5, 1], [0.1, 0.9])
+        signal_indices = sort(findall(x -> q[1] ≤ x ≤ q[2], z[:, 1]))
+        signal_indices =  signal_indices[signal_indices .> aerosol_arrival_ind]
+        signal_start_ind = signal_indices[begin]
+        signal_end_ind = signal_indices[end]
+        signal_end_ind -= 1
 
         gas_blank_end_ind = max(
-            laser_start_ind - (round(Int, gas_blank_trim / (time[2] - time[1]))),
-            firstindex(time),
+            laser_start_ind - (round(Int, gas_blank_trim / (signal_time[2] - signal_time[1]))),
+            firstindex(signal_time),
         )
-        laser_start_time = time[laser_start_ind]
-        aerosol_arrival_time = time[aerosol_arrival_ind]
-        signal_start_time = time[signal_start_ind]
-        signal_end_time = time[signal_end_ind]
+        laser_start_time = signal_time[laser_start_ind]
+        aerosol_arrival_time = signal_time[aerosol_arrival_ind]
+        signal_start_time = signal_time[signal_start_ind]
+        signal_end_time = signal_time[signal_end_ind]
         if verbose == true
             println(
                 "gas blank: ",
-                (time[begin], time[gas_blank_end_ind]),
+                (signal_time[begin], signal_time[gas_blank_end_ind]),
                 [1, gas_blank_end_ind],
             )
             println("laser start: ", (laser_start_time, laser_start_ind))
@@ -587,7 +563,7 @@ function automatic_laser_times(
             )
         end
         return (
-            (gas_blank_end_ind, time[gas_blank_end_ind]),
+            (gas_blank_end_ind, signal_time[gas_blank_end_ind]),
             (laser_start_ind, laser_start_time),
             (aerosol_arrival_ind, aerosol_arrival_time),
             (signal_start_ind, signal_start_time),
