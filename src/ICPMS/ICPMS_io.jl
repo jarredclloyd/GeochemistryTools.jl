@@ -524,22 +524,61 @@ function automatic_laser_times(
             end
         end
         for i ∈ eachindex(signal)
-            if i ≤ laser_start_ind
-                z[i, 5] = 1.0
+            z[i, 5] = if i ≤ laser_start_ind
+               1.0
             else
-                z[i, 5] = sign(z[min(i + 1, lastindex(signal)), 4] - z[i, 4])
+               sign(z[min(i + 1, lastindex(signal)), 4] - z[i, 4])
             end
         end
         aerosol_arrival_ind = findnext(==(-1.0), z[:, 5], laser_start_ind)
         z[aerosol_arrival_ind:end, 1] .=
             whittaker_smooth(signal[aerosol_arrival_ind:end]; lambda = bandwidth)
 
-        q = quantile(z[aerosol_arrival_ind:(end - 5), 1], [0.1, 0.9])
+
+        q = quantile(z[aerosol_arrival_ind:(end - 5), 1], [0.05, 0.95])
         signal_indices = sort(findall(x -> q[1] ≤ x ≤ q[2], z[:, 1]))
         signal_indices = signal_indices[signal_indices .> aerosol_arrival_ind]
         signal_start_ind = signal_indices[begin]
-        signal_end_ind = signal_indices[end]
-        signal_end_ind -= 1
+        signal_end_ind = signal_indices[end-1]
+
+        ind_continuity=Vector{Bool}(undef, length(signal_indices))
+        for i in eachindex(signal_indices)
+            ind_continuity[i] = if i == 1 || (signal_indices[i] - signal_indices[i-1]) == 1
+                true
+            else
+                false
+            end
+        end
+
+        signal_fit =  GeochemistryTools._GLS(signal_start_ind:signal_end_ind, z[signal_start_ind:signal_end_ind, 1], 2)
+        f(x) = signal_fit.beta[1] + signal_fit.beta[2] * x + signal_fit.beta[3] * x^2
+        for i ∈ eachindex(signal)
+            z[i, 5 ] = if i ≤ signal_start_ind
+                0.5
+            else
+                z[i, 4] / f(i)
+            end
+        end
+        alt_signal_end = findlast(>(quantile(z[signal_start_ind:signal_end_ind, 5], 0.05)),z[:,5])
+        if alt_signal_end != signal_end_ind && ind_continuity[signal_indices .== signal_end_ind][1] === false
+            signal_end_ind = alt_signal_end
+        end
+
+
+        if ShapiroWilkTest(z[signal_start_ind:signal_end_ind, 1]).W < 0.8
+            alt_signal_starts = findall(<(quantile(z[signal_start_ind:signal_end_ind, 3], 0.05)), z[:,3])
+            alt_signal_start = findnext(>(
+                quantile(z[signal_start_ind:signal_end_ind, 3],0.95)),
+                z[:,3],
+                alt_signal_starts[findfirst(>(signal_start_ind), alt_signal_starts)])
+            alt_signal_end = alt_signal_starts[findfirst(>(signal_start_ind), alt_signal_starts)] - bandwidth
+
+            if sum(z[signal_start_ind:alt_signal_end, 1]) > sum(z[alt_signal_start:signal_end_ind, 1])
+                signal_end_ind = alt_signal_end
+            else
+                signal_start_ind = alt_signal_start
+            end
+        end
 
         gas_blank_end_ind = max(
             laser_start_ind -
