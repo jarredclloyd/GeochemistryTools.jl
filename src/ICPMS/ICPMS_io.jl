@@ -212,90 +212,73 @@ function load_agilent(
             df = nothing
             @warn "No signal defined for $file"
         else
-            try
-                df = select!(
-                    df,
-                    r"Time",
-                    "total_signal",
-                    r"" * cps_column1,
-                    r"" * cps_column2,
-                )
-                rename!(df, ["signal_time", "total_cps", cps_column1, cps_column2])
-                insertcols!(df, 1, "sample" => sample_name)
-                insertcols!(df, 2, "analysis_name" => analysis_name)
-                insertcols!(df, 3, "spot_size" => spot_size)
-                insertcols!(df, 4, "analysis_time" => analysis_time)
-                insertcols!(df, 6, "beam_time" => df.signal_time .- laser_time)
-                gas_blank_cps_column1 = ct_alg(df[begin:gas_blank_ind, cps_column1])[1]
-                gas_blank_cps_column2 = ct_alg(df[begin:gas_blank_ind, cps_column2])[1]
-                transform!(
-                    df,
-                    Cols(cps_column1, :signal_time) =>
-                        ByRow(
-                            (value, time) ->
-                                time ≤ laser_time ? value : value - gas_blank_cps_column1,
-                        ) => cps_column1 * "_gbsub",
-                )
-                insertcols!(
-                    df,
-                    cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])),
-                )
-                transform!(
-                    df,
-                    Cols(cps_column2, :signal_time) =>
-                        ByRow(
-                            (value, time) ->
-                                time ≤ laser_time ? value : value - gas_blank_cps_column2,
-                        ) => cps_column2 * "_gbsub",
-                )
-                insertcols!(
-                    df,
-                    cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])),
-                )
-                transform!(
-                    df,
-                    Cols(cps_column1 * "_gbsub", cps_column2 * "_gbsub", :signal_time) =>
-                        ByRow(
-                            (cps1, cps2, time) ->
-                                if time ≤ laser_time && iszero(cps2) == true
-                                    0.0
-                                else
-                                    cps1 / cps2
-                                end,
-                        ) => :ratio,
-                )
-                insertcols!(
-                    df,
-                    "ratio_σ" =>
-                        sqrt.(
-                            df[!, :ratio] .^ 2 .* (
-                                (
-                                    df[!, cps_column1 * "_σ"] ./
-                                    df[!, cps_column1 * "_gbsub"]
-                                ) .^ 2 +
-                                (
-                                    df[!, cps_column2 * "_σ"] ./
-                                    df[!, cps_column2 * "_gbsub"]
-                                ) .^ 2
-                            )
-                        ),
-                )
-                if centre == true
-                    centre_value = ct_alg(
-                        pseudolog.(
-                            df[stable_time .≤ df.signal_time .≤ signal_end, :ratio],
-                        ),
-                    )[1]
-                    df.ratio_centred = 1.0 .+ (pseudolog.(df.ratio) .- centre_value)
-                    df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
-                end
-                if trim == true
-                    filter!(:signal_time => x -> stable_time .≤ x .≤ signal_end, df)
-                end
-                append!(data, df)
-            catch
-                @warn "could not process: $file"
+            df = select!(df, r"Time", "total_signal", r"" * cps_column1, r"" * cps_column2)
+            rename!(df, ["signal_time", "total_cps", cps_column1, cps_column2])
+            insertcols!(df, 1, "sample" => sample_name)
+            insertcols!(df, 2, "analysis_name" => analysis_name)
+            insertcols!(df, 3, "spot_size" => spot_size)
+            insertcols!(df, 4, "analysis_time" => analysis_time)
+            insertcols!(df, 6, "beam_time" => df.signal_time .- laser_time)
+            gas_blank_cps_column1 = ct_alg(df[begin:gas_blank_ind, cps_column1])[1]
+            gas_blank_cps_column2 = ct_alg(df[begin:gas_blank_ind, cps_column2])[1]
+            transform!(
+                df,
+                Cols(cps_column1, :signal_time) =>
+                    ByRow(
+                        (value, time) ->
+                            time ≤ laser_time ? value : value - gas_blank_cps_column1,
+                    ) => cps_column1 * "_gbsub",
+            )
+            insertcols!(
+                df,
+                cps_column1 * "_σ" => sqrt.(abs.(df[!, cps_column1 * "_gbsub"])),
+            )
+            transform!(
+                df,
+                Cols(cps_column2, :signal_time) =>
+                    ByRow(
+                        (value, time) ->
+                            time ≤ laser_time ? value : value - gas_blank_cps_column2,
+                    ) => cps_column2 * "_gbsub",
+            )
+            insertcols!(
+                df,
+                cps_column2 * "_σ" => sqrt.(abs.(df[!, cps_column2 * "_gbsub"])),
+            )
+            transform!(
+                df,
+                Cols(cps_column1 * "_gbsub", cps_column2 * "_gbsub", :signal_time) =>
+                    ByRow(
+                        (cps1, cps2, time) -> if time ≤ laser_time && iszero(cps2) == true
+                            0.0
+                        else
+                            cps1 / cps2
+                        end,
+                    ) => :ratio,
+            )
+            insertcols!(
+                df,
+                "ratio_σ" =>
+                    sqrt.(
+                        df[!, :ratio] .^ 2 .* (
+                            (df[!, cps_column1 * "_σ"] ./ df[!, cps_column1 * "_gbsub"]) .^
+                            2 +
+                            (df[!, cps_column2 * "_σ"] ./ df[!, cps_column2 * "_gbsub"]) .^
+                            2
+                        )
+                    ),
+            )
+            if centre == true
+                centre_value = ct_alg(
+                    pseudolog.(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio],),
+                )[1]
+                df.ratio_centred = 1.0 .+ (pseudolog.(df.ratio) .- centre_value)
+                df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
             end
+            if trim == true
+                filter!(:signal_time => x -> stable_time .≤ x .≤ signal_end, df)
+            end
+            append!(data, df)
         end
     end
     if !isempty(data) == true
@@ -477,6 +460,7 @@ function automatic_laser_times(
     verbose::Bool = false,
 )
     medians = Vector{Float64}(undef, Integer(cld(length(signal), bandwidth)))
+    despiked = despike(signal_time, signal)
     for i ∈ eachindex(medians)
         medians[i] = median(
             signal[round(UInt, max((i - 1) * bandwidth, firstindex(signal))):round(
@@ -491,7 +475,7 @@ function automatic_laser_times(
             @view(medians[round(UInt, end / 2):end]),
         ),
     ) > 0.05 ||
-       pvalue(JarqueBeraTest(signal[begin:round(UInt, 3 * (end / 4))]; adjusted = true)) >
+       pvalue(JarqueBeraTest(despiked[begin:round(UInt, 3 * (end / 4))]; adjusted = true)) >
        0.05
         println("no signal detected")
         return ((0, NaN), (0, NaN), (0, NaN), (0, NaN), (0, NaN))
@@ -525,9 +509,9 @@ function automatic_laser_times(
         end
         for i ∈ eachindex(signal)
             z[i, 5] = if i ≤ laser_start_ind
-               1.0
+                1.0
             else
-               sign(z[min(i + 1, lastindex(signal)), 4] - z[i, 4])
+                sign(z[min(i + 1, lastindex(signal)), 4] - z[i, 4])
             end
         end
         aerosol_arrival_ind = findnext(==(-1.0), z[:, 5], laser_start_ind)
@@ -539,45 +523,62 @@ function automatic_laser_times(
         signal_indices = sort(findall(x -> q[1] ≤ x ≤ q[2], z[:, 1]))
         signal_indices = signal_indices[signal_indices .> aerosol_arrival_ind]
         signal_start_ind = signal_indices[begin]
-        signal_end_ind = signal_indices[end-1]
+        signal_end_ind = signal_indices[end - 1]
 
-        ind_continuity=Vector{Bool}(undef, length(signal_indices))
-        for i in eachindex(signal_indices)
-            ind_continuity[i] = if i == 1 || (signal_indices[i] - signal_indices[i-1]) == 1
-                true
-            else
-                false
+        ind_continuity = Vector{Bool}(undef, length(signal_indices))
+        for i ∈ eachindex(signal_indices)
+            ind_continuity[i] =
+                if i == 1 || (signal_indices[i] - signal_indices[i - 1]) == 1
+                    true
+                else
+                    false
+                end
+        end
+
+        if signal_end_ind - signal_start_ind ≥ 5
+            signal_fit = GeochemistryTools._GLS(
+                signal_start_ind:signal_end_ind,
+                z[signal_start_ind:signal_end_ind, 1],
+                2,
+            )
+            f(x) = signal_fit.beta[1] + signal_fit.beta[2] * x + signal_fit.beta[3] * x^2
+            for i ∈ eachindex(signal)
+                z[i, 5] = if i ≤ signal_start_ind
+                    0.5
+                else
+                    z[i, 4] / f(i)
+                end
             end
-        end
-
-        signal_fit =  GeochemistryTools._GLS(signal_start_ind:signal_end_ind, z[signal_start_ind:signal_end_ind, 1], 2)
-        f(x) = signal_fit.beta[1] + signal_fit.beta[2] * x + signal_fit.beta[3] * x^2
-        for i ∈ eachindex(signal)
-            z[i, 5 ] = if i ≤ signal_start_ind
-                0.5
-            else
-                z[i, 4] / f(i)
-            end
-        end
-        alt_signal_end = findlast(>(quantile(z[signal_start_ind:signal_end_ind, 5], 0.05)),z[:,5])
-        if alt_signal_end != signal_end_ind && ind_continuity[signal_indices .== signal_end_ind][1] === false
-            signal_end_ind = alt_signal_end
-        end
-
-
-        if ShapiroWilkTest(z[signal_start_ind:signal_end_ind, 1]).W < 0.8
-            alt_signal_starts = findall(<(quantile(z[signal_start_ind:signal_end_ind, 3], 0.05)), z[:,3])
-            alt_signal_start = findnext(>(
-                quantile(z[signal_start_ind:signal_end_ind, 3],0.95)),
-                z[:,3],
-                alt_signal_starts[findfirst(>(signal_start_ind), alt_signal_starts)])
-            alt_signal_end = alt_signal_starts[findfirst(>(signal_start_ind), alt_signal_starts)] - bandwidth
-
-            if sum(z[signal_start_ind:alt_signal_end, 1]) > sum(z[alt_signal_start:signal_end_ind, 1])
+            alt_signal_end =
+                findlast(>(quantile(z[signal_start_ind:signal_end_ind, 5], 0.05)), z[:, 5])
+            if alt_signal_end != signal_end_ind &&
+            ind_continuity[signal_indices .== signal_end_ind][1] === false
                 signal_end_ind = alt_signal_end
-            else
-                signal_start_ind = alt_signal_start
             end
+
+
+            if ShapiroWilkTest(z[signal_start_ind:signal_end_ind, 1]).W < 0.8
+                alt_signal_starts =
+                    findall(<(quantile(z[signal_start_ind:signal_end_ind, 3], 0.05)), z[:, 3])
+                alt_signal_start = findnext(
+                    >(quantile(z[signal_start_ind:signal_end_ind, 3], 0.95)),
+                    z[:, 3],
+                    alt_signal_starts[findfirst(>(signal_start_ind), alt_signal_starts)],
+                )
+                alt_signal_end =
+                    alt_signal_starts[findfirst(>(signal_start_ind), alt_signal_starts)] -
+                    bandwidth
+                if !isnothing(alt_signal_start)
+                    if sum(z[signal_start_ind:alt_signal_end, 1]) >
+                    sum(z[alt_signal_start:signal_end_ind, 1])
+                        signal_end_ind = alt_signal_end
+                    else
+                        signal_start_ind = alt_signal_start
+                    end
+                end
+            end
+        else
+            @warn "signal appears to be exceedingly short"
         end
 
         gas_blank_end_ind = max(
