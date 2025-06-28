@@ -1,5 +1,5 @@
 #= Preamble
-This file contains various decay system equations for calculation of ratios and ages (U-Pb).
+This file contains various functions for raman spectroscopy
 =#
 
 export load_raman, correct_raman, fit_base, plot_Raman_cor, plot_Raman_cor!
@@ -367,32 +367,4 @@ function _integration_trapezoidal(x::AbstractVector, y::AbstractVector)
         end
     end
     return area
-end
-
-"""
-    despike(x::AbstractVector, y::AbstractVector; threshold=6.0, bandwidth=5)
-
-Despike time-series data.
-
-# Description
-Remove spikes in time-series data. Implements a simple algorithm outlined in
-Whitaker & Hayes (2018) that uses modified z-scores to detect outlier points.
-
-"""
-function despike(x::AbstractVector, y::AbstractVector; threshold::Real=6.0, bandwidth::Integer=5)
-    if length(x) ≠ length(y)
-        error("Vector lengths are not equal")
-    else
-        despiked_y = deepcopy(y)
-        z_score = diff(y)
-        zy_median = median(z_score)
-        zy_mad = mad(z_score, normalize=true) # normalise accounts for bias in MAD calculation
-        z_score .= abs.((z_score .- zy_median) ./ zy_mad)
-        spikes = [1, findall(>(threshold), z_score) .+ 1..., lastindex(y)]
-        for i ∈ spikes
-            despiked_y[i] = mean(y[[collect(max(firstindex(z_score), i - bandwidth):i-1)...,
-                collect(i+1:min(lastindex(z_score), i + bandwidth))...]])
-        end
-    end
-    return despiked_y
 end
