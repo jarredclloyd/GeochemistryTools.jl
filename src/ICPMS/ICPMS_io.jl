@@ -509,17 +509,28 @@ function automatic_laser_times(
         end
         for i ∈ eachindex(signal)
             z[i, 5] = if i ≤ laser_start_ind
-                1.0
+                0.0
             else
-                sign(z[min(i + 1, lastindex(signal)), 4] - z[i, 4])
+                atan(abs((z[i-1, 4] - z[i, 4]) / (1 + (z[i-1, 4] * z[i, 4]))))
             end
         end
-        aerosol_arrival_ind = findnext(==(-1.0), z[:, 5], laser_start_ind)
+        for i ∈ eachindex(signal)
+            z[i, 4] = if i ≤ laser_start_ind || i == lastindex(signal)
+                0.0
+            else
+                if z[i-1,5] > z[i, 5] && z[i, 5] < z[i+1, 5]
+                    1.0
+                else
+                    0.0
+                end
+            end
+        end
+        aerosol_arrival_ind = findnext(==(1.0), z[:, 4], laser_start_ind)
         z[aerosol_arrival_ind:end, 1] .=
             whittaker_smooth(signal[aerosol_arrival_ind:end]; lambda = bandwidth)
 
 
-        q = quantile(z[aerosol_arrival_ind:(end - 5), 1], [0.05, 0.95])
+        q = quantile(z[aerosol_arrival_ind:(end), 1], [0.05, 0.95])
         signal_indices = sort(findall(x -> q[1] ≤ x ≤ q[2], z[:, 1]))
         signal_indices = signal_indices[signal_indices .> aerosol_arrival_ind]
         signal_start_ind = signal_indices[begin]
@@ -544,9 +555,9 @@ function automatic_laser_times(
             f(x) = signal_fit.beta[1] + signal_fit.beta[2] * x + signal_fit.beta[3] * x^2
             for i ∈ eachindex(signal)
                 z[i, 5] = if i ≤ signal_start_ind
-                    0.5
+                    1.0
                 else
-                    z[i, 4] / f(i)
+                    z[i, 1] / f(i)
                 end
             end
             alt_signal_end =
