@@ -5,6 +5,7 @@ This jl file contains dictionaries and other reference information for that are 
 export AVOGADRO,
     INITIAL_Sr,
     CI_CHONDRITE_PO2016,
+    PAAS_P2012,
     IONIC_RADIUS_CNEIGHT,
     #decay constants:
     LAMBDA_K40, LAMBDA_K40_SE,
@@ -78,7 +79,7 @@ const IONIC_RADIUS_CNEIGHT::Base.ImmutableDict{String,Float64} = Base.ImmutableD
 
 #Isotopic properties (mass, radii, charge)
 
-#C1 Chondrite (Palme and O'Neill 2016)
+# C1 Chondrite (Palme and O'Neill 2016)
 const CI_CHONDRITE_PO2016::Base.ImmutableDict{Symbol,Vector{Float64}} = Base.ImmutableDict(
     :H => [19700.0, 1970.0],
     :Li => [1.45, 0.145],
@@ -158,6 +159,26 @@ const CI_CHONDRITE_PO2016::Base.ImmutableDict{Symbol,Vector{Float64}} = Base.Imm
     :Bi => [0.11, 0.0099],
     :Th => [0.03, 0.0021],
     :U => [0.0081, 0.000567],
+)
+
+# Post-Archaean Australian Shale (Pourmand et al. 2012)
+const PAAS_P2012::Base.ImmutableDict{Symbol,Vector{Float64}} = Base.ImmutableDict(
+    :Sc	=> [15.89, 2.2587],
+    :Y	=> [27.31, 5.3647],
+    :La	=> [44.56, 7.6188],
+    :Ce	=> [88.25, 15.7763],
+    :Pr	=> [10.15, 1.8385],
+    :Nd	=> [37.32, 7.0715],
+    :Sm	=> [6.884, 1.4121],
+    :Eu	=> [1.215, 0.2819],
+    :Gd	=> [6.043, 1.304],
+    :Tb	=> [0.8914, 0.1884],
+    :Dy	=> [5.325, 1.1156],
+    :Ho	=> [1.053, 0.2165],
+    :Er	=> [3.075, 0.6184],
+    :Tm	=> [0.4510, 0.0894],
+    :Yb	=> [3.012, 0.5821],
+    :Lu	=> [0.4386, 0.0821],
 )
 
 # Initial Sr87/86 ratios
