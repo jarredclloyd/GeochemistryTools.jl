@@ -43,11 +43,31 @@ struct OrthogonalPolynomial <: LinearRegression
 end
 
 function Base.show(io::IOContext, fit::OrthogonalPolynomial)
-    println(io, "λ₀: $(round(fit.lambda[1], sigdigits = 5))")
-    println(io, "λ₁: $(round(fit.lambda[2], sigdigits = 5))")
-    println(io, "λ₂: $(round(fit.lambda[3], sigdigits = 5))")
-    println(io, "λ₃: $(round(fit.lambda[4], sigdigits = 5))")
-    return println(io, "λ₄: $(round(fit.lambda[5], sigdigits = 5))")
+    if isnothing(fit.n_observations)
+        println(io, "no model was fitted to this data")
+    else
+        println(io, repeat("-", 80))
+        println(io, "Orthogonal Polynomial Model fitted $(fit.n_observations) observations from input data")
+        pretty_table(
+            hcat(
+                ["λ₀", "λ₁", "λ₂", "λ₃", "λ₄"],
+                round.(fit.lambda; sigdigits = 5),
+                round.(Float64.(fit.r_squared); sigdigits = 4),
+                round.(Float64.(fit.OP_r_squared); sigdigits = 4),
+                round.(Float64.(fit.reduced_chi_squared); sigdigits = 4),
+                round.(Float64.(fit.nrmse); sigdigits = 4),
+                round.(Float64.(fit.akaike_weights); sigdigits = 4),
+                round.(Float64.(fit.bayesian_weights); sigdigits = 4),
+            );
+            header = ["Lambda", "Value", "ρ²", "ρ²ₒₚ", "χ²ᵣ", "RMSE (normalised)", "AICc Weight", "BICc Weight"],
+        )
+        println(io, "\n Model Uncertainties (%1SE)")
+        pretty_table(hcat(["λ₀", "λ₁", "λ₂", "λ₃", "λ₄"],
+            round.(abs.(Float64.((fit.lambda_se) ./ fit.lambda) .* 100); sigdigits = 4));
+            header = ["Lambda", "Φ₀(x)", "Φ₁(x)", "Φ₂(x)", "Φ₃(x)", "Φ₄(x)"],
+        )
+        println(io, repeat("-", 80))
+    end
 end
 
 # call functions
