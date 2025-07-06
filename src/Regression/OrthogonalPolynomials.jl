@@ -51,13 +51,13 @@ function Base.show(io::IOContext, fit::OrthogonalPolynomial)
         pretty_table(
             hcat(
                 ["λ₀", "λ₁", "λ₂", "λ₃", "λ₄"],
-                round.(fit.lambda; sigdigits = 5),
-                round.(Float64.(fit.r_squared); sigdigits = 4),
-                round.(Float64.(fit.OP_r_squared); sigdigits = 4),
-                round.(Float64.(fit.reduced_chi_squared); sigdigits = 4),
-                round.(Float64.(fit.nrmse); sigdigits = 4),
-                round.(Float64.(fit.akaike_weights); sigdigits = 4),
-                round.(Float64.(fit.bayesian_weights); sigdigits = 4),
+                round.(Float64.(fit.lambda); sigdigits = 4),
+                round.(fit.r_squared; sigdigits = 4),
+                round.(fit.OP_r_squared; sigdigits = 4),
+                round.(fit.reduced_chi_squared; sigdigits = 4),
+                round.(fit.nrmse; sigdigits = 4),
+                round.(fit.akaike_weights; sigdigits = 4),
+                round.(fit.bayesian_weights; sigdigits = 4),
             );
             header = ["Lambda", "Value", "ρ²", "ρ²ₒₚ", "χ²ᵣ", "RMSE (normalised)", "AICc Weight", "BICc Weight"],
         )
@@ -293,20 +293,20 @@ function _orthogonal_LSQ(
     verbose::Bool=false,
     st_residual_tol::Real=3.0
 )
-    finite_indices = intersect(findall(isfinite, x), findall(isfinite, y))
-    x = Float64x4.(x[finite_indices])
-    y = Float64x4.(y[finite_indices])
+    finite_indices::Vector{Int64} = intersect(findall(isfinite, x), findall(isfinite, y))
+    x::Vector{Float64x4} = Float64x4.(x[finite_indices])
+    y::Vector{Float64x4} = Float64x4.(y[finite_indices])
     𝑁::Integer = length(x)
     if 𝑁 == length(y) && 𝑁 > 2
-        x_sums::Vector{Float64x4} = Vector{Float64x4}(undef, 7)
+        x_sums::MVector{7, Float64x4} = MVector{7, Float64x4}(undef)
         @simd for i ∈ eachindex(x_sums)
             x_sums[i] = sum(x .^ i)
         end
         β::Float64x4 = _beta_orthogonal(𝑁, x_sums)
-        γ::Vector{Float64x4} = _gamma_orthogonal(𝑁, x_sums)
-        δ::Vector{Float64x4} = _delta_orthogonal(𝑁, x_sums)
-        ϵ::Vector{Float64x4} = _epsilon_orthogonal(𝑁, x_sums)
-        order::Vector{Int64} = [0, 1, 2, 3, 4]
+        γ::SVector{2,Float64x4} = _gamma_orthogonal(𝑁, x_sums)
+        δ::SVector{3,Float64x4} = _delta_orthogonal(𝑁, x_sums)
+        ϵ::SVector{4,Float64x4} = _epsilon_orthogonal(𝑁, x_sums)
+        order::SVector{5,Int64} = [0, 1, 2, 3, 4]
 
         # Construct design matrix, minimises allocations
         X::Matrix{Float64x4} = Matrix{Float64x4}(undef, (𝑁, 5))
@@ -347,13 +347,12 @@ function _orthogonal_LSQ(
             Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
             VarΛX = F.V * inv(Diagonal(F.S .^ 2)) * F.Vt
         end
-        rss::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
+        rss::MVector{5, Float64x4} = MVector{5, Float64x4}(undef)
         @simd for i ∈ eachindex(order)
             residuals::Vector{Float64x4} = (y .- (view(X, :, 1:i) * Λ[1:i]))
             rss[i] = transpose(residuals) * inv(Ω) * (residuals)
         end
-        AIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
-        AIC = _akaike_information_criteria.(rss, 𝑁, order)
+        AIC::SVector{5,Float64x4} = _akaike_information_criteria.(rss, 𝑁, order)
         if rm_outlier === true
             𝑁prev::Int64 = 0
             n_iterations::Int64 = 0
@@ -370,8 +369,8 @@ function _orthogonal_LSQ(
                     leverage[i] = sum(view(X, i, 1:minAIC) .* view(Xvar, :, i))
                 end
                 studentised_residuals::Vector{Float64x4} =
-                    y .- (view(X, :, 1:minAIC) * Λ[1:minAIC]) # 3 allocs
-                mse::Vector{Float64x4} = rss ./ (𝑁 .- (order .+ 1))
+                    y .- (view(X, :, 1:minAIC) * Λ[1:minAIC])
+                mse::MVector{5, Float64x4} = rss ./ (𝑁 .- (order .+ 1))
                 studentised_residuals ./= @.(sqrt(mse[minAIC] * (1 - leverage)))
                 outlier_inds::Vector{Int64} = findall(≥(st_residual_tol), abs.(studentised_residuals))
                 n_outliers += length(outlier_inds)
@@ -425,32 +424,31 @@ function _orthogonal_LSQ(
             Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
         end
         tss::Float64x4 = transpose((y .- mean(y))) * inv(Ω) * (y .- mean(y))
-        rmse::Vector{Float64x4} = sqrt.(mse)
-        nrmse::Vector{Float64x4} = rmse ./ (maximum(y) - minimum(y))
-        R²::Vector{Float64x4} = 1 .- (rss ./ (tss))
-        R²ₒₚ::Vector{Float64x4} = _olkin_pratt.(R², 𝑁, order .+ 1)
-        BIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
-        BIC = _bayesian_information_criteria.(rss, 𝑁, order)
-        BICw =
-            exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
+        rmse::SVector{5, Float64} = sqrt.(mse)
+        nrmse::SVector{5, Float64} = rmse ./ (maximum(y) - minimum(y))
+        R²::SVector{5, Float64} = 1 .- (rss ./ (tss))
+        R²ₒₚ::SVector{5, Float64} = _olkin_pratt.(R², 𝑁, order .+ 1)
         AIC = _akaike_information_criteria.(rss, 𝑁, order)
-        AICw =
+        BIC::SVector{5,Float64} = _bayesian_information_criteria.(rss, 𝑁, order)
+        BICw::SVector{5, Float64} =
+            exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
+        AICw::SVector{5, Float64} =
             exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
         return OrthogonalPolynomial(
-            Float64.(Λ),
+            Λ,
             UpperTriangular(Λ_SE),
             β,
             γ,
             δ,
             ϵ,
-            Float64.(VarΛX),
+            VarΛX,
             order,
             R²,
             R²ₒₚ,
             rmse,
             nrmse,
-            rss,
-            mse,
+            Float64.(rss),
+            Float64.(mse),
             AIC,
             AICw,
             BIC,
