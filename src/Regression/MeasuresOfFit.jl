@@ -1,4 +1,5 @@
 function _olkin_pratt(R²::Real, 𝑛::Integer, predictors::Integer)
+    try
     if R² ≥ Base.rtoldefault(typeof(R²))
         z = 1 - R²
         c = (𝑛 - predictors + 1) / 2
@@ -15,6 +16,10 @@ function _olkin_pratt(R²::Real, 𝑛::Integer, predictors::Integer)
         return zero(typeof(R²))
     else
         return OP_R²
+    end
+    catch
+        @warn "Error computing Oklin-Pratt R²"
+        return OP_R² = NaN
     end
 end
 
