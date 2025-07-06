@@ -23,6 +23,8 @@ using SparseArrays
 using LinearAlgebra
 using GenericLinearAlgebra
 using MultiFloats
+using StaticArrays
+using SmallCollections
 using SpecialFunctions
 using PyCall
 using Conda
@@ -30,6 +32,7 @@ using PolynomialRoots
 @reexport using PeriodicTable
 @reexport using IsotopeTable
 @reexport using Unitful
+using PrettyTables
 
 import Base: getindex, setindex!
 import Base.Threads: @spawn, @threads, @simd
