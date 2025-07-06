@@ -28,7 +28,7 @@ function REE_lambda(
     uncertainty_level::Integer = 2,
     uncertainty_suffix::AbstractString = "_2SE",
     normalise::Bool = true,
-    normalisation_values::AbstractString = "CI_PO2016",
+    normalisation_values::AbstractString = "CI_PO2014",
     fit_ce::Bool = false,
     fit_eu::Bool = false,
     fit_gd::Bool = true,
@@ -47,7 +47,7 @@ function REE_lambda(
             )
         end
         X_REE = _X_REE()
-        for i ∈ 1:1:nrow(data)
+        Threads.@threads for i ∈ 1:1:nrow(data)
             data.orthogonal_fit[i] = _lambdaREE(
                 coalesce.(Vector(data[i, measured_lanthanoids]), NaN),
                 lanth_uncertainties;
@@ -87,7 +87,7 @@ function _lambdaREE(
     ],
     weight_type::AbstractString = "abs",
     normalise::Bool = true,
-    normalisation_values::AbstractString = "CI_PO2016",
+    normalisation_values::AbstractString = "CI_PO2014",
     fit_ce::Bool = false,
     fit_eu::Bool = false,
     fit_gd::Bool = true,
@@ -100,148 +100,151 @@ function _lambdaREE(
             fill(nothing, length(fieldnames(OrthogonalPolynomial)))...,
         )
     else
-        if isnothing(operator_matrix)
-            X, β, γ, δ, ϵ = _X_REE()
-        else
-            X, β, γ, δ, ϵ = operator_matrix
-        end
-
-        # if isnothing(lanth_uncertainties) != true
-        #     fitting_indices =
-        #         intersect(fitting_indices, findall(isfinite, lanth_uncertainties))
-        #     lanth_uncertainties = lanth_uncertainties[fitting_indices]
-        # end
-
-        # remove declared anomalous elements
-        if fit_gd == false
-            deleteat!(
-                fitting_indices,
-                fitting_indices .== findfirst(occursin("Gd"), lanth_measured),
-            )
-        end
-        if fit_eu == false
-            deleteat!(
-                fitting_indices,
-                fitting_indices .== findfirst(occursin("Eu"), lanth_measured),
-            )
-        end
-        if fit_ce == false
-            deleteat!(
-                fitting_indices,
-                fitting_indices .== findfirst(occursin("Ce"), lanth_measured),
-            )
-        end
-
-        # normalise data to reference values
-        if normalise == true
-            norm_values::Vector{Real} =
-                Vector{Real}(undef, length(fitting_indices))
-            if uppercase(normalisation_values) == "CI_PO2016"
-                lookup_dict = CI_CHONDRITE_PO2016
-                # elseif uppercase(normalisation_values) == "PAAS"
-                # lookup_dict = PAAS
+        try
+            if isnothing(operator_matrix)
+                X, β, γ, δ, ϵ = _X_REE()
+            else
+                X, β, γ, δ, ϵ = operator_matrix
             end
-            for i ∈ eachindex(norm_values)
-                norm_values[i] = lookup_dict[Symbol(lanth_measured[fitting_indices][i])][1]
+
+            # if isnothing(lanth_uncertainties) != true
+            #     fitting_indices =
+            #         intersect(fitting_indices, findall(isfinite, lanth_uncertainties))
+            #     lanth_uncertainties = lanth_uncertainties[fitting_indices]
+            # end
+
+            # remove declared anomalous elements
+            if fit_gd == false
+                deleteat!(
+                    fitting_indices,
+                    fitting_indices .== findfirst(occursin("Gd"), lanth_measured),
+                )
             end
-            lanth_values = log.(lanth_values[fitting_indices] ./ norm_values)
-        else
-            lanth_values = log.(lanth_values[fitting_indices])
-        end
+            if fit_eu == false
+                deleteat!(
+                    fitting_indices,
+                    fitting_indices .== findfirst(occursin("Eu"), lanth_measured),
+                )
+            end
+            if fit_ce == false
+                deleteat!(
+                    fitting_indices,
+                    fitting_indices .== findfirst(occursin("Ce"), lanth_measured),
+                )
+            end
+
+            # normalise data to reference values
+            if normalise == true
+                norm_values::Vector{Real} = Vector{Real}(undef, length(fitting_indices))
+                if uppercase(normalisation_values) == "CI_PO2014"
+                    lookup_dict = CI_CHONDRITE_PO2014
+                elseif uppercase(normalisation_values) == "PAAS_P2012"
+                    lookup_dict = PAAS_P2012
+                end
+                for i ∈ eachindex(norm_values)
+                    norm_values[i] =
+                        lookup_dict[Symbol(lanth_measured[fitting_indices][i])][1]
+                end
+                lanth_values = log.(lanth_values[fitting_indices] ./ norm_values)
+            else
+                lanth_values = log.(lanth_values[fitting_indices])
+            end
 
 
-        X = X[fitting_indices, :]
+            X = X[fitting_indices, :]
 
 
-        order::Vector{Integer} = [0, 1, 2, 3, 4]
-        if lanth_uncertainties === nothing
-            ω::Vector{MultiFloat{Float64,4}} = fill(1.0, length(fitting_indices))
-        # elseif occursin("rel", lowercase(weight_type)) === true
-        #     ω = lanth_uncertainties[fitting_indices]
-        # elseif occursin("abs", lowercase(weight_type)) == true
-        #     ω =
-        #         abs.(lanth_uncertainties[fitting_indices]) ./
-        #         abs.(lanth_values[fitting_indices])
-        else
-            throw(
-                ArgumentError(
-                    "Value of 'weight_type' is unrecognised. String should contain either 'rel' or 'abs'.",
-                ),
+            order::Vector{Integer} = [0, 1, 2, 3, 4]
+            if lanth_uncertainties === nothing
+                ω::Vector{MultiFloat{Float64,4}} = fill(1.0, length(fitting_indices))
+                # elseif occursin("rel", lowercase(weight_type)) === true
+                #     ω = lanth_uncertainties[fitting_indices]
+                # elseif occursin("abs", lowercase(weight_type)) == true
+                #     ω =
+                #         abs.(lanth_uncertainties[fitting_indices]) ./
+                #         abs.(lanth_values[fitting_indices])
+            else
+                throw(
+                    ArgumentError(
+                        "Value of 'weight_type' is unrecognised. String should contain either 'rel' or 'abs'.",
+                    ),
+                )
+            end
+            𝑁::Integer = length(fitting_indices)
+            Ω::Diagonal{Float64x4,Vector{Float64x4}} = Diagonal(ω .^ 2)
+            X̃::Matrix{Float64x4} = exp(-0.5log(Ω)) * X
+            ỹ::Vector{Float64x4} = exp(-0.5log(Ω)) * lanth_values
+
+            if cond(X̃) ≤ 1e7
+                F = qr(X̃)
+                Λ::Vector{Float64x4} = F \ ỹ
+                VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
+            else
+                F = svd(X̃)
+                Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
+                VarΛX = F.V * inv(Diagonal(F.S .^ 2)) * F.Vt
+            end
+            rss::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
+            @simd for i ∈ eachindex(order)
+                residuals::Vector{Float64x4} = (lanth_values .- (view(X, :, 1:i) * Λ[1:i]))
+                rss[i] = transpose(residuals) * inv(Ω) * (residuals)
+            end
+            AIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
+            AIC = _akaike_information_criteria.(rss, 𝑁, order)
+
+            for i ∈ eachindex(Λ)
+                Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64x4) ? 0.0 : Λ[i]
+            end
+            mse = rss ./ (𝑁 .- (order .+ 1))
+            Λ_SE::AbstractMatrix{Float64x4} = zeros(Float64x4, 5, 5)
+            for i ∈ eachindex(order)
+                Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
+            end
+            tss::Float64x4 =
+                transpose((lanth_values .- mean(lanth_values))) *
+                inv(Ω) *
+                (lanth_values .- mean(lanth_values))
+            rmse::Vector{Float64x4} = sqrt.(mse)
+            nrmse::Vector{Float64x4} =
+                rmse ./ (maximum(lanth_values) - minimum(lanth_values))
+            R²::Vector{Float64x4} = 1 .- (rss ./ (tss))
+            R²ₒₚ::Vector{Float64x4} = _olkin_pratt.(R², 𝑁, order .+ 1)
+            BIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
+            BIC = _bayesian_information_criteria.(rss, 𝑁, order)
+            BICw =
+                exp.(-0.5 .* (BIC .- minimum(BIC))) ./
+                sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
+            AIC = _akaike_information_criteria.(rss, 𝑁, order)
+            AICw =
+                exp.(-0.5 .* (AIC .- minimum(AIC))) ./
+                sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
+            return OrthogonalPolynomial(
+                Float64.(Λ),
+                UpperTriangular(Λ_SE),
+                big.(β),
+                big.(γ),
+                big.(δ),
+                big.(ϵ),
+                Float64.(VarΛX),
+                order,
+                R²,
+                R²ₒₚ,
+                rmse,
+                nrmse,
+                rss,
+                mse,
+                AIC,
+                AICw,
+                BIC,
+                BICw,
+                𝑁,
+            )
+        catch
+            @warn "Error fitting model"
+            return OrthogonalPolynomial(
+                fill(nothing, length(fieldnames(OrthogonalPolynomial)))...,
             )
         end
-        𝑁::Integer = length(fitting_indices)
-        Ω::Diagonal{Float64x4,Vector{Float64x4}} = Diagonal(ω .^ 2)
-        X̃::Matrix{Float64x4} = exp(-0.5log(Ω)) * X
-        ỹ::Vector{Float64x4} = exp(-0.5log(Ω)) * lanth_values
-
-        if cond(X̃) ≤ 1e7
-            F = qr(X̃)
-            Λ::Vector{Float64x4} = F \ ỹ
-            VarΛX = Symmetric(inv(F.R) * transpose(inv(F.R)))
-        else
-            F = svd(X̃)
-            Λ = F.V * inv(Diagonal(F.S)) * transpose(F.U) * ỹ
-            VarΛX = F.V * inv(Diagonal(F.S .^ 2)) * F.Vt
-        end
-        rss::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
-        @simd for i ∈ eachindex(order)
-            residuals::Vector{Float64x4} =
-                (lanth_values .- (view(X, :, 1:i) * Λ[1:i]))
-            rss[i] = transpose(residuals) * inv(Ω) * (residuals)
-        end
-        AIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
-        AIC = _akaike_information_criteria.(rss, 𝑁, order)
-
-        for i ∈ eachindex(Λ)
-            Λ[i] = abs(Λ[i]) ≤ Base.rtoldefault(Float64x4) ? 0.0 : Λ[i]
-        end
-        mse = rss ./ (𝑁 .- (order .+ 1))
-        Λ_SE::AbstractMatrix{Float64x4} = zeros(Float64x4, 5, 5)
-        for i ∈ eachindex(order)
-            Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
-        end
-        tss::Float64x4 =
-            transpose((
-                lanth_values .- mean(lanth_values)
-            )) *
-            inv(Ω) *
-            (lanth_values .- mean(lanth_values))
-        rmse::Vector{Float64x4} = sqrt.(mse)
-        nrmse::Vector{Float64x4} =
-            rmse ./ (
-                maximum(lanth_values) -
-                minimum(lanth_values)
-            )
-        R²::Vector{Float64x4} = 1 .- (rss ./ (tss))
-        R²ₒₚ::Vector{Float64x4} = _olkin_pratt.(R², 𝑁, order .+ 1)
-        BIC::Vector{Float64x4} = Vector{Float64x4}(undef, 5)
-        BIC = _bayesian_information_criteria.(rss, 𝑁, order)
-        BICw =
-            exp.(-0.5 .* (BIC .- minimum(BIC))) ./ sum(exp.(-0.5 .* (BIC .- minimum(BIC))))
-        AIC = _akaike_information_criteria.(rss, 𝑁, order)
-        AICw =
-            exp.(-0.5 .* (AIC .- minimum(AIC))) ./ sum(exp.(-0.5 .* (AIC .- minimum(AIC))))
-        return OrthogonalPolynomial(
-            Float64.(Λ),
-            UpperTriangular(Λ_SE),
-            big.(β),
-            big.(γ),
-            big.(δ),
-            big.(ϵ),
-            Float64.(VarΛX),
-            order,
-            R²,
-            R²ₒₚ,
-            rmse,
-            nrmse,
-            rss,
-            mse,
-            AIC,
-            AICw,
-            BIC,
-            BICw,
-            𝑁,
-        )
     end
 end
 
