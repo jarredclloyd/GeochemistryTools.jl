@@ -1,4 +1,6 @@
-mutable struct LAICPMSAnalysis
+export LAICPMSAnalysis, LAICPMSSession
+
+struct LAICPMSAnalysis
     sample::Union{Nothing,AbstractString}
     material::Union{Nothing,AbstractString}
     analysis_time::Union{Nothing,DateTime}
@@ -17,7 +19,7 @@ mutable struct LAICPMSAnalysis
     signal_end::Union{Nothing,Tuple{Integer,Real}}
 end
 
-mutable struct LAICPMSSession
+struct LAICPMSSession
     laboratory::AbstractString
     session_date_start::Date
     session_date_end::Date
