@@ -350,7 +350,7 @@ function _orthogonal_LSQ(
         rss::MVector{5, Float64x4} = MVector{5, Float64x4}(undef)
         @simd for i ∈ eachindex(order)
             residuals::Vector{Float64x4} = (y .- (view(X, :, 1:i) * Λ[1:i]))
-            rss[i] = transpose(residuals) * inv(Ω) * (residuals)
+            rss[i] = transpose(residuals) * (residuals)
         end
         AIC::SVector{5,Float64x4} = _akaike_information_criteria.(rss, 𝑁, order)
         if rm_outlier === true
@@ -402,7 +402,7 @@ function _orthogonal_LSQ(
                     end
                     @simd for i ∈ eachindex(order)
                         residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
-                        rss[i] = transpose(residuals) * inv(Ω) * (residuals)
+                        rss[i] = transpose(residuals) * (residuals)
                     end
                     AIC = _akaike_information_criteria.(rss, 𝑁, order)
                 end
@@ -423,7 +423,13 @@ function _orthogonal_LSQ(
         for i ∈ eachindex(order)
             Λ_SE[1:i, i] = sqrt.(diag(view(VarΛX, 1:i, 1:i) * (mse[i])))
         end
-        tss::Float64x4 = transpose((y .- mean(y))) * inv(Ω) * (y .- mean(y))
+        χ²::MVector{5, Float64x4} = MVector{5, Float64x4}(undef)
+        @simd for i ∈ eachindex(order)
+                residuals = (y .- (view(X, :, 1:i) * Λ[1:i]))
+                χ²[i] = transpose(residuals) * inv(Ω) * (residuals)
+        end
+        χ²ᵣ::SVector{5,Float64} = _chi_squared_reduced.(χ², 𝑁, order  .+ 1)
+        tss::Float64x4 = transpose((y .- mean(y))) * (y .- mean(y))
         rmse::SVector{5, Float64} = sqrt.(mse)
         nrmse::SVector{5, Float64} = rmse ./ (maximum(y) - minimum(y))
         R²::SVector{5, Float64} = 1 .- (rss ./ (tss))
@@ -447,8 +453,8 @@ function _orthogonal_LSQ(
             R²ₒₚ,
             rmse,
             nrmse,
-            Float64.(rss),
-            Float64.(mse),
+            χ²,
+            χ²ᵣ,
             AIC,
             AICw,
             BIC,
