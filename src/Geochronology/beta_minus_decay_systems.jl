@@ -14,13 +14,13 @@ export ageRbSr, RbSrAgeNorm, RbSrAgeInv, confidence_interval, inflate_ci, inflat
 """
 function ageRbSr(
     β₁::AbstractFloat,
-    β₀::AbstractFloat = 0.0,
-    β₁_se::AbstractFloat = 0.0,
-    β₀_se::AbstractFloat = 0.0,
-    σᵦ₁ᵦ₀::AbstractFloat = 0.0;
-    inverse::Bool = false,
-    se_level_in::Int = 1,
-    se_level_out::Int = 2,
+    β₀::AbstractFloat=0.0,
+    β₁_se::AbstractFloat=0.0,
+    β₀_se::AbstractFloat=0.0,
+    σᵦ₁ᵦ₀::AbstractFloat=0.0;
+    inverse::Bool=false,
+    se_level_in::Int=1,
+    se_level_out::Int=2,
 )
     if inverse == false
         if .==(β₁, 0.0) == true
@@ -84,7 +84,7 @@ function ageRbSr(
     return age, age_se
 end
 
-function ageRbSr(fit::ErrorsInVariablesRegression; inverse = true, se_level_out::Integer = 2)
+function ageRbSr(fit::ErrorsInVariablesRegression; inverse=true, se_level_out::Integer=2)
     if inverse == false
         age, age_se = RbSrAgeNorm(fit.beta1, fit.beta1_se)
         age_se = se_level_out * age_se
@@ -95,7 +95,7 @@ function ageRbSr(fit::ErrorsInVariablesRegression; inverse = true, se_level_out:
     return age, age_se
 end
 
-function RbSrAgeNorm(β₁::AbstractFloat, β₁_se::AbstractFloat = 0.0)
+function RbSrAgeNorm(β₁::AbstractFloat, β₁_se::AbstractFloat=0.0)
     if .==(β₁, 0.0) == true
         throw(
             ArgumentError(
@@ -103,17 +103,17 @@ function RbSrAgeNorm(β₁::AbstractFloat, β₁_se::AbstractFloat = 0.0)
             ),
         )
     end
-    date = log(β₁ + 1) / λRb87
-    date_se = abs(log(β₁_se + 1) / λRb87)
+    date = log(β₁ + 1) / LAMBDA_Rb87
+    date_se = abs(log(β₁_se + 1) / LAMBDA_Rb87)
     return date, date_se
 end
 
 function RbSrAgeInv(
     β₀::AbstractFloat,
     β₁::AbstractFloat,
-    β₀_se::AbstractFloat = 0.0,
-    β₁_se::AbstractFloat = 0.0,
-    σᵦ₁ᵦ₀::AbstractFloat = 0.0,
+    β₀_se::AbstractFloat=0.0,
+    β₁_se::AbstractFloat=0.0,
+    σᵦ₁ᵦ₀::AbstractFloat=0.0,
 )
     if .==(β₀, 0.0) == true || .==(β₁, 0.0) == true
         throw(
@@ -123,21 +123,21 @@ function RbSrAgeInv(
         )
     end
     ratio = inv(-β₀ / β₁)
-    date = log(ratio + 1) / λRb87
+    date = log(ratio + 1) / LAMBDA_Rb87
     ratio_se = ratio * sqrt((β₀_se / β₀)^2 + (β₁_se / β₁)^2 - 2 * σᵦ₁ᵦ₀ / (β₀ * β₁))
     date_se = abs(
-        log(ratio_se + (β₀^2 * β₀_se^2 + β₁^2 * β₁_se^2 + 2 * β₀ * β₁ * σᵦ₁ᵦ₀) + 1) / λRb87,
+        log(ratio_se + (β₀^2 * β₀_se^2 + β₁^2 * β₁_se^2 + 2 * β₀ * β₁ * σᵦ₁ᵦ₀) + 1) / LAMBDA_Rb87,
     )
     return date, date_se
 end
 
-function confidence_interval(se, n; se_level = 1, ci_level = 0.95)
+function confidence_interval(se, n; se_level=1, ci_level=0.95)
     return (se / se_level) * cquantile(TDist(n - 2), (1 - ci_level) / 2)
 end
 
 function inflate_se(se, χ²ᵣ)
     return se * sqrt(χ²ᵣ)
 end
-function inflate_ci(se, χ²ᵣ, n; se_level = 1, ci_level = 0.95)
+function inflate_ci(se, χ²ᵣ, n; se_level=1, ci_level=0.95)
     return (se / se_level) * cquantile(TDist(n - 2), (1 - ci_level) / 2) * sqrt(χ²ᵣ)
 end

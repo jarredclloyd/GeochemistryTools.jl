@@ -147,7 +147,7 @@ Algorithms available are `"mahon"` and `"york"`.
     numeric value, or as a vector of the initial and its standard error (same `se_level_in` as input data). E.g. initial =
     "MDCInv", initial = 0.72, OR initial = [0.72, 0.01].
 
-      + Dictionaries available are `dict_sr87_sr86i`
+      + Dictionaries available are `INITIAL_Sr`
       + For a full list of available keys in any dictionary type `keys(<dict_name>)`
 
 # Example
@@ -171,28 +171,28 @@ https://doi.org/10.1016/j.ijms.2023]].117053
 """
 function fit_eivlr(
     df::AbstractDataFrame,
-    algorithm::AbstractString = "mahon";
-    se_level_in::Integer = 2,
-    se_type::AbstractString = "abs",
-    initial::Any = nothing,
+    algorithm::AbstractString="mahon";
+    se_level_in::Integer=2,
+    se_type::AbstractString="abs",
+    initial::Any=nothing,
 )
     dfCols::Int = ncol(df)
     dfRows::Int = nrow(df)
     if initial !== nothing
-        if isa(initial, AbstractString) == true && haskey(dict_sr87_sr86i, initial) == true
+        if isa(initial, AbstractString) == true && haskey(INITIAL_Sr, initial) == true
             if algorithm .== "mahon"
                 initial = [
                     0,
                     0,
-                    deepcopy(dict_sr87_sr86i[initial])[1],
-                    deepcopy(dict_sr87_sr86i[initial])[2] * se_level_in,
+                    copy(INITIAL_Sr[initial])[1],
+                    copy(INITIAL_Sr[initial])[2] * se_level_in,
                 ]
             else
                 initial = [
                     1e-12,
                     1e-12,
-                    deepcopy(dict_sr87_sr86i[initial])[1],
-                    deepcopy(dict_sr87_sr86i[initial])[2] * se_level_in,
+                    copy(INITIAL_Sr[initial])[1],
+                    copy(INITIAL_Sr[initial])[2] * se_level_in,
                 ]
             end
         elseif length(initial) == 1 && isa(initial, AbstractFloat)
@@ -227,7 +227,7 @@ Or input a single numeric value or two-length numeric vector:
 
 For a full list of available reference material keys in a relevant dictionary: keys(<dict_name>)
 
-Dictionaries currently available are `dict_sr87_sr86i`
+Dictionaries currently available are `INITIAL_Sr`
 """,
                 ),
             )
@@ -298,38 +298,38 @@ end
 function linear_standarderror(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
-    se_level::Integer = 1,
+    se_level::Integer=1,
 )
     X = hcat(repeat([1.0], length(x)), x)
-    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit. covariance_beta fit.beta1_se^2]
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta fit.beta1_se^2]
     return vec(
-        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* se_level
+        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims=2)) .* se_level
     )
 end
 function linear_confidenceband(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
-    confidence_level::AbstractFloat = 0.95,
+    confidence_level::AbstractFloat=0.95,
 )
     ν = fit.n_observations - 2
     tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
     X = hcat(repeat([1.0], length(x)), x)
-    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta fit.beta1_se^2]
     return vec(
-        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims = 2)) .* tvalue
+        sqrt.(fit.reduced_chi_squared .* sum(X .* (X * VarCovar); dims=2)) .* tvalue
     )
 end
 
 function linear_predictionband(
     x::AbstractVector,
     fit::ErrorsInVariablesRegression;
-    confidence_level::AbstractFloat = 0.95,
+    confidence_level::AbstractFloat=0.95,
 )
     ν = fit.n_observations - 2
     tvalue = cquantile(TDist(ν), (1 - confidence_level) / 2)
     X = hcat(repeat([1.0], length(x)), x)
-    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta  fit.beta1_se^2]
+    VarCovar = [fit.beta0_se^2 fit.covariance_beta; fit.covariance_beta fit.beta1_se^2]
     return vec(
-        sqrt.(fit.reduced_chi_squared[order + 1] .* (1 .+ sum(X .* (X * VarCovar); dims = 2))) .* tvalue,
+        sqrt.(fit.reduced_chi_squared[order+1] .* (1 .+ sum(X .* (X * VarCovar); dims=2))) .* tvalue,
     )
 end

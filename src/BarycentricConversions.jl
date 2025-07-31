@@ -48,7 +48,7 @@ julia> ternary(1, 0, 0, 1)
 ```
 """
 function ternary(a::Real, b::Real, c::Real, d::Real)
-    x = (c + 1 - b)/2
+    x = (c + 1 - b) / 2
     y = √3 / 2 * a + √3 / 6 * d
     z = √6 / 3 * d
     return (x, y, z)

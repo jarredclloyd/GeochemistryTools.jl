@@ -12,7 +12,8 @@ International Journal of Research and Reviews in Applied Sciences, 11(3)
 =#
 
 # function exports
-export geomean_zeros, geovar_zeros, geostd_zeros, geosem_zeros, deltalognormal
+export geomean_zeros,
+    geovar_zeros, geostd_zeros, geosem_zeros, deltalognormal, pseudolog, pseudolog_undo
 
 """
     geomean_zeros(x::AbstractVector)
@@ -187,11 +188,32 @@ end
 
     Compute the mean and variance of a delta-lognormal distribution from 'x'
 """
-function deltalognormal(x::AbstractVector)
-    𝑁 = length(x)
-    dlog = Distributions.fit(LogNormal, x[x .> 0])
-    𝜃 = length(x[x .== 0]) / 𝑁
-    γ = (1-𝜃)dlog.μ
-    δ = (1-𝜃)dlog.σ^2 + 𝜃*(1-𝜃)dlog.μ^2
-    return (exp(γ), exp(δ))
+function deltalognormal(x::AbstractVector{T}) where {T<:Real}
+    𝑁 = length(x[isfinite.(x)])
+    𝑁z = length(x[isfinite.(x) .&& x .== 0])
+    if 𝑁z == 𝑁
+        γ = 0
+        δ = 0
+        return γ, δ
+    else
+        𝜃 = 𝑁z / 𝑁
+        if 𝑁 - 𝑁z == 1
+            μ, σ = log(x[isfinite.(x) .&& x .> 0][1]), log(1.0)
+            γ = (1 - 𝜃) * exp(μ + σ^2 / 2)
+            δ = (1 - 𝜃) * exp(2 * μ + σ^2) * exp(σ^2 - (1 - 𝜃))
+        else
+            dlog = Distributions.fit(LogNormal, x[isfinite.(x) .&& x .> 0])
+            γ = (1 - 𝜃) * exp(dlog.μ + dlog.σ^2 / 2)
+            δ = (1 - 𝜃) * exp(2 * dlog.μ + dlog.σ^2) * exp(dlog.σ^2 - (1 - 𝜃))
+        end
+        return γ, δ
+    end
+end
+
+function pseudolog(x, σ = 0.05, base = ℯ)
+    return asinh(x / (2 * σ) / log(base))
+end
+
+function pseudolog_undo(x, σ = 0.05, base = ℯ)
+    return 2 * σ * sinh(x * log(base))
 end

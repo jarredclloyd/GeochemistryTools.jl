@@ -1,5 +1,9 @@
 function _olkin_pratt(R²::Real, 𝑛::Integer, predictors::Integer)
-    if R² ≥ Base.rtoldefault(typeof(R²))
+    if isfinite(R²) == false
+        return NaN
+    elseif R² ≤ Base.rtoldefault(Float64)
+        return zero(Float64)
+    elseif R² ≥ Base.rtoldefault(Float64)
         z = 1 - R²
         c = (𝑛 - predictors + 1) / 2
         if z == 0
@@ -10,11 +14,7 @@ function _olkin_pratt(R²::Real, 𝑛::Integer, predictors::Integer)
             _₂F₁value = _hypergeometric2F1_taylor(1, 1, c, z)
         end
         OP_R² = 1 - ((𝑛 - 3) / (𝑛 - predictors - 1)) * z * _₂F₁value
-    end
-    if R² ≤ Base.rtoldefault(typeof(R²)) || OP_R² ≤ Base.rtoldefault(typeof(R²))
-        return zero(typeof(R²))
-    else
-        return OP_R²
+        OP_R² = OP_R² ≤ Base.rtoldefault(Float64) ? 0 : OP_R²
     end
 end
 
@@ -70,12 +70,12 @@ function _reduced_chi_squared_ci(dof::Integer, confidence_level::AbstractFloat =
 end
 
 function _hypergeometric2F1_taylor(a::Real, b::Real, c::Real, z::Real, tol = eps(Float64))
-    Cⱼ, Sⱼ = 1, 1
+    Cⱼ, Sⱼ = Float64x4(1), Float64x4(1)
     j = 0
     while abs(Cⱼ) / abs(Sⱼ) > tol && j ≤ 1000
         Cⱼ *= (a + j) * (b + j) / (c + j) * z / (j + 1)
         Sⱼ += Cⱼ
         j += 1
     end
-    return Sⱼ
+    return Float64(Sⱼ)
 end

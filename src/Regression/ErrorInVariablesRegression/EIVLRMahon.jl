@@ -31,7 +31,7 @@ Input df as a DataFrame of 4 of 5 columns wide with column order (x, σx, y, σy
     numeric value, or as a vector of the initial and its standard error (same `se_level_in` as input data). E.g. initial =
     "MDCInv", initial = 0.72, OR initial = [0.72, 0.01].
 
-      + Dictionaries available are `dict_sr87_sr86i`
+      + Dictionaries available are `INITIAL_Sr`
       + For a full list of available keys ∈ any dictionary type `keys(<dict_name>)`
 
 # References
@@ -45,10 +45,10 @@ https://doi.org/10.1016/j.ijms.2023]].117053
 """
 function fit_mahon(
     df::AbstractDataFrame;
-    se_level_in::Int = 2,
-    se_level_out::Int = 2,
-    se_type::AbstractString = "abs",
-    initial::Any = nothing,
+    se_level_in::Int=2,
+    se_level_out::Int=2,
+    se_type::AbstractString="abs",
+    initial::Any=nothing,
 ) end
 
 """
@@ -61,7 +61,7 @@ function _eivlr_mahon(
     σx::Vector{<:Real},
     y::Vector{<:Real},
     σy::Vector{<:Real},
-    ρxy::Union{Nothing, Vector{<:Real}} = nothing,
+    ρxy::Union{Nothing,Vector{<:Real}}=nothing,
 )
     if _check_equal_length(x, σx, y, σy) != true
         throw(ArgumentError("The length of x, σx, y and σy must be the same."))
@@ -173,8 +173,8 @@ function _eivlr_mahon_fixedpoint(
     σx::AbstractArray,
     y::AbstractArray,
     σy::AbstractArray,
-    ρxy = nothing;
-    x₀y₀::Tuple{Real,Real,Real,Real} = (0, 0, 0, 0),
+    ρxy=nothing;
+    x₀y₀::Tuple{Real,Real,Real,Real}=(0, 0, 0, 0),
 )
     if _check_equal_length(x, σx, y, σy) != true
         throw(ArgumentError("The length of x, σx, y and σy must be the same."))

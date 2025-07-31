@@ -229,25 +229,25 @@ end
 
 #Base functions
 function ratioPb207U235(age)
-    exp(λU235 * age) - 1
+    exp(LAMBDA_U235 * age) - 1
 end
 
 function ratioPb206U238(age)
-    exp(λU238 * age) - 1
+    exp(LAMBDA_U238 * age) - 1
 end
 
 function ratioPb207Pb206(age)
-    ((exp(λU235 * age) - 1) / (exp(λU238 * age) - 1)) * inv(U238U235)
+    ((exp(LAMBDA_U235 * age) - 1) / (exp(LAMBDA_U238 * age) - 1)) * inv(RATIO_U238U235)
 end
 
 function ratioprimePb207Pb206(age) #  d/dt(((e^(λU235 * age) - 1)/(e^(λU238 * age) - 1))/137.818)
-    inv(U238U235) * ((λU235) * exp(λU235 * age) * (exp(λU238 * age) - 1) - λU238 *
-    exp(λU238 * age) * (exp(λU235 * age) - 1)) / (exp(λU238 * age) - 1)^2
+    inv(RATIO_U238U235) * ((LAMBDA_U235) * exp(LAMBDA_U235 * age) * (exp(LAMBDA_U238 * age) - 1) - LAMBDA_U238 *
+                                                                                                   exp(LAMBDA_U238 * age) * (exp(LAMBDA_U235 * age) - 1)) / (exp(LAMBDA_U238 * age) - 1)^2
 end
 
 function agePb206U238(ratio)
     if ratio > 0
-        log(ratio + 1) / λU238
+        log(ratio + 1) / LAMBDA_U238
     else
         throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
         Please check your data."))
@@ -256,7 +256,7 @@ end
 
 function agePb207U235(ratio)
     if ratio > 0
-        log(ratio + 1) / λU235
+        log(ratio + 1) / LAMBDA_U235
     else
         throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
         Please check your data."))
@@ -296,9 +296,9 @@ function aitchisonTW(rU238Pb206, rPb207Pb206, aPb206U238, aPb207Pb206)
     if rU238Pb206 > 0.0 && rPb207Pb206 > 0.0
         signPb = sign(aPb207Pb206)
         signU = sign(aPb206U238)
-        (signPb * signU) * ((log(rU238Pb206) - log(exp(λU238 * abs(aPb207Pb206)) - 1)) * sin(atan((log(rPb207Pb206) -
-        log(inv(U238U235) * (exp(λU235 * abs(aPb206U238)) - 1) / (exp(λU238 * abs(aPb206U238)) - 1))) /
-        (log(rU238Pb206) - log(exp(λU238 * abs(aPb207Pb206)) - 1)))))
+        (signPb * signU) * ((log(rU238Pb206) - log(exp(LAMBDA_U238 * abs(aPb207Pb206)) - 1)) * sin(atan((log(rPb207Pb206) -
+                                                                                                         log(inv(RATIO_U238U235) * (exp(LAMBDA_U235 * abs(aPb206U238)) - 1) / (exp(LAMBDA_U238 * abs(aPb206U238)) - 1))) /
+                                                                                                        (log(rU238Pb206) - log(exp(LAMBDA_U238 * abs(aPb207Pb206)) - 1)))))
     else
         throw(ArgumentError("A negative or zero value ratio is not possible for geochemical (i.e., compositional) data.
         Please check your data."))

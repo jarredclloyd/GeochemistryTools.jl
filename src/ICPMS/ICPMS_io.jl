@@ -126,6 +126,7 @@ function load_agilent(
     central_tendency::AbstractString = "deltalognormal",
     spot_size_filename::Bool = false,
     spot_size_value::Union{Missing,Integer} = missing,
+    verbose::Bool = false,
 )
     if aggregate_files === false && sample === nothing
         throw(
@@ -145,16 +146,16 @@ function load_agilent(
         date_time_constructor = date_time_constructor,
         day_first = day_first,
     )
-     if lowercase.(central_tendency) == "gmean"
-            ct_alg = geomean_zeros
-        elseif lowercase.(central_tendency) == "median"
-            ct_alg = median
-        elseif lowercase.(central_tendency) == "amean"
-            ct_alg = mean
-        elseif lowercase.(central_tendency) == "deltalognormal"
-            ct_alg =  deltalognormal
+    if lowercase.(central_tendency) == "gmean"
+        ct_alg = geomean_zeros
+    elseif lowercase.(central_tendency) == "median"
+        ct_alg = median
+    elseif lowercase.(central_tendency) == "amean"
+        ct_alg = mean
+    elseif lowercase.(central_tendency) == "deltalognormal"
+        ct_alg = deltalognormal
     end
-    for file in files
+    for file ∈ files
         if spot_size_filename === true
             spot_size = tryparse(
                 Int,
@@ -168,13 +169,7 @@ function load_agilent(
             spot_size = spot_size_value
         end
         head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
-        sample_name = rstrip(
-            chop(
-                analysis_name;
-                tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
-            ),
-        )
+        sample_name, analysis_name = _analysis_name(head_info[1]; adjustforlineread = true)
         analysis_time = rstrip(
             chop(
                 head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
@@ -186,6 +181,9 @@ function load_agilent(
         analysis_time = DateTime(analysis_time, date_time_format)
         if Dates.Year(analysis_time) < Dates.Year(2000)
             analysis_time = analysis_time + Dates.Year(2000)
+        end
+        if verbose === true
+            println("processing $file")
         end
         df = CSV.read(
             file,
@@ -212,6 +210,7 @@ function load_agilent(
         end
         if automatic_times == true && isnothing(auto_times) == true
             df = nothing
+            @warn "No signal defined for $file"
         else
             df = select!(df, r"Time", "total_signal", r"" * cps_column1, r"" * cps_column2)
             rename!(df, ["signal_time", "total_cps", cps_column1, cps_column2])
@@ -250,8 +249,11 @@ function load_agilent(
                 df,
                 Cols(cps_column1 * "_gbsub", cps_column2 * "_gbsub", :signal_time) =>
                     ByRow(
-                        (cps1, cps2, time) ->
-                            time ≤ laser_time && iszero(cps2) == true ? 0.0 : cps1 / cps2,
+                        (cps1, cps2, time) -> if time ≤ laser_time && iszero(cps2) == true
+                            0.0
+                        else
+                            cps1 / cps2
+                        end,
                     ) => :ratio,
             )
             insertcols!(
@@ -267,8 +269,10 @@ function load_agilent(
                     ),
             )
             if centre == true
-                centre_value = ct_alg(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio])[1]
-                df.ratio_centred = 1.0 .+ (df.ratio .- centre_value)
+                centre_value = ct_alg(
+                    pseudolog.(df[stable_time .≤ df.signal_time .≤ signal_end, :ratio],),
+                )[1]
+                df.ratio_centred = 1.0 .+ (pseudolog.(df.ratio) .- centre_value)
                 df.ratio_centred_σ = abs.(df.ratio_centred) .* (df.ratio_σ ./ df.ratio)
             end
             if trim == true
@@ -363,15 +367,9 @@ function load_agilent2(
         date_time_constructor = date_time_constructor,
         day_first = day_first,
     )
-    for file in files
+    for file ∈ files
         head_info = split(readuntil(file, "Time "), "\n")
-        analysis_name = chop(head_info[1]; head = findlast("\\", head_info[1])[1], tail = 3)
-        sample_name = rstrip(
-            chop(
-                analysis_name;
-                tail = length(analysis_name) - findlast("-", analysis_name)[1] + 1,
-            ),
-        )
+        sample_name, analysis_name = _analysis_name(head_info[1]; adjustforlineread = true)
         analysis_time = rstrip(
             chop(
                 head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
@@ -455,14 +453,15 @@ julia> automatic_laser_times(G00.time, G00.signal_total)
 ```
 """
 function automatic_laser_times(
-    time::AbstractVector{<:Real},
+    signal_time::AbstractVector{<:Real},
     signal::AbstractVector{<:Real};
-    bandwidth::Integer = UInt8(cld(sqrt(length(signal)), 2)),
+    bandwidth::Integer = Integer(cld(sqrt(length(signal)), 2)),
     gas_blank_trim::Integer = 5,
     verbose::Bool = false,
 )
     medians = Vector{Float64}(undef, Integer(cld(length(signal), bandwidth)))
-    for i in eachindex(medians)
+    despiked = despike(signal_time, signal)
+    for i ∈ eachindex(medians)
         medians[i] = median(
             signal[round(UInt, max((i - 1) * bandwidth, firstindex(signal))):round(
                 UInt,
@@ -475,77 +474,137 @@ function automatic_laser_times(
             @view(medians[begin:round(UInt, end / 2)]),
             @view(medians[round(UInt, end / 2):end]),
         ),
-    ) > 0.05 || pvalue(JarqueBeraTest(signal; adjusted = true)) > 0.05
+    ) > 0.05 ||
+       pvalue(JarqueBeraTest(despiked[begin:round(UInt, 3 * (end / 4))]; adjusted = true)) >
+       0.05
         println("no signal detected")
+        return ((0, NaN), (0, NaN), (0, NaN), (0, NaN), (0, NaN))
     else
-        z = Array{Float64}(undef, length(signal), 3)
-        for i in eachindex(signal)
-            z[i, 1] = if i < bandwidth
-                geomean_zeros(@view(signal[begin:i]))
-            else
-                geomean_zeros(@view(signal[(i - bandwidth + 1):i]))
-            end
-            z[i, 2] = if i < bandwidth
-                geovar_zeros(@view(signal[begin:i]))
-            else
-                geovar_zeros(@view(signal[(i - bandwidth + 1):i]))
-            end
-            z[i, 3] = if i < 3
-                Inf
+        z = Array{Float64}(undef, length(signal), 5)
+
+        for i ∈ eachindex(signal)
+            z[i, 1] = mean(
+                @view(signal[max(i - 1, firstindex(signal)):min(i + 1, lastindex(signal))])
+            )[1]
+            z[i, 2] =
+                i == 1 ? 0 : std(@view(z[max(i - bandwidth, firstindex(signal)):i, 1]))
+            z[i, 3] = if i ≤ 2
+                1.0
             else
                 pvalue(OneSampleTTest(@view(z[2:i, 2]), mean(@view(z[2:(i - 1), 2]))))
             end
         end
-        z[:,3] = replace!(x -> isnan(x) ? Inf : x, z[:,3])
         laser_start_ind = findmin(@view(z[:, 3]))[2]
-        laser_start_time = time[laser_start_ind]
-        q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
-        aerosol_arrival_ind =
-            laser_start_ind + findfirst(≥(q[2]), @view(z[laser_start_ind:end, 1])) - 1
-        aerosol_arrival_time = time[aerosol_arrival_ind]
-        q = quantile(@view(z[aerosol_arrival_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
-        signal_start_ind = min(
-            aerosol_arrival_ind + findfirst(>(q[4]), @view(z[aerosol_arrival_ind:end, 1])),
-            lastindex(time),
-        )
-        q = quantile(@view(z[signal_start_ind:end, 2]), [0.05, 0.25, 0.5, 0.75, 0.95])
-        signal_end_ind = min(findlast(<(q[5]), @view(z[:, 2])), lastindex(time))
-        signal_start_time = time[signal_start_ind]
-        signal_end_time = time[signal_end_ind]
-        slope = sign(
-            GeochemistryTools._GLS(
-                @view(time[signal_start_ind:signal_end_ind]),
-                @view(signal[signal_start_ind:signal_end_ind]),
-                1,
-            ).beta[2],
-        )
-        if slope > 0 || signal_end_time - signal_start_time < 10
-            q = quantile(@view(z[laser_start_ind:end, 1]), [0.05, 0.25, 0.5, 0.75, 0.95])
-            aerosol_arrival_ind =
-                laser_start_ind + findfirst(≥(q[1]), @view(z[laser_start_ind:end, 1])) - 1
-            aerosol_arrival_time = time[aerosol_arrival_ind]
-            q = quantile(
-                @view(z[aerosol_arrival_ind:end, 1]),
-                [0.05, 0.25, 0.5, 0.75, 0.95],
-            )
-            signal_start_ind = min(
-                aerosol_arrival_ind +
-                findfirst(<(q[1]), @view(z[aerosol_arrival_ind:end, 1])),
-                lastindex(time),
-            )
-            q = quantile(@view(z[signal_start_ind:end, 2]), [0.05, 0.25, 0.5, 0.75, 0.95])
-            signal_end_ind = min(findlast(<(q[5]), @view(z[:, 2])), lastindex(time))
-            signal_start_time = time[signal_start_ind]
-            signal_end_time = time[signal_end_ind]
+        z[laser_start_ind:end, 1] .=
+            whittaker_smooth(signal[laser_start_ind:end]; lambda = bandwidth)
+
+        for i ∈ eachindex(signal)
+            z[i, 4] = if i ≤ laser_start_ind
+                0.0
+            else
+                z[min(i + 1, lastindex(signal)), 1] -
+                z[max(i - 1, firstindex(signal)), 1] /
+                (min(i + 1, lastindex(signal)) - max(i - 1, firstindex(signal)))
+            end
         end
+        for i ∈ eachindex(signal)
+            z[i, 5] = if i ≤ laser_start_ind
+                0.0
+            else
+                atan(abs((z[i-1, 4] - z[i, 4]) / (1 + (z[i-1, 4] * z[i, 4]))))
+            end
+        end
+        for i ∈ eachindex(signal)
+            z[i, 4] = if i ≤ laser_start_ind || i == lastindex(signal)
+                0.0
+            else
+                if z[i-1,5] > z[i, 5] && z[i, 5] < z[i+1, 5]
+                    1.0
+                else
+                    0.0
+                end
+            end
+        end
+        aerosol_arrival_ind = findnext(==(1.0), z[:, 4], laser_start_ind)
+        z[aerosol_arrival_ind:end, 1] .=
+            whittaker_smooth(signal[aerosol_arrival_ind:end]; lambda = bandwidth)
+
+
+        q = quantile(z[aerosol_arrival_ind:(end), 1], [0.05, 0.95])
+        signal_indices = sort(findall(x -> q[1] ≤ x ≤ q[2], z[:, 1]))
+        signal_indices = signal_indices[signal_indices .> aerosol_arrival_ind]
+        signal_start_ind = signal_indices[begin]
+        signal_end_ind = signal_indices[end - 1]
+
+        ind_continuity = Vector{Bool}(undef, length(signal_indices))
+        for i ∈ eachindex(signal_indices)
+            ind_continuity[i] =
+                if i == 1 || (signal_indices[i] - signal_indices[i - 1]) == 1
+                    true
+                else
+                    false
+                end
+        end
+
+        if signal_end_ind - signal_start_ind ≥ 5
+            signal_fit = GeochemistryTools._GLS(
+                signal_start_ind:signal_end_ind,
+                z[signal_start_ind:signal_end_ind, 1],
+                2,
+            )
+            f(x) = signal_fit.beta[1] + signal_fit.beta[2] * x + signal_fit.beta[3] * x^2
+            for i ∈ eachindex(signal)
+                z[i, 5] = if i ≤ signal_start_ind
+                    1.0
+                else
+                    z[i, 1] / f(i)
+                end
+            end
+            alt_signal_end =
+                findlast(>(quantile(z[signal_start_ind:signal_end_ind, 5], 0.05)), z[:, 5])
+            if alt_signal_end != signal_end_ind &&
+            ind_continuity[signal_indices .== signal_end_ind][1] === false
+                signal_end_ind = alt_signal_end
+            end
+
+
+            if ShapiroWilkTest(z[signal_start_ind:signal_end_ind, 1]).W < 0.8
+                alt_signal_starts =
+                    findall(<(quantile(z[signal_start_ind:signal_end_ind, 3], 0.05)), z[:, 3])
+                alt_signal_start = findnext(
+                    >(quantile(z[signal_start_ind:signal_end_ind, 3], 0.95)),
+                    z[:, 3],
+                    alt_signal_starts[findfirst(>(signal_start_ind), alt_signal_starts)],
+                )
+                alt_signal_end =
+                    alt_signal_starts[findfirst(>(signal_start_ind), alt_signal_starts)] -
+                    bandwidth
+                if !isnothing(alt_signal_start)
+                    if sum(z[signal_start_ind:alt_signal_end, 1]) >
+                    sum(z[alt_signal_start:signal_end_ind, 1])
+                        signal_end_ind = alt_signal_end
+                    else
+                        signal_start_ind = alt_signal_start
+                    end
+                end
+            end
+        else
+            @warn "signal appears to be exceedingly short"
+        end
+
         gas_blank_end_ind = max(
-            laser_start_ind - (round(Int, gas_blank_trim / (time[2] - time[1]))),
-            firstindex(time),
+            laser_start_ind -
+            (round(Int, gas_blank_trim / (signal_time[2] - signal_time[1]))),
+            firstindex(signal_time),
         )
+        laser_start_time = signal_time[laser_start_ind]
+        aerosol_arrival_time = signal_time[aerosol_arrival_ind]
+        signal_start_time = signal_time[signal_start_ind]
+        signal_end_time = signal_time[signal_end_ind]
         if verbose == true
             println(
                 "gas blank: ",
-                (time[begin], time[gas_blank_end_ind]),
+                (signal_time[begin], signal_time[gas_blank_end_ind]),
                 [1, gas_blank_end_ind],
             )
             println("laser start: ", (laser_start_time, laser_start_ind))
@@ -557,11 +616,124 @@ function automatic_laser_times(
             )
         end
         return (
-            (gas_blank_end_ind, time[gas_blank_end_ind]),
+            (gas_blank_end_ind, signal_time[gas_blank_end_ind]),
             (laser_start_ind, laser_start_time),
             (aerosol_arrival_ind, aerosol_arrival_time),
             (signal_start_ind, signal_start_time),
             (signal_end_ind, signal_end_time),
         )
     end
+end
+
+function _analysis_name(
+    filestring::AbstractString;
+    headpattern::AbstractString = ".b\\",
+    tailpattern::AbstractString = ".d",
+    analysis_sample_separator::AbstractString = "-",
+    padlength::Integer = 3,
+    adjustforlineread::Bool = false,
+)
+
+    analysis_string = chop(
+        filestring;
+        head = findlast(headpattern, filestring)[end],
+        tail = adjustforlineread + length(findlast(tailpattern, filestring)),
+    )
+
+    sample_name = rstrip(
+        chop(
+            analysis_string;
+            tail = adjustforlineread + length(analysis_string) -
+                   findlast(analysis_sample_separator, analysis_string)[begin],
+        ),
+    )
+
+    analysis_number = lstrip(
+        chop(
+            analysis_string;
+            head = findlast(analysis_sample_separator, analysis_string)[end],
+            tail = 0,
+        ),
+    )
+
+    analysis_string = (sample_name * "-" * lpad(analysis_number, padlength, "0"))
+
+    return (sample_name, analysis_string)
+end
+
+# Developmental Change to IO for LAICIPMS data to decrease file size and read time
+
+function _dev_read_agilent(
+    file::AbstractString;
+    material::AbstractString = "unspecified",
+    analysis_type::AbstractString = "unknown",
+    laser_fluence::Union{Real,Quantity} = Inf,
+    laser_repetition_rate::Union{Real,Quantity} = Inf,
+    spot_diameter::Union{Real,Quantity} = Inf,
+    date_time_constructor::AbstractString = "automatic",
+    day_first::Bool = true,
+    header_row::Integer = 4,
+    first_row::Integer = 5,
+    footer_skip::Integer = 3,
+)
+
+    date_time_format::DateFormat = date_format_test(
+        file;
+        date_time_constructor = date_time_constructor,
+        day_first = day_first,
+    )
+
+    head_info = split(readuntil(file, "Time "), "\n")
+    analysis_name, sample_name = _analysis_name(head_info[1]; adjustforlineread = true)
+    analysis_time = rstrip(
+        chop(
+            head_info[3][(findfirst(":", head_info[3])[1] + 2):(findlast(
+                "using",
+                head_info[3],
+            )[1] - 1)],
+        ),
+    )
+    analysis_time = DateTime(analysis_time, date_time_format)
+    if Dates.Year(analysis_time) < Dates.Year(2000)
+        analysis_time = analysis_time + Dates.Year(2000)
+    end
+    data = CSV.read(
+        file,
+        DataFrame;
+        header = header_row,
+        skipto = first_row,
+        footerskip = footer_skip,
+        ignoreemptyrows = true,
+        normalizenames = true,
+        delim = ',',
+    )
+    rename!(data, "Time_Sec_" => "signal_time")
+    transform!(data, AsTable(Not(1)) => ByRow(sum) => :total_signal)
+    auto_times = automatic_laser_times(data[!, 1], data[!, :total_signal])
+    gas_blank_start, gas_blank_end, laser_on, stable_time, signal_start, signal_end =
+        ((0, 1), auto_times...)
+    laser_fluence = (laser_fluence)u"J/cm^2"
+    laser_repetition_rate = (laser_repetition_rate)u"Hz"
+    spot_diameter = (spot_diameter)u"μm"
+    gas_blanks = nothing
+
+    # return (sample, material, analysis_name, analysis_time, data)
+    return LAICPMSAnalysis(
+        sample_name,
+        material,
+        analysis_time,
+        analysis_name,
+        analysis_type,
+        laser_fluence,
+        laser_repetition_rate,
+        spot_diameter,
+        laser_on,
+        stable_time,
+        gas_blank_start,
+        gas_blank_end,
+        data,
+        gas_blanks,
+        signal_start,
+        signal_end,
+    )
 end

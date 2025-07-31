@@ -22,7 +22,7 @@ Input df as a DataFrame of 4 of 5 columns wide with column order (X, σx, y, σy
 - `initial::Any`: A value for the y-intercept. Can be input as a string key from an appropriate dictionary, as a single
     numeric value, or as a vector of the initial and its standard error (same `se_level_in` as input data). E.g. initial =
         "MDCInv", initial = 0.72, OR initial = [0.72, 0.01].
-    - Dictionaries available are `dict_sr87_sr86i`
+    - Dictionaries available are `INITIAL_Sr`
     - For a full list of available keys in any dictionary type `keys(<dict_name>)`
 
 # Example
@@ -38,16 +38,16 @@ Journal of Physics*, 72(3), doi:https://doi.org/10.1119/1.1632486.
 """
 function yorkfit(
     df::AbstractDataFrame;
-    se_level_in::Int = 2,
+    se_level_in::Int=2,
     # se_level_out::Int = 2,
-    se_type::AbstractString = "abs",
-    initial::Any = nothing,
+    se_type::AbstractString="abs",
+    initial::Any=nothing,
 )
     dfCols::Int = ncol(df)
     dfRows::Int = nrow(df)
     if initial !== nothing
-        if isa(initial, String) == true && haskey(dict_sr87_sr86i, initial) == true
-            initial = deepcopy(dict_sr87_sr86i[initial])
+        if isa(initial, String) == true && haskey(INITIAL_Sr, initial) == true
+            initial = copy(INITIAL_Sr[initial])
         elseif length(initial) == 1 && isa(initial, AbstractFloat)
             initial = [1e-15, 1e-15, initial, 0.01]
         elseif length(initial) == 2 && isa(initial[1], AbstractFloat) && isa(initial[2], AbstractFloat)
@@ -64,7 +64,7 @@ function yorkfit(
 
             For a full list of available reference material keys in a relevant dictionary: keys(<dict_name>)
 
-            Dictionaries currently available are `dict_sr87_sr86i`
+            Dictionaries currently available are `INITIAL_Sr`
             """))
         end
         if dfCols == 4
@@ -75,8 +75,8 @@ function yorkfit(
         end
     end
     if occursin('a', lowercase.(se_type)) == true ||
-        occursin("abs", lowercase.(se_type)) == true ||
-        occursin("absolute", lowercase.(se_type)) == true
+       occursin("abs", lowercase.(se_type)) == true ||
+       occursin("absolute", lowercase.(se_type)) == true
         if dfCols == 5
             yfit = _eivlr_york(
                 df[!, 1], df[!, 2] ./ se_level_in, df[!, 3], df[!, 4] ./ se_level_in, df[!, 5]
@@ -89,8 +89,8 @@ function yorkfit(
             throw(ArgumentError("Column width is not equal to 4 or 5. Some data is missing."))
         end
     elseif occursin('r', lowercase.(se_type)) == true ||
-        occursin("rel", lowercase.(se_type)) == true ||
-        occursin("relative", lowercase.(se_type)) == true
+           occursin("rel", lowercase.(se_type)) == true ||
+           occursin("relative", lowercase.(se_type)) == true
         if dfCols == 5
             yfit = _eivlr_york(
                 df[!, 1],
@@ -113,7 +113,7 @@ function yorkfit(
     return yfit
 end
 
-function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, σy::Vector{<:Real}, ρxy::Union{Nothing, Vector{<:Real}} = nothing)
+function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, σy::Vector{<:Real}, ρxy::Union{Nothing,Vector{<:Real}}=nothing)
     if _check_equal_length(x, σx, y, σy) != true
         throw(ArgumentError("The length of x, σx, y and σy must be the same."))
     end
@@ -129,8 +129,8 @@ function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, 
     βₑ::Float64 = β₁
 
     # weights
-    ωx::Vector{Float64} = @. 1.0 / σx ^ 2
-    ωy::Vector{Float64} = @. 1.0 / σy ^ 2
+    ωx::Vector{Float64} = @. 1.0 / σx^2
+    ωy::Vector{Float64} = @. 1.0 / σy^2
 
     # initial fit via York method
     α::Vector{Float64} = sqrt.(ωx .* ωy)
@@ -161,7 +161,7 @@ function _eivlr_york(x::Vector{<:Real}, σx::Vector{<:Real}, y::Vector{<:Real}, 
     u = xᵢ .- x̄
     β₁SE::Float64 = √(1 / sum(Ω .* u .^ 2))
     β₀SE::Float64 = √(1 / sum(Ω) + (x̄ * β₁SE)^2)
-    σᵦ₁ᵦ₀::Float64 = - x̄ * β₁SE^2
+    σᵦ₁ᵦ₀::Float64 = -x̄ * β₁SE^2
     χ²::Float64 = sum(Ω .* (y .- β₁ .* x .- β₀) .^ 2)
     ν::Int = 𝑁 > 2 ? 𝑁 - 2 : 1
     χ²ᵣ::Float64 = χ² / ν

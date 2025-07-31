@@ -1,20 +1,22 @@
+export LAICPMSAnalysis, LAICPMSSession
+
 struct LAICPMSAnalysis
-    session_date_start::Date
-    material::AbstractString
-    sample::AbstractString
-    analysis::AbstractString
-    analysis_time::Time
-    laser_fluence::AbstractFloat
-    laser_repetition_rate::Real
-    laser_on::AbstractFloat
-    laser_off::AbstractFloat
-    spot_diameter::Integer
-    gas_blank_start::Real
-    gas_blank_end::Real
-    gas_blanks::Vector{Real}
-    signal_start::Tuple{Real, Integer}
-    signal_end::Tuple{Real, Integer}
-    data::DataFrame
+    sample::Union{Nothing,AbstractString}
+    material::Union{Nothing,AbstractString}
+    analysis_time::Union{Nothing,DateTime}
+    analysis_name::Union{Nothing,AbstractString}
+    analysis_type::Union{Nothing,AbstractString}
+    laser_fluence::Union{Nothing,Quantity}
+    laser_repetition_rate::Union{Nothing,Quantity}
+    spot_diameter::Union{Nothing,Quantity}
+    laser_on::Union{Nothing,Tuple{Integer,Real}}
+    stable_signal::Union{Nothing,Tuple{Integer,Real}}
+    gas_blank_start::Union{Nothing,Tuple{Integer,Real}}
+    gas_blank_end::Union{Nothing,Tuple{Integer,Real}}
+    data::Union{Nothing,AbstractDataFrame}
+    gas_blanks::Union{Nothing,Vector{Tuple{Symbol,Real,Real}}}
+    signal_start::Union{Nothing,Tuple{Integer,Real}}
+    signal_end::Union{Nothing,Tuple{Integer,Real}}
 end
 
 struct LAICPMSSession
@@ -23,6 +25,7 @@ struct LAICPMSSession
     session_date_end::Date
     ICPMS_model::AbstractString
     laser_model::AbstractString
-    laser_wavelength::Real
-    laser_pulse_width::Real
+    laser_wavelength::Quantity
+    laser_pulse_width::Quantity
+    analyses::Vector{LAICPMSAnalysis}
 end
