@@ -67,13 +67,14 @@ Erb, D. (2022). pybaselines: A Python library of algorithms for the baseline cor
 experimental data.
 Zenodo. https://doi.org/10.5281/zenodo.7255880
 """
-function fit_base(data::DataFrame; intensity_col=:intensity, λ=Nothing)
+function fit_base(data::DataFrame; intensity_col=:intensity, λ=Nothing, method::Symbol=:derpsalsa)
+    @assert in(method, keys(pybaselines.whittaker)) "Supplied method not found in Whittaker baselines, use keys(pybaselines.whittaker) to look for vaild values."
     if λ == Nothing
-        output = pybaselines.whittaker.iarpls(data[!, intensity_col])
+        output = pybaselines.whittaker[method](data[!, intensity_col])
         data.baseline = output[1]
         data.corr_intensity = data[!, intensity_col] .- data[!, :baseline]
     elseif λ > 0
-        output = pybaselines.whittaker.iarpls(data[!, intensity_col], λ)
+        output = pybaselines.whittaker[method](data[!, intensity_col], λ)
         data.baseline = output[1]
         data.corr_intensity = data[!, intensity_col] .- data[!, :baseline]
     end
