@@ -1,7 +1,7 @@
 name = "GeochemistryTools"
 uuid = "353b66c2-bbc9-4dac-8f82-6fcd8c646e7a"
+version = "0.0.4-DEV"
 authors = ["Jarred C Lloyd"]
-version = "0.0.3-DEV"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
@@ -36,13 +36,14 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 [compat]
 Conda = "1.10"
 GenericLinearAlgebra = "0.3"
-IsotopeTable = "0.1"
-PeriodicTable = "1.2"
-PrettyTables = "2.4.0"
-PyCall = "1.96"
-SmallCollections = "0.4.1"
-StaticArrays = "1.9.13"
-Unitful = "1.22"
+IsotopeTable = "0.2"
+MultiFloats = "3.0"
+PeriodicTable = "1.0"
+PrettyTables = "3.0"
+PyCall = "1.0"
+SmallCollections = "0.5.0"
+StaticArrays = "1.0"
+Unitful = "1.0"
 julia = "1.10"
 
 [extras]
