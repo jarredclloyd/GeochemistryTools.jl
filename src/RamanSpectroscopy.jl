@@ -43,23 +43,23 @@ function load_raman(hostdir, sample::AbstractString;
 end
 
 """
-    fit_base(DataFrame; [intensity_col, λ])
+    fit_base(DataFrame; [intensity_col, lambda, method])
 
-Computes baseline and corrects intensities using the IarPLS algorithm.
+Computes baseline and corrects intensities using the Whittaker class algorithms.
 
 # Description
 Utilises pybaselines, as such requires PyCall and Conda to be installed. The
 GeochemistryTools.jl package will have addressed this on package add.
-`λ` (the smoothing parameter) and `intensity_col` are optional arguments which can be specified.
+`lambda` (the smoothing parameter) and `intensity_col` are optional arguments which can be specified.
 The column index `(intensity_col)` parameter can be a string, integer, or symbol. It is set
 to :intensity by default which will work for data loaded using the `load_Raman()` function.
-λ default is 1e5, higher numbers increase smoothing.
+lambda default is 1e5, higher numbers increase smoothing.
 
 Returns the original data frame with new columns (`:baseline, :corr_intensity, :norm_intensity`).
 
 # Example
 ```julia-repl
-julia> fit_base(df; :intensity, λ = 1e5)
+julia> fit_base(df; :intensity, lambda = 1e5, method=:derpsalsa)
 
 ```
 # References
@@ -67,14 +67,14 @@ Erb, D. (2022). pybaselines: A Python library of algorithms for the baseline cor
 experimental data.
 Zenodo. https://doi.org/10.5281/zenodo.7255880
 """
-function fit_base(data::DataFrame; intensity_col=:intensity, λ=Nothing, method::Symbol=:derpsalsa)
+function fit_base(data::DataFrame; intensity_col=:intensity, lambda=Nothing, method::Symbol=:derpsalsa)
     @assert in(method, keys(pybaselines.whittaker)) "Supplied method not found in Whittaker baselines, use keys(pybaselines.whittaker) to look for vaild values."
-    if λ == Nothing
+    if lambda == Nothing
         output = pybaselines.whittaker[method](data[!, intensity_col])
         data.baseline = output[1]
         data.corr_intensity = data[!, intensity_col] .- data[!, :baseline]
-    elseif λ > 0
-        output = pybaselines.whittaker[method](data[!, intensity_col], λ)
+    elseif lambda > 0
+        output = pybaselines.whittaker[method](data[!, intensity_col], lambda)
         data.baseline = output[1]
         data.corr_intensity = data[!, intensity_col] .- data[!, :baseline]
     end
