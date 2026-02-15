@@ -48,10 +48,38 @@ function Base.show(io::IOContext, fit::OrthogonalPolynomial)
     else
         println(io, repeat("-", 80))
         println(io, "Orthogonal Polynomial Model fitted $(fit.n_observations) observations from input data")
+        data_1 = hcat(
+            [string("λ", Char(8319 + i)) for i ∈ eachindex(fit.lambda)],
+            round.(Float64.(fit.lambda); sigdigits = 4),
+            round.(Float64.(fit.lambda_se ./ abs.(fit.lambda)) .* 100; sigdigits = 4),
+        )
+        pretty_table(
+            data_1;
+            column_labels = [
+                [
+                    "Coeff.",
+                    "Value",
+                    [
+                        string("Φ", Char(8319 + i), "(x) SE") for i ∈ axes(fit.lambda_se, 2)
+                    ]...,
+                ],
+                ["", "", [string("(%)") for i ∈ axes(fit.lambda_se, 2)]...],
+            ],
+            highlighters = [
+                TextHighlighter(
+                    (data_1, i, j) -> (j ≥ 3) && (data_1[i, j] === 0.0),
+                    crayon"dark_gray",
+                ),
+                TextHighlighter(
+                    (data_1, i, j) -> (j ≥ 3) && (data_1[i, j] ≥ 20),
+                    crayon"red",
+                ),
+            ],
+        )
+
         pretty_table(
             hcat(
-                ["λ₀", "λ₁", "λ₂", "λ₃", "λ₄"],
-                round.(Float64.(fit.lambda); sigdigits = 4),
+                fit.order,
                 round.(fit.r_squared; sigdigits = 4),
                 round.(fit.OP_r_squared; sigdigits = 4),
                 round.(fit.reduced_chi_squared; sigdigits = 4),
@@ -59,14 +87,18 @@ function Base.show(io::IOContext, fit::OrthogonalPolynomial)
                 round.(fit.akaike_weights; sigdigits = 4),
                 round.(fit.bayesian_weights; sigdigits = 4),
             );
-            header = ["Lambda", "Value", "ρ²", "ρ²ₒₚ", "χ²ᵣ", "RMSE (normalised)", "AICc Weight", "BICc Weight"],
+            title = "Model statistics",
+            column_labels = [
+                "𝑘 (degree)",
+                "R²",
+                "ρ²ₒₚ",
+                "χ²ᵣ",
+                "RMSE (normalised)",
+                "AICc Weight",
+                "BICc Weight",
+            ],
         )
-        println(io, "\n Model Uncertainties (%1SE)")
-        pretty_table(hcat(["λ₀", "λ₁", "λ₂", "λ₃", "λ₄"],
-            round.(abs.(Float64.((fit.lambda_se) ./ fit.lambda) .* 100); sigdigits = 4));
-            header = ["Lambda", "Φ₀(x)", "Φ₁(x)", "Φ₂(x)", "Φ₃(x)", "Φ₄(x)"],
-        )
-        println(io, repeat("-", 80))
+        println(io, repeat("-", Base.displaysize(stdout)[2]))
     end
 end
 
