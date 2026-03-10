@@ -522,17 +522,142 @@ function _find_columns_mica(data)
     return workingdata
 end
 
-SSP18 = DataFrame([
-    :SiO2 => 34.79,
-    :TiO2 => 3.26,
-    :Al2O3 => 18.82,
-    :FeO => 21.39,
-    :MnO => 0.51,
-    :MgO => 7.62,
-    :CaO => 0,
-    :Na2O => 0.12,
-    :K2O => 9.66,
-    :BaO => 0.14,
-    :F => 0.17,
-    :Cl => 0.05,
-])
+function formula_mica_ppm(
+    data::AbstractDataFrame,
+    units::AbstractString;
+    normalising_charge::Int = -22,
+    Fe_priority::Float64 = 0.7,
+)
+    I_site = [:NH4, :Na, :K, :Ca, :Rb, :Cs, :Ba]
+    M_site = [:Li, :Mg, :Ti, :V, :Cr, :Mn²⁺, :Mn³⁺, :Zn, :Fe²⁺, :Fe³⁺, :Al]
+    T_site = [:Fe³⁺, :Al, :Be, :B, :Si]
+    A_site = [:F, :Cl, :OH, :S]
+    column_names = [
+        :NH4,
+        :Na,
+        :K,
+        :Ca,
+        :Rb,
+        :Cs,
+        :Ba,
+        :Li,
+        :Mg,
+        :Ti,
+        :V,
+        :Cr,
+        :Mn²⁺,
+        :Mn³⁺,
+        :Zn,
+        :Fe²⁺,
+        :Fe³⁺,
+        :Al,
+        :Be,
+        :B,
+        :Si,
+        :F,
+        :Cl,
+        :OH,
+        :S,
+    ]
+    workingdata = _find_columns_mica(data)
+    workingvector = collect(values(workingdata[1, Not(:Sample)]))
+
+    # add wt > ppm
+
+
+    moles_compound = mass_element ./ atomic_mass
+
+    oxidation_states = [
+        1.0,  # 1  NH4+
+        1.0,  # 2  Na+
+        1.0,  # 3  K+
+        2.0,  # 4  Ca2+
+        1.0,  # 5  Rb+
+        1.0,  # 6  Cs+
+        2.0,  # 7  Ba2+
+        1.0,  # 8  Li+
+        2.0,  # 9  Mg2+
+        4.0,  # 10 Ti4+
+        3.0,  # 11 V3+
+        3.0,  # 12 Cr3+
+        2.0,  # 13 Mn2+ (total Mn starts here as 2+)
+        3.0,  # 14 Mn3+ (will be set by redox)
+        2.0,  # 15 Zn2+
+        2.0,  # 16 Fe2+ (total Fe starts here as 2+)
+        3.0,  # 17 Fe3+ (will be set by redox)
+        3.0,  # 18 Al3+
+        2.0,  # 19 Be2+
+        3.0,  # 20 B3+
+        4.0,  # 21 Si4+
+        -1.0, # 22 F-
+        -1.0, # 23 Cl-
+        -1.0, # 24 OH-
+        -2.0,  # 25 S2-
+    ]
+
+
+    positive_charge_raw = sum(moles[1:21] .* oxidation_states[1:21])
+    charge_scale = positive_charge_raw > 0 ? normalising_charge / positive_charge_raw : 0.0
+    apfu = moles_compound .* charge_scale # atoms per formula unit (provisional)
+
+    if iszero(apfu[24])
+        apfu[24] = clamp(2.0 - (apfu[22] + apfu[23]), 0.0, 2.0)
+    end
+
+    positive_charge = sum(apfu[1:21] .* oxidation_states[1:21])
+    charge_imbalance = abs(normalising_charge - positive_charge)
+
+    # if charge_imbalance < 0
+
+    #     if deficit > 0
+    #         dFe = min(deficit * Fe_priority, Fe2)
+    #         dMn = min(max(deficit - dFe, 0.0), Mn2)
+    #         # apply oxidation (each +1 converts one divalent atom to trivalent)
+    #         apfu[16] = Fe2 - dFe    # Fe2+
+    #         apfu[17] = Fe3 + dFe    # Fe3+
+    #         apfu[13] = Mn2 - dMn    # Mn2+
+    #         apfu[14] = Mn3 + dMn    # Mn3+
+    #     end
+
+    # total_Mn = apfu[13] + apfu[14]
+    # total_Fe = apfu[16] + apfu[17]
+    # Fe3 = clamp(charge_imbalance * Fe_priority, 0.0, total_Fe)
+    # Mn3 = clamp(charge_imbalance * (1.0 - Fe_priority), 0.0, total_Mn)
+    # apfu[13] = total_Mn - Mn3
+    # apfu[14] = Mn3 / 2.0
+    # apfu[16] = total_Fe - Fe3
+    # apfu[17] = Fe3 / 2.0
+    # end
+
+    # Site allocation
+    I_site = sum(apfu[1:7])
+    T_site = sum(apfu[19:21])
+    M_site = sum(apfu[8:16])
+    A_site = sum(apfu[22:end])
+    if T_site < 4.0
+        Al = apfu[18]
+        Al_T = clamp(4 - T_site, 0, 4)
+        Al_M = clamp(Al - Al_T, 0, Inf64)
+        T_site += Al_T
+        M_site += Al_M
+        if T_site < 4.0
+            Fe3 = apfu[17]
+            Fe3_T = clamp(4 - T_site, 0, 4)
+            Fe3_M = clamp(Fe3 - Fe3_T, 0, Inf)
+            T_site += Fe3_T
+            M_site += Fe3_M
+        end
+    end
+
+    sites = Dict(:I => I_site, :T => T_site, :M => M_site, :A => A_site)
+
+    println("Cation sum: $(sum(apfu[1:21]))")
+    println("Total ions: $(sum(apfu))")
+    return (
+        column_names,
+        round.(apfu; digits = 3),
+        charge_imbalance,
+        iteration,
+        sites,
+    )
+end
