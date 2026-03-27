@@ -76,3 +76,16 @@ function cation_to_oxide(value::Real; cation::Union{AbstractString}, cation_mult
         throw(ArgumentError("""Invalid units. Please choose `"wt%"`  or `"ppm"`."""))
     end
 end
+
+
+function oxide_to_ppm(
+    value::Real,
+    cation_mult::Real,
+    anion_mult::Real,
+    element::AbstractString
+)
+    mass_element = get_atomicmass(element).val
+    mass_oxygen = get_atomicmass(:O).val
+    mass_frac = (cation_mult * mass_element) / (cation_mult * mass_element + anion_mult * mass_oxygen)
+    return value * 1e4 * mass_frac
+end
