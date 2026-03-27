@@ -195,8 +195,8 @@ function load_agilent(
             normalizenames = true,
             delim = ',',
         )
+        transform!(df, AsTable(Not(1)) => ByRow(sum) => :total_signal)
         if automatic_times == true
-            transform!(df, AsTable(Not(1)) => ByRow(sum) => :total_signal)
             auto_times = automatic_laser_times(df[!, 1], df[!, :total_signal])
             if !isnothing(auto_times) == true
                 gas_blank_ind = auto_times[1][1]
