@@ -1,0 +1,5 @@
+[workspace]
+projects = ["GeochemistryToolsCore"]
+
+[deps]
+GeochemistryToolsCore = "ac6bb3b6-d67b-4657-a6f4-001b3f748459"
