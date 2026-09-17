@@ -1,0 +1,9 @@
+
+#
+# SPDX-License-Identifier: MPL-2.0
+
+*.jl.*.cov
+*.jl.cov
+*.jl.mem
+*/Manifest*.toml
+/docs/build/
