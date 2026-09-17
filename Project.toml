@@ -1,5 +1,10 @@
 [workspace]
-projects = ["GeochemistryToolsCore"]
-
-[deps]
-GeochemistryToolsCore = "ac6bb3b6-d67b-4657-a6f4-001b3f748459"
+projects = [
+    "GeochemistryTools",
+    "GeochemistryToolsCore",
+    "ICPMS_IO",
+    "Isochrons",
+    "Minerals",
+    "OrthogonalGeochemistry",
+    "Profilometry",
+]
